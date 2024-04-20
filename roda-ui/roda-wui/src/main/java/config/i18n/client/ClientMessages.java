@@ -11,9 +11,9 @@ import java.util.Date;
 import java.util.List;
 
 import org.roda.core.data.v2.accessKey.AccessKeyStatus;
+import org.roda.core.data.v2.disposal.confirmation.DisposalConfirmationState;
 import org.roda.core.data.v2.ip.AIPState;
 import org.roda.core.data.v2.ip.Permissions.PermissionType;
-import org.roda.core.data.v2.ip.disposal.DisposalConfirmationState;
 import org.roda.core.data.v2.jobs.CertificateInfo;
 import org.roda.core.data.v2.jobs.JobParallelism;
 import org.roda.core.data.v2.jobs.JobPriority;
@@ -467,7 +467,6 @@ public interface ClientMessages extends Messages {
 
   String closeButton();
 
-
   String copyAndCloseButton();
 
   String selectButton();
@@ -519,6 +518,7 @@ public interface ClientMessages extends Messages {
   String viewTechnicalMetadata();
 
   String showTechnicalMetadata();
+
   String viewRepresentationInfoCreatingApplicationName();
 
   String viewRepresentationInfoCreatingApplicationVersion();
@@ -1481,7 +1481,6 @@ public interface ClientMessages extends Messages {
 
   String casTitleText();
 
-
   // Login Dialog
 
   String loginDialogTitle();
@@ -1563,8 +1562,10 @@ public interface ClientMessages extends Messages {
   String editUserApply();
 
   String editUserAction();
+
   // Pre ingest panel
   String dropFolderInformationText();
+
   // User Data Panel
   String username();
 
@@ -2093,6 +2094,8 @@ public interface ClientMessages extends Messages {
 
   String disposalHoldListAips();
 
+  String deleteDisposalSchedule(String title);
+
   String deleteConfirmationReportDialogTitle();
 
   String deleteConfirmationReportDialogMessage();
@@ -2261,6 +2264,7 @@ public interface ClientMessages extends Messages {
   String searchPrefilterCreatedByJob(String jobName);
 
   String genericSearchWithPrefilterTitle();
+
   String saveSearchTitle();
 
   String saveSearchDescription();
