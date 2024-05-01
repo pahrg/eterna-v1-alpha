@@ -14,6 +14,7 @@ import org.roda.core.data.v2.ip.IndexedAIP;
 import org.roda.core.data.v2.ip.TransferredResource;
 import org.roda.core.data.v2.ip.metadata.IndexedPreservationAgent;
 import org.roda.core.data.v2.ip.metadata.IndexedPreservationEvent;
+import org.roda.core.data.v2.log.LogEntry;
 import org.roda.core.data.v2.notifications.Notification;
 import org.roda.core.data.v2.risks.IndexedRisk;
 import org.roda.core.data.v2.risks.RiskIncidence;
@@ -35,7 +36,7 @@ public class Services implements DirectRestService {
     RODADispatcher.INSTANCE.setOperationType(operationType);
   }
 
-  public <S extends DirectRestService> S get(Class<S> serviceClass) {
+  private <S extends DirectRestService> S get(Class<S> serviceClass) {
     if (TransferredResourceRestService.class.equals(serviceClass)) {
       return GWT.create(TransferredResourceRestService.class);
     } else if (JobsRestService.class.equals(serviceClass)) {
@@ -71,6 +72,7 @@ public class Services implements DirectRestService {
       method.apply(REST.withCallback(new MethodCallback<T>() {
         @Override
         public void onFailure(Method method, Throwable throwable) {
+          MethodCallThrowableTreatment.treatCommonFailures(method, throwable);
           result.completeExceptionally(throwable);
         }
 
@@ -85,7 +87,7 @@ public class Services implements DirectRestService {
     return result;
   }
 
-  public <S extends RODAEntityRestService<O>, O extends IsIndexed, T> CompletableFuture<T> futureFromObjectClass(
+  private <S extends RODAEntityRestService<O>, O extends IsIndexed, T> CompletableFuture<T> futureFromObjectClass(
     String objectClassString, CheckedFunction<S, T> method) {
     S service;
     if (TransferredResource.class.getName().equals(objectClassString)) {
@@ -96,14 +98,12 @@ public class Services implements DirectRestService {
       service = GWT.create(AIPRestService.class);
     } else if (DisposalConfirmation.class.getName().equals(objectClassString)) {
       service = GWT.create(DisposalConfirmationRestService.class);
-    } else if (RiskIncidence.class.getName().equals(objectClassString)) {
-      service = GWT.create(RiskIncidenceRestService.class);
-    } else if (IndexedRisk.class.getName().equals(objectClassString)) {
-      service = GWT.create(IndexedRiskRestService.class);
     } else if (IndexedPreservationEvent.class.getName().equals(objectClassString)) {
       service = GWT.create(PreservationEventRestService.class);
     } else if (IndexedPreservationAgent.class.getName().equals(objectClassString)) {
       service = GWT.create(PreservationAgentRestService.class);
+    } else if (LogEntry.class.getName().equals(objectClassString)) {
+      service = GWT.create(AuditLogRestService.class);
     } else {
       throw new IllegalArgumentException(objectClassString + " not supported");
     }
@@ -113,6 +113,7 @@ public class Services implements DirectRestService {
       method.apply(REST.withCallback(new MethodCallback<T>() {
         @Override
         public void onFailure(Method method, Throwable throwable) {
+          MethodCallThrowableTreatment.treatCommonFailures(method, throwable);
           result.completeExceptionally(throwable);
         }
 
