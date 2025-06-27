@@ -108,8 +108,12 @@
 
 # RODA Changelog
 ## v5.7.6 (2025-06-02)
+#### New features
+#### Enhancements 
+#### Bug fixes
 #### Security
 - Updated dependency of jaxb for glassfish
+- Several dependency major upgrades to fix security vulnerabilities
 
 ---
 
