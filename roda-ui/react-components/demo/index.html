@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="sv">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Test</title>
+</head>
+
+<body>
+  <div id="root1"></div>
+  <div id="root2"></div>
+  <script type="module" src="/main.tsx"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      const badgePanel1 = new window.ReactGwtInterfaces.BadgePanel()
+      badgePanel1.mount(document.getElementById("root1"));
+      badgePanel1.setText("TEST");
+      const badgePanel2 = new window.ReactGwtInterfaces.BadgePanel()
+      badgePanel2.mount(document.getElementById("root2"));
+      badgePanel2.setText("APA");
+    });
+  </script>
+</body>
+
+</html>
