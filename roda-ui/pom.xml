@@ -12,5 +12,6 @@
 	<packaging>pom</packaging>
 	<modules>
 		<module>roda-wui</module>
-	</modules>
+        <module>react-components</module>
+    </modules>
 </project>

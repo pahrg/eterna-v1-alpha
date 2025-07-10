@@ -7,67 +7,82 @@
  */
 package org.roda.wui.client.common;
 
-import org.roda.core.data.common.RodaConstants;
-import org.roda.wui.client.common.utils.HtmlSnippetUtils;
-import org.roda.wui.common.client.tools.ConfigurationManager;
-import org.roda.wui.common.client.tools.StringUtils;
-
+import com.google.gwt.core.client.JavaScriptObject;
+import com.google.gwt.dom.client.Element;
 import com.google.gwt.safehtml.shared.SafeHtml;
-import com.google.gwt.safehtml.shared.SafeHtmlUtils;
 import com.google.gwt.user.client.ui.FlowPanel;
-import com.google.gwt.user.client.ui.HTML;
-import com.google.gwt.user.client.ui.Label;
+import jsinterop.annotations.JsType;
+import org.roda.wui.client.reactbridge.ReactGwtInterface;
+
+import java.util.List;
 
 /**
  * @author Gabriel Barros <gbarros@keep.pt>
  */
 public class BadgePanel extends FlowPanel {
-  private HTML iconHTML;
+  @JsType(isNative = true, name="BadgePanel", namespace = "ReactGwtInterfaces")
+  public static class BadgePanelReactInterface extends ReactGwtInterface {
+    public native void setIcon(String iconString);
 
-  private HTML notificationHTML;
+    public native void setText(String text);
 
-  private Label textLabel;
+    public native void enableNotification(boolean value);
+  }
+
+  private final BadgePanelReactInterface badgePanelReactComponent = new BadgePanelReactInterface();
+
+  public static native void consoleLog(String text) /*-{
+    console.log(text);
+  }-*/;
+
+  public static native void consoleLog(Element el) /*-{
+    console.log(el);
+  }-*/;
+
+  public static native void consoleLog(List<String> obj) /*-{
+    console.log(obj);
+  }-*/;
+
+  public static native void consoleLog(JavaScriptObject obj) /*-{
+    console.log(obj);
+  }-*/;
 
   public BadgePanel() {
     super();
     this.addStyleName("badge-panel");
+  }
 
-    iconHTML = new HTML();
-    iconHTML.addStyleName("badge-icon");
-    add(iconHTML);
-    iconHTML.setVisible(false);
+  @Override
+  public void onAttach() {
+    BadgePanel.consoleLog("onAttach");
+    BadgePanel.consoleLog(this.getElement());
+    super.onAttach();
+    badgePanelReactComponent.mount(this.getElement());
+  }
 
-    textLabel = new Label();
-    textLabel.addStyleName("badge-label");
-    add(textLabel);
-
-    notificationHTML = new HTML(HtmlSnippetUtils.getStackIcon("fas fa-sync-alt", "fas fa-question"));
-    notificationHTML.addStyleName("badge-notification");
-    notificationHTML.setVisible(false);
-    add(notificationHTML);
+  @Override
+  public void onDetach() {
+    BadgePanel.consoleLog("onDetach");
+    badgePanelReactComponent.unmount();
+    super.onDetach();
   }
 
   public void setIconClass(String classSimpleName) {
-    setIcon(ConfigurationManager.getString(RodaConstants.UI_ICONS_CLASS, classSimpleName));
+    badgePanelReactComponent.setIcon(classSimpleName);
   }
 
   public void setIcon(String iconCss) {
-    // set default if empty
-    if (StringUtils.isBlank(iconCss)) {
-      iconCss = "fa fa-question-circle";
-    }
-
-    setIcon(SafeHtmlUtils.fromSafeConstant("<i class=\"" + iconCss + "\"></i>"));
+    badgePanelReactComponent.setIcon(iconCss);
   }
 
   public void setIcon(SafeHtml iconSafeHtml) {
-    iconHTML.setHTML(iconSafeHtml);
-    iconHTML.setVisible(true);
+    badgePanelReactComponent.setIcon(iconSafeHtml.asString());
   }
 
   public void setText(String text) {
-    textLabel.setTitle(text);
-    textLabel.setText(text);
+    BadgePanel.consoleLog("setText");
+    BadgePanel.consoleLog("text");
+    badgePanelReactComponent.setText(text);
   }
 
   @Override
@@ -76,6 +91,6 @@ public class BadgePanel extends FlowPanel {
   }
 
   public void enableNotification(boolean value){
-    notificationHTML.setVisible(value);
+    badgePanelReactComponent.enableNotification(value);
   }
 }
