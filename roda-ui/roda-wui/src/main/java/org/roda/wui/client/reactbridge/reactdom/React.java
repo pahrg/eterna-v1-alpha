@@ -11,6 +11,11 @@ public class React {
   private React() {
   }
 
+  public static native <P> ReactElement<P> createElement(String type, P props);
+  public static native <P> ReactElement<P> createElement(String type, P props, String value);
+  public static native <P> ReactElement<P> createElement(String type, P props, ReactNode ...children);
+  public static native <P> ReactElement<P> createElement(String type, P props, ReactNode child, String value);
+
   // function createElement<P extends {}>(type: FunctionComponent<P>, props?: Attributes & P | null, ...children: ReactNode[]): FunctionComponentElement<P>;
   public static native <P> ReactElement<P> createElement(FunctionComponent<P> type);
   public static native <P> ReactElement<P> createElement(FunctionComponent<P> type, P props);

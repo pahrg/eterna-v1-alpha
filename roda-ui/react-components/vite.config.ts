@@ -1,7 +1,7 @@
 import path from "node:path";
 //import react from "@vitejs/plugin-react-swc";
 //import externalize from "vite-plugin-externalize-dependencies";
-//import pluginExternal from "vite-plugin-external";
+import pluginExternal from "vite-plugin-external";
 import { defineConfig } from "vite";
 
 // https://vite.dev/config/
@@ -10,18 +10,20 @@ export default defineConfig(({ mode }) => {
 
 	return {
 		plugins: [
-			/*
 			pluginExternal({
 				externals(libName) {
-					if (libName === "react") {
-						return true;
-					}
-					if (libName === "react-dom/client") {
+					if (
+						[
+							"react",
+							"react-dom",
+							"react-dom/client",
+							"react/jsx-runtime",
+						].includes(libName)
+					) {
 						return true;
 					}
 				},
 			}),
-			*/
 			/*externalize({
 				externals: [
 					"react", // Externalize "react", and all of its subexports (react/*), such as react/jsx-runtime
@@ -42,15 +44,13 @@ export default defineConfig(({ mode }) => {
 		},
 		rollupOptions: !isDevMode
 			? {
-					//external: ["react", "react-dom"],
-					/*
+					external: ["react", "react-dom"],
 					output: {
 						globals: {
 							react: "React",
 							"react-dom/client": "ReactDOM",
 						},
 					},
-					*/
 					/*format: "iife",*/
 				}
 			: undefined,

@@ -1,4 +1,7 @@
 package org.roda.wui.client.reactbridge.reactdom;
 
+import jsinterop.annotations.JsType;
+
 // Definition from @types/react-dom/client.d.ts
-public sealed interface Container permits Element, DocumentFragment, Document {}
+@JsType
+public class Container/*permits Element, DocumentFragment, Document */{}

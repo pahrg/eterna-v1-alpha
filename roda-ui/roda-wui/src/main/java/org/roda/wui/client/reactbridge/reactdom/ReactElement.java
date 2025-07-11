@@ -19,8 +19,8 @@ import jsinterop.annotations.JsType;
  * ```
  */
 @JsType(isNative = true, namespace = JsPackage.GLOBAL, name = "Object")
-public class ReactElement<P> {
-  Object type;
-  P props;
-  String key;
+public class ReactElement<P> extends JSX.Element implements ReactNode {
+  public Object type;
+  public P props;
+  public String key;
 }

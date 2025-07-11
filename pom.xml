@@ -121,7 +121,7 @@
         <maven.compiler.release>21</maven.compiler.release>
         <roda.temporary.repository>${user.dir}</roda.temporary.repository>
         <java_version>21</java_version>
-        <gwt.version>2.11.0</gwt.version>
+        <gwt.version>2.12.2</gwt.version>
         <cas.client.version>4.0.4</cas.client.version>
         <jersey.version>3.1.6</jersey.version>
         <swagger.version>2.2.21</swagger.version>

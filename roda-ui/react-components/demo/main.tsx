@@ -18,5 +18,5 @@ window.ReactGwtInterfaces = {};
 
 console.log("before 2");
 window.ReactComponents.BadgePanel = Components.BadgePanel;
-window.ReactGwtInterfaces.BadgePanel = Components.BadgePanelGwtInterface;
+//window.ReactGwtInterfaces.BadgePanel = Components.BadgePanelGwtInterface;
 console.log("after");

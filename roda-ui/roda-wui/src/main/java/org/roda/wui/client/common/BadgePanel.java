@@ -7,82 +7,91 @@
  */
 package org.roda.wui.client.common;
 
-import com.google.gwt.core.client.JavaScriptObject;
-import com.google.gwt.dom.client.Element;
 import com.google.gwt.safehtml.shared.SafeHtml;
+import com.google.gwt.safehtml.shared.SafeHtmlUtils;
 import com.google.gwt.user.client.ui.FlowPanel;
+import jsinterop.annotations.JsPackage;
 import jsinterop.annotations.JsType;
-import org.roda.wui.client.reactbridge.ReactGwtInterface;
+import jsinterop.base.Js;
+import jsinterop.base.JsPropertyMap;
+import org.roda.core.data.common.RodaConstants;
+import org.roda.wui.client.reactbridge.ReactComponents;
+import org.roda.wui.client.reactbridge.domhandler.Element;
+import org.roda.wui.client.reactbridge.htmlreactparser.HTMLReactParser;
+import org.roda.wui.client.reactbridge.htmlreactparser.HTMLReactParserOptions;
+import org.roda.wui.client.reactbridge.reactdom.React;
+import org.roda.wui.client.reactbridge.reactdom.ReactDOMClient;
+import org.roda.wui.client.reactbridge.reactdom.ReactNode;
+import org.roda.wui.client.reactbridge.reactdom.Root;
+import org.roda.wui.common.client.tools.ConfigurationManager;
+import org.roda.wui.common.client.tools.StringUtils;
 
-import java.util.List;
+import java.util.Objects;
 
 /**
  * @author Gabriel Barros <gbarros@keep.pt>
  */
 public class BadgePanel extends FlowPanel {
-  @JsType(isNative = true, name="BadgePanel", namespace = "ReactGwtInterfaces")
-  public static class BadgePanelReactInterface extends ReactGwtInterface {
-    public native void setIcon(String iconString);
-
-    public native void setText(String text);
-
-    public native void enableNotification(boolean value);
-  }
-
-  private final BadgePanelReactInterface badgePanelReactComponent = new BadgePanelReactInterface();
-
-  public static native void consoleLog(String text) /*-{
-    console.log(text);
-  }-*/;
-
-  public static native void consoleLog(Element el) /*-{
-    console.log(el);
-  }-*/;
-
-  public static native void consoleLog(List<String> obj) /*-{
-    console.log(obj);
-  }-*/;
-
-  public static native void consoleLog(JavaScriptObject obj) /*-{
-    console.log(obj);
-  }-*/;
+  BadgePanelProps props = new BadgePanelProps();
+  Root reactRoot;
 
   public BadgePanel() {
     super();
     this.addStyleName("badge-panel");
+    this.reactRoot = ReactDOMClient.createRoot(this.getElement());
   }
 
   @Override
   public void onAttach() {
-    BadgePanel.consoleLog("onAttach");
-    BadgePanel.consoleLog(this.getElement());
     super.onAttach();
-    badgePanelReactComponent.mount(this.getElement());
+    this.reactRoot.render(React.createElement(ReactComponents.get("BadgePanel"), props));
   }
 
   @Override
   public void onDetach() {
-    BadgePanel.consoleLog("onDetach");
-    badgePanelReactComponent.unmount();
+    this.reactRoot.unmount();
     super.onDetach();
   }
 
+  // Get icon class name from roda-wui.properties, eg: ui.icons.class.IndexedAIP = far fa-circle
+  // Not used....
   public void setIconClass(String classSimpleName) {
-    badgePanelReactComponent.setIcon(classSimpleName);
+    setIcon(ConfigurationManager.getString(RodaConstants.UI_ICONS_CLASS, classSimpleName));
   }
 
+  // Set className with arbitrary name
   public void setIcon(String iconCss) {
-    badgePanelReactComponent.setIcon(iconCss);
+    // set default if empty
+    if (StringUtils.isBlank(iconCss)) {
+      iconCss = "fa fa-question-circle";
+    }
+
+    setIcon(SafeHtmlUtils.fromSafeConstant("<i class=\"" + iconCss + "\"></i>"));
   }
 
   public void setIcon(SafeHtml iconSafeHtml) {
-    badgePanelReactComponent.setIcon(iconSafeHtml.asString());
+    HTMLReactParserOptions htmlReactParserOptions = new HTMLReactParserOptions();
+    htmlReactParserOptions.replace = (node, index) -> {
+      if (Objects.requireNonNull(node) instanceof Element) {
+        return Js.uncheckedCast(node);
+      }
+      String iconString = iconSafeHtml.asString();
+      String iconClassName = iconString.trim().isEmpty() ? "fa fa-question-circle" : iconString;
+      return React.createElement("i", JsPropertyMap.of("className", iconClassName));
+    };
+
+    props.icon = HTMLReactParser.parse(iconSafeHtml.asString(), htmlReactParserOptions);
+    this.reactRoot.render(React.createElement(ReactComponents.get("BadgePanel"), props));
   }
 
   public void setText(String text) {
-    BadgePanel.consoleLog("setText");
-    BadgePanel.consoleLog("text");
-    badgePanelReactComponent.setText(text);
+    props.text = text;
+    this.reactRoot.render(React.createElement(ReactComponents.get("BadgePanel"), props));
+  }
+
+  public void enableNotification(boolean value) {
+    props.notification = value;
+    this.reactRoot.render(React.createElement(ReactComponents.get("BadgePanel"), props));
   }
 
   @Override
@@ -90,7 +99,12 @@ public class BadgePanel extends FlowPanel {
     super.addStyleName(style);
   }
 
-  public void enableNotification(boolean value){
-    badgePanelReactComponent.enableNotification(value);
+  @JsType(isNative = true, namespace = JsPackage.GLOBAL, name = "Object")
+  public static class BadgePanelProps {
+    ReactNode icon;
+
+    String text;
+
+    boolean notification;
   }
 }

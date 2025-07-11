@@ -89,7 +89,9 @@
         {
             "imports": {
                 "react": "https://cdn.jsdelivr.net/npm/react@19.1.0/+esm",
-                "react-dom/client": "https://cdn.jsdelivr.net/npm/react-dom@19.1.0/client.js/+esm"
+                "react/jsx-runtime": "https://cdn.jsdelivr.net/npm/react@19.1.0/jsx-runtime.js/+esm",
+                "react-dom/client": "https://cdn.jsdelivr.net/npm/react-dom@19.1.0/client.js/+esm",
+                "html-react-parser": "https://cdn.jsdelivr.net/npm/html-react-parser@5.2.5/dist/html-react-parser.js/+esm"
             }
         }
     </script>
@@ -97,10 +99,14 @@
     <script type="module">
         import React from "react";
         import ReactDOM from "react-dom/client";
+        import HTMLReactParser from "html-react-parser";
 
         window.React = React;
         window.ReactDOM = ReactDOM;
+        window.HTMLReactParser = HTMLReactParser;
     </script>
+
+    <!--<script src="https://cdn.jsdelivr.net/npm/html-react-parser@5.2.5/dist/html-react-parser.min.js"></script>-->
 
     <!-- ETERNA React Components -->
     <script type="module" src="webjars/react-components/0.0.1/react-components.js" type="text/javascript"></script>
