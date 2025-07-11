@@ -16,6 +16,4 @@ declare global {
 window.ReactComponents = {};
 window.ReactGwtInterfaces = {};
 
-console.log("before 2");
-window.ReactComponents.BadgePanel = Components.BadgePanel;
-console.log("after");
+window.ReactComponents = Components;
