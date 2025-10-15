@@ -9,11 +9,11 @@ objectClass: inetOrgPerson
 objectClass: shadowAccount
 cn: Administrator
 sn: Administrator
-email: demo-admin@roda-community.org
-givenName: RODA Administrator
+email: demo-admin@whitered.se
+givenName: ETERNA Administrator
 shadowInactive: 0
 uid: admin
-userPassword:: cm9kYQ==
+userPassword:: ZXRlcm5h
 
 dn: uid=guest,ou=users,dc=roda,dc=org
 objectClass: extensibleObject
