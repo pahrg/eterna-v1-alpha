@@ -947,7 +947,7 @@ public class ModelServiceTest {
    * @Test public void testImportLog() throws RODAException, IOException { Path
    * dummyLogFile = corporaPath.resolve("logs").resolve("dummy.log"); int response
    * = RESTClientUtility.sendPostRequestWithFile("http://localhost:8080",
-   * "/api/v1/log_entries", "admin", "roda", dummyLogFile);
+   * "/api/v1/log_entries", "admin", "eterna", dummyLogFile);
    *
    * assertEquals(response, RodaConstants.HTTP_RESPONSE_CODE_SUCCESS); }
    */
