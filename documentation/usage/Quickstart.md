@@ -3,7 +3,7 @@
 After installing, direct your browser to the correct IP address (this depends on your installation mode and used settings) and log in with the following credentials:
 
 * Username: admin
-* Password: roda
+* Password: eterna
 
 With this you will have access to all features.
 
