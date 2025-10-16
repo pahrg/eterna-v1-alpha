@@ -24,9 +24,9 @@ objectClass: inetOrgPerson
 objectClass: shadowAccount
 cn: Guest
 sn: Guest
-email: demo-guest@roda-community.org
-givenName: RODA Guest
+email: demo-guest@whitered.se
+givenName: ETERNA Guest
 shadowInactive: 0
 uid: guest
-userPassword:: cm9kYQ==
+userPassword:: ZXRlcm5h
 
