@@ -1693,7 +1693,7 @@ public class RodaCoreFactory {
         rodaConfig.getString("ldap.adminDN", "uid=admin,ou=system"));
 
       final String ldapAdminPassword = rodaConfig.getString("core.ldap.adminPassword",
-        rodaConfig.getString("ldap.adminPassword", "roda"));
+        rodaConfig.getString("ldap.adminPassword", "eterna"));
 
       final String ldapPasswordDigestAlgorithm = rodaConfig.getString("core.ldap.passwordDigestAlgorithm",
         rodaConfig.getString("ldap.passwordDigestAlgorithm", "PKCS5S2"));
