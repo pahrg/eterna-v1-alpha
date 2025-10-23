@@ -1,4 +1,11 @@
 # ETERNA Changelog
+## v0.5.0-dev (2025-10-23)
+#### Updates
+- Added Swedish and English SVG credentials images
+- Updated default admin password to 'eterna'
+- Updated LDAP configuration for admin user with new password and details
+- Updated documentation to reflect the new default admin password
+
 ## v0.4.2 (2025-10-14)
 #### New features
 - Added functionality to display user extra fields in the user details view
