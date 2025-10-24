@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.ResourceBundle;
 import java.util.Set;
 import java.util.Timer;
@@ -90,6 +91,11 @@ public class PluginManager {
   private static Path RODA_CONFIG_PATH = null;
   private static Path RODA_PLUGINS_PATH = null;
   private static Path RODA_PLUGINS_SHARED_PATH = null;
+
+  private static String ETERNA_PLUGIN_MANIFEST_KEY = "ETERNA-Plugin";
+  private static String ETERNA_PLUGIN_MANIFEST_KEY_DEPENDS = "ETERNA-Plugin-Depends";
+
+  // Added for compatibility with RODA plugins
   private static String RODA_PLUGIN_MANIFEST_KEY = "RODA-Plugin";
   private static String RODA_PLUGIN_MANIFEST_KEY_DEPENDS = "RODA-Plugin-Depends";
   /**
@@ -350,7 +356,9 @@ public class PluginManager {
           if (manifest != null) {
             Attributes mainAttributes = manifest.getMainAttributes();
             // Get plugin class names from manifest
-            String pluginClassNamesString = mainAttributes.getValue(RODA_PLUGIN_MANIFEST_KEY);
+            final String eternaPluginClassNamesString = mainAttributes.getValue(ETERNA_PLUGIN_MANIFEST_KEY);
+            final String rodaPluginClassNamesString = mainAttributes.getValue(RODA_PLUGIN_MANIFEST_KEY);
+            final String pluginClassNamesString = Optional.ofNullable(eternaPluginClassNamesString).orElse(rodaPluginClassNamesString);
             if (pluginClassNamesString != null) {
               pluginClassNames.addAll(Arrays.asList(pluginClassNamesString.split("\\s+")));
             }
@@ -735,14 +743,18 @@ public class PluginManager {
 
         // Get plugin class names from manifest
         List<String> pluginClassNames = new ArrayList<>();
-        String pluginClassNamesString = mainAttributes.getValue(RODA_PLUGIN_MANIFEST_KEY);
+        String eternaPluginClassNamesString = mainAttributes.getValue(ETERNA_PLUGIN_MANIFEST_KEY);
+        String rodaPluginClassNamesString = mainAttributes.getValue(RODA_PLUGIN_MANIFEST_KEY);
+        String pluginClassNamesString = Optional.ofNullable(eternaPluginClassNamesString).orElse(rodaPluginClassNamesString);
         if (pluginClassNamesString != null) {
           pluginClassNames.addAll(Arrays.asList(pluginClassNamesString.split("\\s+")));
         }
 
         // Get plugin names that this plugin depends on from manifest
         List<String> pluginDepends = new ArrayList<>();
-        String pluginClassNamesDependsString = mainAttributes.getValue(RODA_PLUGIN_MANIFEST_KEY_DEPENDS);
+        String eternaPluginClassNamesDependsString = mainAttributes.getValue(ETERNA_PLUGIN_MANIFEST_KEY_DEPENDS);
+        String rodaPluginClassNamesDependsString = mainAttributes.getValue(RODA_PLUGIN_MANIFEST_KEY_DEPENDS);
+        String pluginClassNamesDependsString = Optional.ofNullable(eternaPluginClassNamesDependsString).orElse(rodaPluginClassNamesDependsString);
         if (pluginClassNamesDependsString != null) {
           pluginDepends.addAll(Arrays.asList(pluginClassNamesDependsString.split("\\s+")));
         }
