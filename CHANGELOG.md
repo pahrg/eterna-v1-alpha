@@ -5,6 +5,7 @@
 - Updated default admin password to 'eterna'
 - Updated LDAP configuration for admin user with new password and details
 - Updated documentation to reflect the new default admin password
+- Change PluginManager to expect an ETERNA-plugin manifest entry, has a fallback to support RODA plugins
 
 ## v0.4.2 (2025-10-14)
 #### New features
