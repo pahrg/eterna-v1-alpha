@@ -67,6 +67,7 @@ import com.google.gwt.i18n.client.LocaleInfo;
 import com.google.gwt.safehtml.shared.SafeHtml;
 import com.google.gwt.safehtml.shared.SafeHtmlBuilder;
 import com.google.gwt.safehtml.shared.SafeHtmlUtils;
+import com.google.gwt.storage.client.Storage;
 import com.google.gwt.user.cellview.client.AbstractHasData.RedrawEvent;
 import com.google.gwt.user.cellview.client.CellTable;
 import com.google.gwt.user.cellview.client.Column;
@@ -534,6 +535,22 @@ public abstract class AsyncTableCell<T extends IsIndexed> extends FlowPanel
       RadioButton buttonPage = new RadioButton("selectedItemsRadio", messages.selectThisPage());
       buttonPage.setValue(true);
       popupLayout.add(buttonPage);
+
+      display.addColumnSortHandler(new AsyncHandler(display));
+
+      // Save sorting changes
+      display.addColumnSortHandler(event -> {
+
+        ColumnSortList sortList = display.getColumnSortList();
+        saveSortState(sortList);
+      });
+
+      // Apply saved sorting AFTER rendering
+      Scheduler.get().scheduleDeferred(() -> {
+        applySavedSortState(display);
+        // Force a refresh to make sure backend refetches sorted data
+        dataProvider.update(fieldsToReturn);
+      });
 
       focusPanel.setWidget(popupLayout);
       popup.setWidget(focusPanel);
@@ -1262,4 +1279,86 @@ public abstract class AsyncTableCell<T extends IsIndexed> extends FlowPanel
       refresh();
     }
   }
+
+  // ---------------------- SORT PERSISTENCE LOGIC START ----------------------
+
+  private String getCurrentNodeUUID() {
+    String token = History.getToken(); // safer for GWT single-page apps
+
+    if (token.contains("browse/")) {
+      String path = token.substring(token.indexOf("browse/") + "browse/".length());
+      String[] parts = path.split("/");
+
+      for (String part : parts) {
+        if (part.matches("^[0-9a-fA-F\\-]{10,}$")) {
+          return part; // Found UUID
+        }
+      }
+    }
+
+    return "global";
+  }
+
+  private String getSortStorageKey() {
+    String nodeType = getCurrentNodeType();
+    String nodeUUID = getCurrentNodeUUID();
+    return "eterna_sort_" + listId + "_" + nodeType + "_" + nodeUUID;
+  }
+
+  private void saveSortState(ColumnSortList sortList) {
+    Storage storage = Storage.getLocalStorageIfSupported();
+    if (storage == null || sortList == null || sortList.size() == 0) {
+      return;
+    }
+
+    ColumnSortList.ColumnSortInfo info = sortList.get(0);
+    String columnId = info.getColumn().getDataStoreName();
+    boolean ascending = info.isAscending();
+
+    if (columnId != null) {
+      storage.setItem(getSortStorageKey(), columnId + ":" + (ascending ? "asc" : "desc"));
+    }
+
+  }
+
+  private void applySavedSortState(CellTable<T> display) {
+    Storage storage = Storage.getLocalStorageIfSupported();
+    if (storage == null)
+      return;
+
+    String saved = storage.getItem(getSortStorageKey());
+    if (saved != null && saved.contains(":")) {
+      String[] parts = saved.split(":");
+      String savedColumn = parts[0];
+      boolean ascending = parts[1].equals("asc");
+
+      // Match column based on getDataStoreName() or a custom identifier
+      for (int i = 0; i < display.getColumnCount(); i++) {
+        Column<T, ?> col = display.getColumn(i);
+        if (savedColumn.equals(col.getDataStoreName())) {
+          display.getColumnSortList().push(new ColumnSortList.ColumnSortInfo(col, ascending));
+          display.redrawHeaders();
+          display.redraw();
+          break;
+        }
+      }
+    }
+  }
+
+  private String getCurrentNodeType() {
+    String token = History.getToken();
+
+    if (token.contains("browse/")) {
+      String path = token.substring(token.indexOf("browse/") + "browse/".length());
+      String[] parts = path.split("/");
+
+      // e.g. browse/UUID
+      if (parts.length >= 1 && parts[0].matches("^[0-9a-fA-F\\-]{10,}$")) {
+        return "AIP";
+      }
+    }
+
+    return "global";
+  }
+
 }
