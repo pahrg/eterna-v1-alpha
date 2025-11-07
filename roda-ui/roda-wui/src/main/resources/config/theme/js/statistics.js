@@ -9,47 +9,54 @@
     var matchedObject = this;
 
     function init() {
-      if (!matchedObject || matchedObject.length == 0) {
-        return;
+  if (!matchedObject || matchedObject.length == 0) {
+    return;
+  }
+
+  matchedObject.each(function() {
+    var element = $(this);
+
+    inheritDataAttributes(element);
+
+    var view = element.data("view");
+    var initView = function() {};
+    if (view == "chart") {
+      var viewField = element.data("view-field");
+      if (viewField == "facetResults") {
+        initView = initViewFacetChart;
+      } else {
+        console.log("Unknown view-field '" + viewField + "'");
       }
-
-      matchedObject.each(function() {
-        var element = $(this);
-
-        inheritDataAttributes(element);
-
-        var view = element.data("view");
-        var initView = function() {};
-        if (view == "chart") {
-          var viewField = element.data("view-field");
-          if (viewField == "facetResults") {
-            initView = initViewFacetChart;
-          } else {
-            console.log("Unknown view-field '" + viewField + "'");
-          }
-        } else if (view == "text") {
-          initView = initViewText;
-        } else if (view == "download") {
-          initView = initViewDownload;
-        } else {
-          console.log("Unknown view '" + view + "'");
-        }
-
-        var source = element.data("source");
-        var dataFunction = function() {};
-        if (source == "index") {
-          dataFunction = fetchIndexData;
-        } else if (source == "function") {
-          var customFunction = element.data("function");
-          executeFunctionByName(window, customFunction, element);
-        } else {
-          console.log("Unknown data source '" + source + "'");
-        }
-
-        initView(element, dataFunction);
-
-      });
+    } else if (view == "text") {
+      initView = initViewText;
+    } else if (view == "download") {
+      initView = initViewDownload;
+    } else {
+      console.log("Unknown view '" + view + "'");
     }
+
+    var source = element.data("source");
+    var dataFunction = function() {};
+    if (source == "index") {
+      dataFunction = fetchIndexData;
+    } else if (source == "function") {
+      var customFunction = element.data("function");
+      // ✅ Instead of calling immediately, wrap in dataFunction
+      dataFunction = function(el, cb) {
+        var result = executeFunctionByName(window, customFunction, el, cb);
+        if (result) {
+          cb(el, result);
+        }
+      };
+    } else {
+      console.log("Unknown data source '" + source + "'");
+    }
+
+    // run the chosen initView with the correct dataFunction
+    initView(element, dataFunction);
+
+  });
+}
 
     function inheritDataAttributes(element) {
       var attributes = [
@@ -74,50 +81,50 @@
     }
 
     function buildDataUrl(element, noLimits) {
-      var returnClass = $(element).data("source-class");
+  var returnClass = $(element).data("source-class");
 
       var filters = $(element).data("source-filters") ? $(element).data(
         "source-filters").split(/\s*[ ,]\s*/) : [];
-      var filterParams = filters.map(function(filter) {
+  var filterParams = filters.map(function(filter) {
         return "filter=" + filter
-      }).join("&");
+  }).join("&");
 
       var facets = $(element).data("source-facets") ? $(element).data(
         "source-facets").split(/\s*[ ,]\s*/) : [];
-      var facetParams = facets.map(function(facet) {
+  var facetParams = facets.map(function(facet) {
         return "facet=" + facet
-      }).join("&");
+  }).join("&");
 
 
-      var onlyActive = $(element).data("source-only-active") || "false";
-      var lang = document.locale;
+  var onlyActive = $(element).data("source-only-active") || "false";
+  var lang = document.locale;
 
-      var pathname = window.location.pathname;
-      var url;
+  var pathname = window.location.pathname;
+  var url;
       if(noLimits) {
-    	  url = pathname + "api/v1/index?returnClass=" +
-          returnClass + "&" +
-          filterParams + "&" +
-          facetParams +
-          "&lang=" + lang +
-          "&onlyActive=" + onlyActive;
-      } else {
-	      var start = $(element).data("source-start") || 0;
-	      var limit = $(element).data("source-limit") || 0;
-	      var facetLimit = $(element).data("view-limit") || 100;
+    url = pathname + "api/v1/index?returnClass=" +
+      returnClass + "&" +
+      filterParams + "&" +
+      facetParams +
+      "&lang=" + lang +
+      "&onlyActive=" + onlyActive;
+  } else {
+    var start = $(element).data("source-start") || 0;
+    var limit = $(element).data("source-limit") || 0;
+    var facetLimit = $(element).data("view-limit") || 100;
 
-	      url = pathname + "api/v1/index?returnClass=" +
-	          returnClass + "&" +
-	          filterParams + "&" +
-	          facetParams +
-	          "&start=" + start +
-	          "&limit=" + limit +
-	          "&facetLimit=" + facetLimit +
-	          "&lang=" + lang +
-	          "&onlyActive=" + onlyActive;
-      }
-      return url;
-    }
+    url = pathname + "api/v1/index?returnClass=" +
+      returnClass + "&" +
+      filterParams + "&" +
+      facetParams +
+      "&start=" + start +
+      "&limit=" + limit +
+      "&facetLimit=" + facetLimit +
+      "&lang=" + lang +
+      "&onlyActive=" + onlyActive;
+  }
+  return url;
+}
 
     function fetchIndexData(element, viewCallback) {
       $.ajax({
@@ -135,65 +142,114 @@
       element.text(data[element.data("view-field")]);
     }
 
-    function initViewDownload(element, dataFunction) {
-      var noLimits = true;
-      var url = buildDataUrl(element, noLimits);
-      if (element.data("view-field") == "facetResults") {
-        url = url + "&exportFacets=true";
-        var filename = element.data("view-filename");
-        if (filename) {
-          url = url + "&filename=" + filename;
-        }
-      }
+  function initViewDownload(element, dataFunction) {
+  var viewField = element.data("view-field");
+  var filename = element.data("view-filename") || "export.csv";
+  var source = element.data("source");
 
-      element.click(function() {
-        var type = 'text/csv';
-        $.ajax({
-          accepts: {
-            text: type
-          },
-          url: url + "&acceptFormat=csv",
-          processData: false,
-          dataType: 'text',
-          success: function(data) {
-            saveAs(new Blob([data], {
-              type: type
-            }), filename);
+  // Always clear our namespaced handler before re-binding
+  element.off("click.download");
+
+  if (source === "function") {
+    element.on("click.download", function(e) {
+      e.preventDefault();
+      e.stopImmediatePropagation(); // prevent stacking
+
+      dataFunction(element, function(el, data) {
+        if (!data) return;
+
+        let csv = "";
+
+        if (viewField === "facetResults" && data.facetResults) {
+          let facet = data.facetResults[0];
+          csv += "Label,Count\n";
+          facet.values.forEach(function(v) {
+            csv += v.label + "," + v.count + "\n";
+          });
+        } else {
+          csv += "Metric,Value\n";
+          if (data.total) csv += "Total," + data.total + "\n";
+          if (data.used) csv += "Used," + data.used + "\n";
+          if (data.facetResults) {
+            data.facetResults[0].values.forEach(function(v) {
+              csv += v.label + "," + v.count + "\n";
+            });
           }
-        });
+        }
+
+        let blob = new Blob([csv], { type: "text/csv" });
+        saveAs(blob, filename);
       });
+    });
+  } else {
+    var noLimits = true;
+    var url = buildDataUrl(element, noLimits);
+    if (viewField == "facetResults") {
+      url = url + "&exportFacets=true";
     }
 
-    function initViewFacetChart(element, dataFunction) {
-      dataFunction(element, viewFacetChartCallback);
-    }
+    element.on("click.download", function(e) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
 
-    function viewFacetChartCallback(element, data) {
-      var chartOptionsCallback;
-      var type = element.data("view-type");
-      if (type == "function") {
-        var customFacetFunction = element.data("view-type-function");
+      var type = "text/csv";
+         if (element.data("function") === "customAipStats") {
+            customAipStats(element, function(el, data) {
+                saveAs(new Blob([data], { type: type }), filename);
+            }, { isExport: true }); // <-- Passing export flag
+        }
+      else{
+        $.ajax({
+        accepts: { text: type },
+        url: url + "&acceptFormat=csv",
+        processData: false,
+        dataType: "text",
+        success: function(data) {
+          saveAs(new Blob([data], { type: type }), filename);
+        }
+      });
+      }
+    });
+  }
+}
+function initViewFacetChart(element, dataFunction) {
+  var result = dataFunction(element, function(el, data) {
+    viewFacetChartCallback(el, data);
+  });
+
+  // If function returned data directly
+  if (result) {
+    viewFacetChartCallback(element, result);
+  }
+}
+
+   function viewFacetChartCallback(element, data) {
+  var chartOptionsCallback;
+  var type = element.data("view-type");
+  if (type == "function") {
+    var customFacetFunction = element.data("view-type-function");
         chartOptionsCallback = functionByName(window,
           customFacetFunction);
-      } else {
-        var facetDataSourceCallbacks = {
-          "line": facetLineChartOptions,
-          "bar": facetBarChartOptions,
-          "radar": facetRadarChartOptions,
-          "polarArea": facetPolarAreaChartOptions,
-          "pie": facetPieChartOptions,
-          "doughnut": facetDoughnutChartOptions,
-          "horizontalBar": facetHorizontalBarChartOptions,
-        };
-        if (type in facetDataSourceCallbacks) {
-          chartOptionsCallback = facetDataSourceCallbacks[type];
-        } else {
-          chartOptionsCallback = function() {};
-          console.log("Unknown view-type '" + type + "'");
-        }
-      }
-      new Chart(element, chartOptionsCallback(data, element));
+  } else {
+    var facetDataSourceCallbacks = {
+      "line": facetLineChartOptions,
+      "bar": facetBarChartOptions,
+      "radar": facetRadarChartOptions,
+      "polarArea": facetPolarAreaChartOptions,
+      "pie": facetPieChartOptions,
+      "doughnut": facetDoughnutChartOptions,
+      "horizontalBar": facetHorizontalBarChartOptions,
+    };
+    if (type in facetDataSourceCallbacks) {
+      chartOptionsCallback = facetDataSourceCallbacks[type];
+    } else {
+      chartOptionsCallback = function() {};
+      console.log("Unknown view-type '" + type + "'");
     }
+  }
+  var ctx = element[0].getContext("2d");
+  new Chart(ctx, chartOptionsCallback(data, element));
+}
 
     function facetLineChartOptions(data, element) {
       var options = facetCommonChartOptions("line", data, element);
@@ -377,60 +433,64 @@
   $(window).ready(
     function() {
 
-	  $(document).on('DOMNodeInserted', ".chartjs-hidden-iframe", function(e) {
-		elem = e.target;
-		$(elem).attr("title", "statistic_frame");
-      });
+    $(document).on('DOMNodeInserted', ".chartjs-hidden-iframe", function(e) {
+      elem = e.target;
+      $(elem).attr("title", "statistic_frame");
+    });
 
-      function recreateScriptTags(element) {
-        var scriptNodes = element.getElementsByTagName('script');
-        for (var i = 0; i < scriptNodes.length; i++) {
-          var scriptNode = scriptNodes[i];
-          var parent = scriptNode.parentElement;
-          var newScriptNode = document.createElement('script');
-          newScriptNode.async = scriptNode.async;
-          newScriptNode.type = scriptNode.type;
-          if (scriptNode.src) {
-            newScriptNode.src = scriptNode.src;
-          }
-          newScriptNode.innerHTML = scriptNode.innerHTML;
-          parent.insertBefore(newScriptNode, scriptNode);
-          parent.removeChild(scriptNode);
+    function recreateScriptTags(element) {
+      var scriptNodes = element.getElementsByTagName('script');
+      for (var i = 0; i < scriptNodes.length; i++) {
+        var scriptNode = scriptNodes[i];
+        var parent = scriptNode.parentElement;
+        var newScriptNode = document.createElement('script');
+        newScriptNode.async = scriptNode.async;
+        newScriptNode.type = scriptNode.type;
+        if (scriptNode.src) {
+          newScriptNode.src = scriptNode.src;
         }
+        newScriptNode.innerHTML = scriptNode.innerHTML;
+        parent.insertBefore(newScriptNode, scriptNode);
+        parent.removeChild(scriptNode);
       }
+    }
 
-      // select the target node
-      var target = document.body;
+    // select the target node
+    var target = document.body;
 
-      // create an observer instance
-      var observer = new MutationObserver(function(mutations) {
-        mutations.forEach(function(mutation) {
-          // when the statistics page is added...
-          var statistics = document.getElementById("statistics");
+    // create an observer instance
+    var observer = new MutationObserver(function(mutations) {
+      mutations.forEach(function(mutation) {
+        // when the statistics page is added...
+        var statistics = document.getElementById("statistics");
           if (statistics && Array.from(mutation.addedNodes).indexOf(
               statistics) >= 0) {
             // Recreate the <script> elements to make them
             // "active"
-            recreateScriptTags(statistics);
+          recreateScriptTags(statistics);
             // init statistic() plugin for existing .statistic
             // elements.
-            $(".statistic").statistic();
-          }
-        });
+          $(".statistic").statistic();
+        }
       });
+    });
 
-      // configuration of the observer:
+    // configuration of the observer:
       var config = {
         subtree: true,
         childList: true
       };
 
-      // pass in the target node, as well as the observer options
-      observer.observe(target, config);
+    // pass in the target node, as well as the observer options
+    observer.observe(target, config);
+    // ✅ FIX: also run immediately if #statistics already exists
+    if (document.getElementById("statistics")) {
+      $(".statistic").statistic();
+    }
 
-      // later, you can stop observing
-      // observer.disconnect();
-    });
+    // later, you can stop observing
+    // observer.disconnect();
+  });
 
 }(jQuery));
 
@@ -581,5 +641,149 @@ if (!Array.from) {
     };
   }());
 }
+// function customDiskStats(element, callback) {
+//   var total = 500;
+//   var used = 100;
+//   var available = total - used;
 
-/*** END ARRAY.FROM workaround ***/
+//   var data = {
+//     total: total + " GB",
+//     used: used + " GB",
+//     facetResults: [
+//       {
+//         field: "Disk Usage",
+//         values: [
+//           { label: "Used", count: used },
+//           { label: "Available", count: available }
+//         ]
+//       }
+//     ]
+//   };
+
+//   if (typeof callback === "function") {
+//     callback(element, data);
+//   }
+//   return data; // ✅ always return so initViewFacetChart can pick it up
+// }
+
+let diskStatsCache = null;     // cache object
+let diskStatsPromise = null;   // in-progress request
+
+function customDiskStats(element, callback) {
+  // if already cached → return immediately
+  if (diskStatsCache) {
+    if (typeof callback === "function") {
+      callback(element, diskStatsCache);
+    }
+    return diskStatsCache;
+  }
+
+  // if request is already in flight → attach callback
+  if (diskStatsPromise) {
+    diskStatsPromise.then(data => {
+      if (typeof callback === "function") {
+        callback(element, data);
+      }
+    });
+    return; // don’t start a new fetch
+  }
+
+  // otherwise → fetch once
+  diskStatsPromise = fetch("/diskstats")
+    .then(response => response.json())
+    .then(stats => {
+      const data = {
+        total: stats.total + " " + stats.totalUnit,
+        used: stats.used + " " + stats.usedUnit,
+        facetResults: [
+          {
+            field: "Disk Usage",
+            values: [
+              { label: "Used", count: stats.used },
+              { label: "Available", count: stats.available }
+            ]
+          }
+        ],
+        solrIndexUsage: stats.solrIndexUsage
+      };
+
+      diskStatsCache = data; // save for reuse
+      if (typeof callback === "function") {
+        callback(element, data);
+      }
+      return data;
+    })
+    .catch(err => {
+      console.error("Failed to fetch disk stats:", err);
+    });
+
+  return; // no placeholder anymore
+}
+
+function formatMonthLabel(isoDate) {
+  if (!isoDate) return "";
+ 
+  try {
+    const date = new Date(isoDate);
+    const month = date.toLocaleString("en-US", { month: "short" }); // Jan, Feb, Mar...
+    const year = date.getFullYear();
+    return `${month} ${year}`; // e.g. "Mar 2025"
+  } catch (e) {
+    console.warn("Invalid date:", isoDate);
+    return isoDate;
+  }
+}
+ 
+function customAipStats(element, callback, options) {
+  var type = options && options.isExport ? 'text/csv' : 'application/json';
+  var facetField = $(element).data("source-facets");
+ 
+  var payload = {
+    classToReturn: "org.roda.core.data.v2.ip.IndexedAIP",
+    filter: {
+      parameters: [
+        { type: "AllFilterParameter" }
+      ]
+    },
+    onlyActive: true,
+    sublist: {
+      firstElementIndex: 0,
+      maximumElementCount: 0
+    },
+    facets: {
+      parameters: {}
+    },
+   exportFacets: true
+  };
+ 
+  payload.facets.parameters[facetField] = {
+    name: facetField,
+    start: "NOW/MONTH-11MONTH",
+    end: "NOW/MONTH+1MONTH",
+    gap: "+1MONTH",
+    type: "RangeFacetParameter"
+  };
+ 
+  $.ajax({
+    headers: {
+      'Accept': type
+    },
+    url: "/api/v1/index/find",  
+    method: "POST",
+    contentType: "application/json",
+    data: JSON.stringify(payload),
+    success: function (data) {
+      if (typeof callback === "function") {
+        callback(element, data);
+      }
+    },
+    error: function (xhr, status, error) {
+      console.error("Failed to fetch AIP stats:", error);
+    }
+  });
+}
+
+
+
+
+
