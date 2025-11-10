@@ -472,6 +472,8 @@ public class FileStorageService implements StorageService {
         throw new GenericException("Looking for a binary but found something else");
       } else {
         try {
+          // ensuring parent exists when creating a new file
+          binaryPath.getParent().toFile().mkdirs();
           payload.writeToPath(binaryPath);
         } catch (IOException e) {
           throw new GenericException("Could not update binary content", e);
