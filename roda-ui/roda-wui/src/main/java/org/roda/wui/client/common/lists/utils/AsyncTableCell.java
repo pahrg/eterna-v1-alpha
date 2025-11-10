@@ -91,6 +91,7 @@ import com.google.gwt.user.client.ui.HTML;
 import com.google.gwt.user.client.ui.InlineHTML;
 import com.google.gwt.user.client.ui.InlineLabel;
 import com.google.gwt.user.client.ui.Label;
+import com.google.gwt.user.client.ui.ListBox;
 import com.google.gwt.user.client.ui.RadioButton;
 import com.google.gwt.user.client.ui.SimplePanel;
 import com.google.gwt.view.client.CellPreviewEvent;
@@ -161,6 +162,8 @@ public abstract class AsyncTableCell<T extends IsIndexed> extends FlowPanel
   private InlineHTML autoUpdateSignal = new InlineHTML("");
   private HandlerRegistration autoUpdateHandler;
 
+  private int selectedPageSize;
+
   // private List<Consumer<AutoUpdateState>> autoUpdateConsumers = new
   // ArrayList<>();
 
@@ -174,6 +177,7 @@ public abstract class AsyncTableCell<T extends IsIndexed> extends FlowPanel
 
     this.classToReturn = options.getClassToReturn();
     this.initialPageSize = options.getInitialPageSize();
+    this.selectedPageSize = options.getInitialPageSize();
     this.pageSizeIncrement = options.getPageSizeIncrement();
     this.listId = options.getListId();
     this.actionable = options.getActionable();
@@ -260,6 +264,40 @@ public abstract class AsyncTableCell<T extends IsIndexed> extends FlowPanel
 
     pageSizePager = new RodaPageSizePager(getPageSizePagerIncrement());
     pageSizePager.setDisplay(display);
+    // Create a ListBox for selecting page size
+    ListBox pageSizeListBox = new ListBox();
+    pageSizeListBox.addStyleName("form-listbox");
+    pageSizeListBox.addItem("5", "5");
+    pageSizeListBox.addItem("10", "10");
+    pageSizeListBox.addItem("20", "20");
+    pageSizeListBox.addItem("50", "50");
+    pageSizeListBox.addItem("100", "100");
+    pageSizeListBox.addItem("200", "200");
+
+    // Select default page size
+    String initialPageSizeValue = String.valueOf(getInitialPageSize());
+    for (int i = 0; i < pageSizeListBox.getItemCount(); i++) {
+      if (pageSizeListBox.getValue(i).equals(initialPageSizeValue)) {
+        pageSizeListBox.setSelectedIndex(i);
+        break;
+      }
+    }
+
+    pageSizeListBox.addChangeHandler(event -> {
+        selectedPageSize = Integer.parseInt(pageSizeListBox.getSelectedValue());
+        display.setVisibleRangeAndClearData(new Range(0, selectedPageSize), true);
+        resultsPager.setPageSize(selectedPageSize);
+    });
+
+    // Optional label
+    FlowPanel pageSizeSelectorPanel = new FlowPanel();
+    pageSizeSelectorPanel.addStyleName("my-asyncdatagrid-page-size-selector");
+
+    Label pageSizeLabel = new Label(messages.pageSizeLabel() + ": ");
+    pageSizeLabel.addStyleName("page-size-label");
+    pageSizeSelectorPanel.add(pageSizeLabel);
+    pageSizeSelectorPanel.add(pageSizeListBox);
+
 
     Button csvDownloadButton = new Button(messages.tableDownloadCSV());
     csvDownloadButton.addStyleName("btn btn-link csvDownloadButton");
@@ -279,6 +317,7 @@ public abstract class AsyncTableCell<T extends IsIndexed> extends FlowPanel
     mainPanel.add(display);
     mainPanel.add(resultsPager);
     mainPanel.add(pageSizePager);
+    mainPanel.add(pageSizeSelectorPanel);
     mainPanel.add(autoUpdatePanel);
     mainPanel.add(csvDownloadButton);
 
@@ -645,7 +684,7 @@ public abstract class AsyncTableCell<T extends IsIndexed> extends FlowPanel
 
   public void refresh() {
     selected = new HashSet<>();
-    display.setVisibleRangeAndClearData(new Range(0, getInitialPageSize()), true);
+    display.setVisibleRangeAndClearData(new Range(0, selectedPageSize), true);
     updateEmptyTableWidget();
   }
 
