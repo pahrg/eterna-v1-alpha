@@ -252,6 +252,7 @@ public abstract class AsyncTableCell<T extends IsIndexed> extends FlowPanel
       }
     };
 
+    applySavedSortState(display);
     dataProvider.addDataDisplay(display);
 
     resultsPager = new AccessibleSimplePager(AccessibleSimplePager.TextLocation.LEFT,
@@ -319,7 +320,6 @@ public abstract class AsyncTableCell<T extends IsIndexed> extends FlowPanel
       display.setSelectionModel(selectionModel);
     }
 
-    display.addColumnSortHandler(new AsyncHandler(display));
 
     getElement().setId("list-" + listId);
     resultsPager.addStyleName("my-asyncdatagrid-pager-results");
@@ -543,13 +543,6 @@ public abstract class AsyncTableCell<T extends IsIndexed> extends FlowPanel
 
         ColumnSortList sortList = display.getColumnSortList();
         saveSortState(sortList);
-      });
-
-      // Apply saved sorting AFTER rendering
-      Scheduler.get().scheduleDeferred(() -> {
-        applySavedSortState(display);
-        // Force a refresh to make sure backend refetches sorted data
-        dataProvider.update(fieldsToReturn);
       });
 
       focusPanel.setWidget(popupLayout);
@@ -1282,31 +1275,14 @@ public abstract class AsyncTableCell<T extends IsIndexed> extends FlowPanel
 
   // ---------------------- SORT PERSISTENCE LOGIC START ----------------------
 
-  private String getCurrentNodeUUID() {
-    String token = History.getToken(); // safer for GWT single-page apps
-
-    if (token.contains("browse/")) {
-      String path = token.substring(token.indexOf("browse/") + "browse/".length());
-      String[] parts = path.split("/");
-
-      for (String part : parts) {
-        if (part.matches("^[0-9a-fA-F\\-]{10,}$")) {
-          return part; // Found UUID
-        }
-      }
-    }
-
-    return "global";
-  }
 
   private String getSortStorageKey() {
-    String nodeType = getCurrentNodeType();
-    String nodeUUID = getCurrentNodeUUID();
-    return "eterna_sort_" + listId + "_" + nodeType + "_" + nodeUUID;
+    String historyToken = History.getToken(); // Guaranteed unique for this page
+    return "Sort." + listId + "." + historyToken;
   }
 
   private void saveSortState(ColumnSortList sortList) {
-    Storage storage = Storage.getLocalStorageIfSupported();
+    Storage storage = Storage.getSessionStorageIfSupported();
     if (storage == null || sortList == null || sortList.size() == 0) {
       return;
     }
@@ -1318,47 +1294,28 @@ public abstract class AsyncTableCell<T extends IsIndexed> extends FlowPanel
     if (columnId != null) {
       storage.setItem(getSortStorageKey(), columnId + ":" + (ascending ? "asc" : "desc"));
     }
-
   }
 
-  private void applySavedSortState(CellTable<T> display) {
-    Storage storage = Storage.getLocalStorageIfSupported();
-    if (storage == null)
-      return;
+    private void applySavedSortState(CellTable<T> display) {
+      Storage storage = Storage.getSessionStorageIfSupported();
+      if (storage == null) {
+        return;
+      }
 
-    String saved = storage.getItem(getSortStorageKey());
-    if (saved != null && saved.contains(":")) {
-      String[] parts = saved.split(":");
-      String savedColumn = parts[0];
-      boolean ascending = parts[1].equals("asc");
+      String saved = storage.getItem(getSortStorageKey());
+      if (saved != null && saved.contains(":")) {
+        String[] parts = saved.split(":");
+        String savedColumn = parts[0];
+        boolean ascending = parts[1].equals("asc");
 
-      // Match column based on getDataStoreName() or a custom identifier
-      for (int i = 0; i < display.getColumnCount(); i++) {
-        Column<T, ?> col = display.getColumn(i);
-        if (savedColumn.equals(col.getDataStoreName())) {
-          display.getColumnSortList().push(new ColumnSortList.ColumnSortInfo(col, ascending));
-          display.redrawHeaders();
-          display.redraw();
-          break;
+          for (int i = 0; i < display.getColumnCount(); i++) {
+            Column<T, ?> col = display.getColumn(i);
+            if (savedColumn.equals(col.getDataStoreName())) {
+              display.getColumnSortList().push(new ColumnSortList.ColumnSortInfo(col, ascending));
+              break;
+            }
+          }
         }
       }
-    }
-  }
-
-  private String getCurrentNodeType() {
-    String token = History.getToken();
-
-    if (token.contains("browse/")) {
-      String path = token.substring(token.indexOf("browse/") + "browse/".length());
-      String[] parts = path.split("/");
-
-      // e.g. browse/UUID
-      if (parts.length >= 1 && parts[0].matches("^[0-9a-fA-F\\-]{10,}$")) {
-        return "AIP";
-      }
-    }
-
-    return "global";
-  }
 
 }
