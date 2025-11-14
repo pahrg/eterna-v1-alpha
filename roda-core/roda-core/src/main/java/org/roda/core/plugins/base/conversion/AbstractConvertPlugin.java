@@ -313,7 +313,8 @@ public abstract class AbstractConvertPlugin<T extends IsRODAObject> extends Abst
                     "." + FilenameUtils.normalize(getOutputFormat()));
                 String result = executePlugin(directAccess.getPath(), pluginResult, fileFormat);
 
-                newFileId = file.getId();
+                newFileId = file.getId().replaceFirst("[.][^.]+$", "." + outputFormat);
+                
                 ContentPayload payload = new FSPathContentPayload(pluginResult);
 
                 if (createDIP) {
