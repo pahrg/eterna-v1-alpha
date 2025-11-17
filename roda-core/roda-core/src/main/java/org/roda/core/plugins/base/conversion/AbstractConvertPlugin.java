@@ -322,38 +322,19 @@ public abstract class AbstractConvertPlugin<T extends IsRODAObject> extends Abst
                       directAccess.getPath().toFile().length(), payload, true);
                   newDIPFiles.add(f);
                 } else {
-                  // Create file in existing representation
-                  if (!context.newRepresentations.contains(context.newRepresentationId)) {
-                    try {
-                      // Check if representation already exists
-                      model.retrieveRepresentation(context.aipId, context.newRepresentationId);
-                      LOGGER.debug("Using existing representation {} on AIP {}", context.newRepresentationId,
-                          context.aipId);
-                    } catch (NotFoundException e) {
-                      // Representation doesn't exist, create it
-                      LOGGER.debug("Creating a new representation {} on AIP {}", context.newRepresentationId,
-                          context.aipId);
-                      boolean original = false;
-                      String newRepresentationType = RodaConstants.REPRESENTATION_TYPE_MIXED;
+                // Create file in existing representation
+                String actualRepresentationId = context.newRepresentationId;
+                if (!context.newRepresentations.contains(actualRepresentationId)) {
+                  // Determine the appropriate representation ID based on existing reps and desired type
+                  actualRepresentationId = determineRepresentationId(model, context.aipId, context.newRepresentationId,
+                      representationType, job.getUsername(), markAsPreservation);
 
-                      if (StringUtils.isNotBlank(representationType)) {
-                        newRepresentationType = representationType;
-                      }
-
-                      List<String> state = Collections.emptyList();
-                      if (markAsPreservation) {
-                        state = List.of("PRESERVATION");
-                      }
-
-                      model.createRepresentation(context.aipId, context.newRepresentationId, original,
-                          newRepresentationType, true, job.getUsername(), state);
-                      context.reportItem.setSourceAndOutcomeObjectId(context.reportItem.getSourceObjectId(),
-                          IdUtils.getRepresentationId(context.aipId, context.newRepresentationId));
-                    }
-                    context.newRepresentations.add(context.newRepresentationId);
+                  if (!context.newRepresentations.contains(actualRepresentationId)) {
+                    context.newRepresentations.add(actualRepresentationId);
                   }
+                }
 
-                  File f = model.updateFile(context.aipId, context.newRepresentationId, file.getPath(), newFileId,
+                  File f = model.updateFile(context.aipId, actualRepresentationId, file.getPath(), newFileId,
                       payload, true, job.getUsername(), true);
                   newFiles.add(f);
                 }
@@ -970,6 +951,68 @@ public abstract class AbstractConvertPlugin<T extends IsRODAObject> extends Abst
       ContentPayload payload = new FSPathContentPayload(uriPath);
       model.createDIPFile(newRepresentationID, f.getPath(), f.getId(), uriPath.toFile().length(), payload, notify);
     }
+  }
+
+  private String determineRepresentationId(ModelService model, String aipId, String baseRepresentationId,
+      String desiredType, String username, boolean markAsPreservation) throws RequestNotValidException,
+      GenericException, AuthorizationDeniedException, NotFoundException, AlreadyExistsException {
+
+    String desiredRepresentationType = StringUtils.isNotBlank(desiredType) ? desiredType
+        : RodaConstants.REPRESENTATION_TYPE_MIXED;
+
+    try {
+      Representation existingRep = model.retrieveRepresentation(aipId, baseRepresentationId);
+
+      if (desiredRepresentationType.equals(existingRep.getType())) {
+        LOGGER.debug("Reusing existing representation '{}' with matching type '{}' on AIP {}", baseRepresentationId,
+            desiredRepresentationType, aipId);
+        return baseRepresentationId;
+      } else {
+        // Type mismatch - create a new representation with unique ID
+        String newRepresentationId = generateUniqueRepresentationId(model, aipId, baseRepresentationId);
+        LOGGER.debug("Creating new representation '{}' (type: '{}') because existing '{}' has different type '{}' on AIP {}",
+            newRepresentationId, desiredRepresentationType, baseRepresentationId, existingRep.getType(), aipId);
+
+        createNewRepresentation(model, aipId, newRepresentationId, desiredRepresentationType, username, markAsPreservation);
+        return newRepresentationId;
+      }
+    } catch (NotFoundException e) {
+      // Base representation doesn't exist, create it
+      LOGGER.debug("Creating base representation '{}' with type '{}' on AIP {}", baseRepresentationId,
+          desiredRepresentationType, aipId);
+      createNewRepresentation(model, aipId, baseRepresentationId, desiredRepresentationType, username, markAsPreservation);
+      return baseRepresentationId;
+    }
+  }
+
+  private String generateUniqueRepresentationId(ModelService model, String aipId, String baseId) {
+    int counter = 1;
+    String candidateId = baseId + "_" + counter;
+
+    while (true) {
+      try {
+        model.retrieveRepresentation(aipId, candidateId);
+        counter++;
+        candidateId = baseId + "_" + counter;
+      } catch (NotFoundException | GenericException | RequestNotValidException | AuthorizationDeniedException e) {
+        // Representation doesn't exist, this ID is available
+        break;
+      }
+    }
+
+    return candidateId;
+  }
+
+  private void createNewRepresentation(ModelService model, String aipId, String representationId, String type,
+      String username, boolean markAsPreservation) throws RequestNotValidException, GenericException,
+      AuthorizationDeniedException, NotFoundException, AlreadyExistsException {
+    boolean original = false;
+    List<String> state = Collections.emptyList();
+    if (markAsPreservation) {
+      state = List.of("PRESERVATION");
+    }
+
+    model.createRepresentation(aipId, representationId, original, type, true, username, state);
   }
 
   private String getOutputMessage(CommandException exception) {
