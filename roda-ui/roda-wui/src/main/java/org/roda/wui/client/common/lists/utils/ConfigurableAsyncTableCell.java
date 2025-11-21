@@ -381,6 +381,7 @@ public class ConfigurableAsyncTableCell<T extends IsIndexed> extends AsyncTableC
 
         htmlHeader = SafeHtmlUtils.fromString(header);
       }
+      column.setDataStoreName(name);
 
       // set column sortable
       column.setSortable(c.isSortable());

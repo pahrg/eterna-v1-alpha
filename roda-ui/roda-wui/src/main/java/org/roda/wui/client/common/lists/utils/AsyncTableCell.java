@@ -67,6 +67,7 @@ import com.google.gwt.i18n.client.LocaleInfo;
 import com.google.gwt.safehtml.shared.SafeHtml;
 import com.google.gwt.safehtml.shared.SafeHtmlBuilder;
 import com.google.gwt.safehtml.shared.SafeHtmlUtils;
+import com.google.gwt.storage.client.Storage;
 import com.google.gwt.user.cellview.client.AbstractHasData.RedrawEvent;
 import com.google.gwt.user.cellview.client.CellTable;
 import com.google.gwt.user.cellview.client.Column;
@@ -251,6 +252,7 @@ public abstract class AsyncTableCell<T extends IsIndexed> extends FlowPanel
       }
     };
 
+    applySavedSortState(display);
     dataProvider.addDataDisplay(display);
 
     resultsPager = new AccessibleSimplePager(AccessibleSimplePager.TextLocation.LEFT,
@@ -318,7 +320,6 @@ public abstract class AsyncTableCell<T extends IsIndexed> extends FlowPanel
       display.setSelectionModel(selectionModel);
     }
 
-    display.addColumnSortHandler(new AsyncHandler(display));
 
     getElement().setId("list-" + listId);
     resultsPager.addStyleName("my-asyncdatagrid-pager-results");
@@ -534,6 +535,15 @@ public abstract class AsyncTableCell<T extends IsIndexed> extends FlowPanel
       RadioButton buttonPage = new RadioButton("selectedItemsRadio", messages.selectThisPage());
       buttonPage.setValue(true);
       popupLayout.add(buttonPage);
+
+      display.addColumnSortHandler(new AsyncHandler(display));
+
+      // Save sorting changes
+      display.addColumnSortHandler(event -> {
+
+        ColumnSortList sortList = display.getColumnSortList();
+        saveSortState(sortList);
+      });
 
       focusPanel.setWidget(popupLayout);
       popup.setWidget(focusPanel);
@@ -1262,4 +1272,50 @@ public abstract class AsyncTableCell<T extends IsIndexed> extends FlowPanel
       refresh();
     }
   }
+
+  // ---------------------- SORT PERSISTENCE LOGIC START ----------------------
+
+
+  private String getSortStorageKey() {
+    String historyToken = History.getToken(); // Guaranteed unique for this page
+    return "Sort." + listId + "." + historyToken;
+  }
+
+  private void saveSortState(ColumnSortList sortList) {
+    Storage storage = Storage.getSessionStorageIfSupported();
+    if (storage == null || sortList == null || sortList.size() == 0) {
+      return;
+    }
+
+    ColumnSortList.ColumnSortInfo info = sortList.get(0);
+    String columnId = info.getColumn().getDataStoreName();
+    boolean ascending = info.isAscending();
+
+    if (columnId != null) {
+      storage.setItem(getSortStorageKey(), columnId + ":" + (ascending ? "asc" : "desc"));
+    }
+  }
+
+    private void applySavedSortState(CellTable<T> display) {
+      Storage storage = Storage.getSessionStorageIfSupported();
+      if (storage == null) {
+        return;
+      }
+
+      String saved = storage.getItem(getSortStorageKey());
+      if (saved != null && saved.contains(":")) {
+        String[] parts = saved.split(":");
+        String savedColumn = parts[0];
+        boolean ascending = parts[1].equals("asc");
+
+          for (int i = 0; i < display.getColumnCount(); i++) {
+            Column<T, ?> col = display.getColumn(i);
+            if (savedColumn.equals(col.getDataStoreName())) {
+              display.getColumnSortList().push(new ColumnSortList.ColumnSortInfo(col, ascending));
+              break;
+            }
+          }
+        }
+      }
+
 }
