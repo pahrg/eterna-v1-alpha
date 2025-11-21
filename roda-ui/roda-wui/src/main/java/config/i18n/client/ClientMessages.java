@@ -1825,6 +1825,8 @@ public interface ClientMessages extends Messages {
 
   String showLess();
 
+  String pageSizeLabel();
+
   String uriLinkingIdentifierTitle();
 
   /* Version action */

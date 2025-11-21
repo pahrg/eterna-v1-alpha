@@ -1434,6 +1434,22 @@ pre code {
     display: none;
 }
 
+.my-asyncdatagrid-page-size-selector {
+    display: flex;
+    gap: 4px;
+    margin: 4px 8px;
+    float: right;
+}
+
+.my-asyncdatagrid-page-size-selector select{
+    padding: 0px 2px;
+    height: 20px;
+}
+
+.page-size-label{
+    font-size: 13px;
+}
+
 .table-empty .my-asyncdatagrid-pager-results {
     display: none;
 }
