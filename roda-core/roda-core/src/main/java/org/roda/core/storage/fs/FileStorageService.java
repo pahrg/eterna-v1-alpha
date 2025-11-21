@@ -10,6 +10,7 @@ package org.roda.core.storage.fs;
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
@@ -17,10 +18,13 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -55,6 +59,7 @@ import org.roda.core.storage.StorageServiceUtils;
 import org.roda.core.util.IdUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 /**
  * Class that persists binary files and their containers in the File System.
@@ -919,4 +924,68 @@ public class FileStorageService implements StorageService {
     }
     return storagePaths;
   }
+
+  public Map<StoragePath, Path> listContainersWithPaths() throws GenericException {
+    Map<StoragePath, Path> containersWithPaths = new HashMap<>();
+
+    try (CloseableIterable<Container> containers = listContainers()) {
+      for (Container container : containers) {
+        if (container == null) {
+          LOGGER.warn("Encountered null container while listing containers under {}", basePath);
+          continue; // skip it
+        }
+
+        StoragePath storagePath = container.getStoragePath();
+        Path entityPath = FSUtils.getEntityPath(basePath, storagePath);
+        containersWithPaths.put(storagePath, entityPath);
+      }
+    } catch (IOException e) {
+      throw new GenericException("Error closing containers iterable", e);
+    }
+
+    return containersWithPaths;
+  }
+
+  @Override
+  public Map<String, Object> getStorageStats() throws GenericException {
+    Map<StoragePath, Path> containersWithPaths = listContainersWithPaths();
+
+    // get distinct parent paths (leaving out container names)
+    Set<Path> distinctBasePaths = containersWithPaths.values().stream().map(Path::getParent)
+      .collect(Collectors.toSet());
+
+    Set<FileStore> seenStores = new HashSet<>();
+    long totalAll = 0, usedAll = 0, availAll = 0;
+
+    for (Path basePath : distinctBasePaths) {
+      try {
+        FileStore store = Files.getFileStore(basePath);
+        if (seenStores.add(store)) { // avoid double counting
+          long total = store.getTotalSpace();
+          long unallocated = store.getUnallocatedSpace(); // matches "Free" in df
+          long avail = store.getUsableSpace(); // matches "Avail" in df
+          long used = total - unallocated; // matches "Used" in df
+
+          totalAll += total;
+          usedAll += used;
+          availAll += avail;
+
+        }
+      } catch (IOException e) {
+        throw new GenericException("Could not retrieve storage statistics for " + basePath, e);
+      }
+    }
+
+    Map<String, Object> stats = new HashMap<>();
+    stats.putAll(FSUtils.formatSize(totalAll, "total"));
+    stats.putAll(FSUtils.formatSize(usedAll, "used"));
+    stats.putAll(FSUtils.formatSize(availAll, "available"));
+
+    stats.put("solrIndexUsage", 0L);
+
+    return stats;
+  }
+  
+
+
 }

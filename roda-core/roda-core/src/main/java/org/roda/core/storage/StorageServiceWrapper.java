@@ -246,4 +246,9 @@ public class StorageServiceWrapper implements StorageService {
     return storageService.getShallowFiles(storagePath);
   }
 
+  @Override
+  public Map<String, Object> getStorageStats() throws GenericException {
+    return storageService.getStorageStats();
+  }
+
 }

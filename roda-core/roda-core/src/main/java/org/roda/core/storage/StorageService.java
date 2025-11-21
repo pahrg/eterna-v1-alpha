@@ -389,4 +389,6 @@ public interface StorageService {
   String getStoragePathAsString(StoragePath storagePath, boolean skipContainer);
 
   List<StoragePath> getShallowFiles(StoragePath storagePath) throws NotFoundException, GenericException;
+
+  Map<String, Object> getStorageStats() throws GenericException;
 }

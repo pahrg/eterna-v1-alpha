@@ -6532,8 +6532,22 @@ td.datePickerMonth, td.datePickerYear {
 }
 .stat_col_card {
 	background: #eee;
-	padding: 0 2em 4em 2em;
+	padding: 0 2em 1em 2em;   /* reduced bottom padding */
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-start; 
+	position: relative;
 }
+
+.stat_col_card .description {
+	position: absolute;
+	bottom: 10px;             /* stick to bottom */
+	left: 2em;
+	right: 2em;
+	font-size: 13px;
+	color: #555;
+}
+
 .statistic {
 	white-space: nowrap;
 }
