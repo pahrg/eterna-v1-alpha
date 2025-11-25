@@ -1623,7 +1623,11 @@ public class ModelService extends ModelObservable {
     RodaCoreFactory.checkIfWriteIsAllowedAndIfFalseThrowException(nodeType);
 
     String identifier = fileId;
-    if (!PreservationMetadataType.FILE.equals(type)) {
+    if (PreservationMetadataType.FILE.equals(type)) {
+      if (URNUtils.verifyPremisPrefix(type, fileId)) {
+        identifier = URNUtils.extractFileIdFromId(fileId);
+      }
+    } else {
       identifier = IdUtils.getFileId(aipId, representationId, fileDirectoryPath, fileId);
     }
 
