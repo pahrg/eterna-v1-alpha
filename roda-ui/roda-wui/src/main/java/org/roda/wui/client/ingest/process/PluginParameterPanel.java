@@ -181,11 +181,9 @@ public class PluginParameterPanel extends Composite {
 
         innerPanel.add(createRepresentationType(messages.representationTypeTitle(),
           messages.representationTypeDescription(), typeChanged));
-        ValueChangeHandler<Boolean> preservationStatusChanged = preservationStatusChangedEvent -> representationParameter
-          .setMarkAsPreservation(preservationStatusChangedEvent.getValue());
 
-        innerPanel.add(createBooleanLayout(messages.changeRepresentationStatusToPreservationTitle(), Boolean.toString(true),
-          messages.changeRepresentationStatusToPreservationDescription(), false, preservationStatusChanged));
+        // Always set markAsPreservation to true for conversion plugins
+        representationParameter.setMarkAsPreservation(true);
 
         value = RodaConstants.PLUGIN_PARAMS_CONVERSION_REPRESENTATION;
       } else {

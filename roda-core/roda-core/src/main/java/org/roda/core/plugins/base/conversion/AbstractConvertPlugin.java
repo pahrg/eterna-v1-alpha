@@ -22,6 +22,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringUtils;
 import org.roda.core.RodaCoreFactory;
 import org.roda.core.common.iterables.CloseableIterable;
+import org.roda.core.common.iterables.CloseableIterables;
 import org.roda.core.data.common.RodaConstants;
 import org.roda.core.data.common.RodaConstants.PreservationEventType;
 import org.roda.core.data.exceptions.AlreadyExistsException;
@@ -40,7 +41,6 @@ import org.roda.core.data.v2.ip.DIPFile;
 import org.roda.core.data.v2.ip.File;
 import org.roda.core.data.v2.ip.FileLink;
 import org.roda.core.data.v2.ip.IndexedFile;
-import org.roda.core.data.v2.ip.IndexedRepresentation;
 import org.roda.core.data.v2.ip.Representation;
 import org.roda.core.data.v2.ip.StoragePath;
 import org.roda.core.data.v2.ip.metadata.LinkingIdentifier;
@@ -53,6 +53,13 @@ import org.roda.core.data.v2.jobs.Report;
 import org.roda.core.data.v2.validation.ValidationException;
 import org.roda.core.data.v2.validation.ValidationIssue;
 import org.roda.core.data.v2.validation.ValidationReport;
+import org.roda.core.data.v2.index.IndexResult;
+import org.roda.core.data.v2.index.filter.Filter;
+import org.roda.core.data.v2.index.filter.SimpleFilterParameter;
+import org.roda.core.data.v2.index.sort.SortParameter;
+import org.roda.core.data.v2.index.sort.Sorter;
+import org.roda.core.data.v2.index.sublist.Sublist;
+import org.roda.core.data.v2.ip.IndexedRepresentation;
 import org.roda.core.index.IndexService;
 import org.roda.core.model.ModelService;
 import org.roda.core.model.utils.ModelUtils;
@@ -72,9 +79,6 @@ import org.roda.core.util.IdUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * @deprecated It will be removed in the next major version.
- */
 public abstract class AbstractConvertPlugin<T extends IsRODAObject> extends AbstractAIPComponentsPlugin<T> {
   private static final Logger LOGGER = LoggerFactory.getLogger(AbstractConvertPlugin.class);
   private static Map<String, PluginParameter> pluginParameters = new HashMap<>();
@@ -110,7 +114,42 @@ public abstract class AbstractConvertPlugin<T extends IsRODAObject> extends Abst
   private String dipTitle = "";
   private String dipDescription = "";
   private String representationType = "";
-  private boolean markAsPreservation = false;
+  private boolean markAsPreservation = true;
+
+  /**
+   * Context object to encapsulate conversion parameters and state
+   */
+  private static class ConversionContext {
+    final String aipId;
+    final String sourceRepresentationId;
+    final String newRepresentationId;
+    final Report reportItem;
+    final List<String> newRepresentations;
+
+    ConversionContext(String aipId, String sourceRepresentationId, String newRepresentationId,
+        Report reportItem, List<String> newRepresentations) {
+      this.aipId = aipId;
+      this.sourceRepresentationId = sourceRepresentationId;
+      this.newRepresentationId = newRepresentationId;
+      this.reportItem = reportItem;
+      this.newRepresentations = newRepresentations;
+    }
+  }
+
+  /**
+   * Result object for file processing operations
+   */
+  private static class ConversionResult {
+    final PluginState state;
+    final List<File> alteredFiles;
+    final List<File> newFiles;
+
+    ConversionResult(PluginState state, List<File> alteredFiles, List<File> newFiles) {
+      this.state = state;
+      this.alteredFiles = alteredFiles;
+      this.newFiles = newFiles;
+    }
+  }
 
   protected AbstractConvertPlugin() {
     super();
@@ -227,196 +266,196 @@ public abstract class AbstractConvertPlugin<T extends IsRODAObject> extends Abst
         "convert", "allplugins", "hasPartialSuccessOnOutcome"));
   }
 
+  /**
+   * Helper method to process files for conversion
+   */
+  private ConversionResult processFilesForConversion(IndexService index, ModelService model, StorageService storage,
+      CloseableIterable<OptionalWithCause<File>> allFiles, Job job, ConversionContext context, Report report)
+      throws PluginException, AuthorizationDeniedException, RequestNotValidException, NotFoundException,
+      GenericException, IOException, AlreadyExistsException {
+
+    PluginState pluginResultState = PluginState.SUCCESS;
+    ValidationReport validationReport = new ValidationReport();
+    boolean hasUnacceptedFormatFiles = false;
+    List<File> alteredFiles = new ArrayList<>();
+    List<File> newFiles = new ArrayList<>();
+    List<DIPFile> newDIPFiles = new ArrayList<>();
+
+    for (OptionalWithCause<File> oFile : allFiles) {
+      String newFileId = null;
+      if (oFile.isPresent()) {
+        File file = oFile.get();
+        LOGGER.debug("Processing file {}", file);
+
+        if (!file.isDirectory()) {
+          if (FSUtils.isManifestOfExternalFiles(file.getId())) {
+            processShallowFile(index, file, job, context.newRepresentationId, model, pluginResultState,
+                context.reportItem, true, storage, newFileId, newDIPFiles, newFiles,
+                pluginResultState, report);
+          } else {
+            IndexedFile ifile = index.retrieve(IndexedFile.class, IdUtils.getFileId(file),
+                RodaConstants.FILE_FORMAT_FIELDS_TO_RETURN);
+            String fileMimetype = ifile.getFileFormat().getMimeType();
+            String filePronom = ifile.getFileFormat().getPronom();
+            String fileFormat = ifile.getId().substring(ifile.getId().lastIndexOf('.') + 1);
+            List<String> applicableTo = getApplicableTo();
+            List<String> convertableTo = getConvertableTo();
+            Map<String, List<String>> pronomToExtension = getPronomToExtension();
+            Map<String, List<String>> mimetypeToExtension = getMimetypeToExtension();
+
+            if (doPluginExecute(fileFormat, filePronom, fileMimetype, applicableTo, convertableTo,
+                pronomToExtension, mimetypeToExtension)) {
+
+              fileFormat = getNewFileFormat(fileFormat, filePronom, fileMimetype, applicableTo,
+                  pronomToExtension, mimetypeToExtension);
+
+              StoragePath fileStoragePath = ModelUtils.getFileStoragePath(file);
+              DirectResourceAccess directAccess = storage.getDirectAccess(fileStoragePath);
+
+              LOGGER.debug("Running a ConvertPlugin ({} to {}) on {}", fileFormat, outputFormat, file.getId());
+              try {
+                Path pluginResult = Files.createTempFile(getWorkingDirectory(), "converted",
+                    "." + FilenameUtils.normalize(getOutputFormat()));
+                String result = executePlugin(directAccess.getPath(), pluginResult, fileFormat);
+
+                newFileId = file.getId().replaceFirst("[.][^.]+$", "." + outputFormat);
+
+                ContentPayload payload = new FSPathContentPayload(pluginResult);
+
+                if (createDIP) {
+                  DIPFile f = model.createDIPFile(context.newRepresentationId, file.getPath(), newFileId,
+                      directAccess.getPath().toFile().length(), payload, true);
+                  newDIPFiles.add(f);
+                } else {
+                  // Create file in existing representation
+                  String actualRepresentationId = context.newRepresentationId;
+                  if (!context.newRepresentations.contains(actualRepresentationId)) {
+                    // Determine the appropriate representation ID based on existing reps and
+                    // desired type
+                    actualRepresentationId = determineRepresentationId(index, model, context.aipId,
+                        context.newRepresentationId,
+                        representationType, job.getUsername(), markAsPreservation);
+
+                    if (!context.newRepresentations.contains(actualRepresentationId)) {
+                      context.newRepresentations.add(actualRepresentationId);
+                    }
+                  }
+
+                  File f = model.updateFile(context.aipId, actualRepresentationId, file.getPath(), newFileId,
+                      payload, true, job.getUsername(), true);
+                  newFiles.add(f);
+                }
+
+                alteredFiles.add(file);
+                IOUtils.closeQuietly(directAccess);
+
+                Report fileReportItem = PluginHelper.initPluginReportItem(this, file.getId(), File.class,
+                    AIPState.ACTIVE);
+                fileReportItem.setPluginState(pluginResultState).setPluginDetails(result);
+                context.reportItem.addReport(fileReportItem);
+
+              } catch (CommandException e) {
+                pluginResultState = PluginState.FAILURE;
+                context.reportItem.setPluginState(pluginResultState).addPluginDetails(getOutputMessage(e));
+
+                LOGGER.debug("Conversion ({} to {}) failed on file {} of representation {} from AIP {}",
+                    fileFormat, outputFormat, file.getId(), context.sourceRepresentationId, context.aipId);
+              }
+
+            } else {
+              if (ignoreFiles) {
+                validationReport.addIssue(new ValidationIssue(ModelUtils.getFileStoragePath(file).toString()));
+              } else {
+                pluginResultState = PluginState.FAILURE;
+                hasUnacceptedFormatFiles = true;
+              }
+            }
+          }
+        }
+      } else {
+        LOGGER.error("Cannot process AIP representation file", oFile.getCause());
+      }
+    }
+
+    context.reportItem.setPluginState(pluginResultState);
+
+    if (pluginResultState.equals(PluginState.SUCCESS)) {
+      if (ignoreFiles && !validationReport.getIssues().isEmpty()) {
+        context.reportItem.setHtmlPluginDetails(true)
+            .setPluginDetails(validationReport.toHtml(false, false, false, "Ignored files"));
+      }
+    }
+
+    if (hasUnacceptedFormatFiles) {
+      context.reportItem.setPluginDetails(
+          "Source files include formats that are not accepted by this plugin and the plugin was not set to ignore these files. The conversion was not run.");
+    }
+
+    return new ConversionResult(pluginResultState, alteredFiles, newFiles);
+  }
+
   @Override
   protected Report executeOnAIP(IndexService index, ModelService model, StorageService storage, Report report,
       JobPluginInfo jobPluginInfo, List<AIP> list, Job job) {
     for (AIP aip : list) {
       LOGGER.debug("Processing AIP {}", aip.getId());
       List<String> newRepresentations = new ArrayList<>();
-      String newRepresentationID = null;
-      boolean notify = true;
+      String newRepresentationID = IdUtils.createUUID();
       PluginState reportState = PluginState.SUCCESS;
-      ValidationReport validationReport = new ValidationReport();
-      boolean hasUnacceptedFormatFiles = false;
       List<File> alteredFiles = new ArrayList<>();
       List<File> newFiles = new ArrayList<>();
-      List<DIPFile> newDIPFiles = new ArrayList<>();
-      List<File> unchangedFiles = new ArrayList<>();
       if (aip.getRepresentations() != null && !aip.getRepresentations().isEmpty()) {
+        // Create a single "converted" representation for all files from all
+        // representations
+        Report aipReportItem = PluginHelper.initPluginReportItem(this, aip.getId(),
+            aip.getId(), AIP.class, AIPState.ACTIVE);
+        if (createDIP) {
+          aipReportItem.setOutcomeObjectClass(DIP.class.getName());
+        }
+
+        // Process all representations and collect all their files
+        List<OptionalWithCause<File>> allFilesFromAllRepresentations = new ArrayList<>();
+
         for (Representation representation : aip.getRepresentations()) {
-          newRepresentationID = IdUtils.createUUID();
-          PluginState pluginResultState = PluginState.SUCCESS;
-
-          Report reportItem = PluginHelper.initPluginReportItem(this, IdUtils.getRepresentationId(representation),
-              IdUtils.getRepresentationId(representation), Representation.class, AIPState.ACTIVE);
-          if (createDIP) {
-            reportItem.setOutcomeObjectClass(DIP.class.getName());
-          }
-
-          try (CloseableIterable<OptionalWithCause<File>> allFiles = model.listFilesUnder(aip.getId(),
+          try (CloseableIterable<OptionalWithCause<File>> repFiles = model.listFilesUnder(aip.getId(),
               representation.getId(), true)) {
-            LOGGER.debug("Processing representation {}", representation);
-
-            for (OptionalWithCause<File> oFile : allFiles) {
-              String newFileId = null;
-              if (oFile.isPresent()) {
-                File file = oFile.get();
-                LOGGER.debug("Processing file {}", file);
-
-                if (!file.isDirectory()) {
-                  if (FSUtils.isManifestOfExternalFiles(file.getId())) {
-                    processShallowFile(index, file, job, newRepresentationID, model, pluginResultState, reportItem,
-                        notify, storage, newFileId, newDIPFiles, newFiles, reportState, report);
-                  } else {
-                    IndexedFile ifile = index.retrieve(IndexedFile.class, IdUtils.getFileId(file),
-                        RodaConstants.FILE_FORMAT_FIELDS_TO_RETURN);
-                    String fileMimetype = ifile.getFileFormat().getMimeType();
-                    String filePronom = ifile.getFileFormat().getPronom();
-                    String fileFormat = ifile.getId().substring(ifile.getId().lastIndexOf('.') + 1);
-                    List<String> applicableTo = getApplicableTo();
-                    List<String> convertableTo = getConvertableTo();
-                    Map<String, List<String>> pronomToExtension = getPronomToExtension();
-                    Map<String, List<String>> mimetypeToExtension = getMimetypeToExtension();
-
-                    if (doPluginExecute(fileFormat, filePronom, fileMimetype, applicableTo, convertableTo,
-                        pronomToExtension, mimetypeToExtension)) {
-
-                      fileFormat = getNewFileFormat(fileFormat, filePronom, fileMimetype, applicableTo,
-                          pronomToExtension, mimetypeToExtension);
-
-                      StoragePath fileStoragePath = ModelUtils.getFileStoragePath(file);
-                      DirectResourceAccess directAccess = storage.getDirectAccess(fileStoragePath);
-
-                      LOGGER.debug("Running a ConvertPlugin ({} to {}) on {}", fileFormat, outputFormat, file.getId());
-                      try {
-                        Path pluginResult = Files.createTempFile(getWorkingDirectory(), "converted",
-                            "." + FilenameUtils.normalize(getOutputFormat()));
-                        String result = executePlugin(directAccess.getPath(), pluginResult, fileFormat);
-
-                        newFileId = file.getId().replaceFirst("[.][^.]+$", "." + outputFormat);
-                        ContentPayload payload = new FSPathContentPayload(pluginResult);
-
-                        if (createDIP) {
-                          FileLink fileLink = new FileLink(file.getAipId(), file.getRepresentationId(), file.getPath(),
-                              file.getId());
-                          List<FileLink> links = new ArrayList<>();
-                          links.add(fileLink);
-
-                          DIP dip = new DIP();
-                          dip.setId(IdUtils.createUUID());
-                          dip.setFileIds(links);
-                          dip.setPermissions(aip.getPermissions());
-                          dip.setTitle(dipTitle);
-                          dip.setDescription(dipDescription);
-                          dip.setType(RodaConstants.DIP_TYPE_CONVERSION);
-                          dip = model.createDIP(dip, true);
-                          newRepresentationID = dip.getId();
-
-                          DIPFile f = model.createDIPFile(newRepresentationID, file.getPath(), newFileId,
-                              directAccess.getPath().toFile().length(), payload, notify);
-                          newDIPFiles.add(f);
-                        } else {
-                          // create a new representation if it does not exist
-                          if (!newRepresentations.contains(newRepresentationID)) {
-                            LOGGER.debug("Creating a new representation {} on AIP {}", newRepresentationID,
-                                aip.getId());
-                            boolean original = false;
-                            newRepresentations.add(newRepresentationID);
-                            String newRepresentationType = representation.getType();
-
-                            if (StringUtils.isNotBlank(representationType)) {
-                              newRepresentationType = representationType;
-                            }
-
-                            List<String> state = Collections.emptyList();
-                            if (markAsPreservation) {
-                              state = List.of("PRESERVATION");
-                            }
-
-                            model.createRepresentation(aip.getId(), newRepresentationID, original,
-                                newRepresentationType, notify, job.getUsername(), state);
-                            reportItem.setSourceAndOutcomeObjectId(reportItem.getSourceObjectId(),
-                                IdUtils.getRepresentationId(representation.getAipId(), newRepresentationID));
-                          }
-
-                          File f = model.createFile(aip.getId(), newRepresentationID, file.getPath(), newFileId,
-                              payload, job.getUsername(), notify);
-                          newFiles.add(f);
-                        }
-
-                        alteredFiles.add(file);
-                        IOUtils.closeQuietly(directAccess);
-
-                        Report fileReportItem = PluginHelper.initPluginReportItem(this, file.getId(), File.class,
-                            AIPState.ACTIVE);
-                        fileReportItem.setPluginState(pluginResultState).setPluginDetails(result);
-                        reportItem.addReport(fileReportItem);
-
-                      } catch (CommandException e) {
-                        pluginResultState = PluginState.FAILURE;
-                        reportState = pluginResultState;
-                        reportItem.setPluginState(pluginResultState).addPluginDetails(getOutputMessage(e));
-
-                        LOGGER.debug("Conversion ({} to {}) failed on file {} of representation {} from AIP {}",
-                            fileFormat, outputFormat, file.getId(), representation.getId(), aip.getId());
-                      }
-
-                    } else {
-                      unchangedFiles.add(file);
-
-                      if (ignoreFiles) {
-                        validationReport.addIssue(new ValidationIssue(ModelUtils.getFileStoragePath(file).toString()));
-                      } else {
-                        pluginResultState = PluginState.FAILURE;
-                        reportState = pluginResultState;
-                        hasUnacceptedFormatFiles = true;
-                      }
-                    }
-                  }
-                }
-              } else {
-                LOGGER.error("Cannot process AIP representation file", oFile.getCause());
-              }
+            for (OptionalWithCause<File> file : repFiles) {
+              allFilesFromAllRepresentations.add(file);
             }
+          } catch (Exception e) {
+            LOGGER.error("Error listing files for representation {}: {}", representation.getId(), e.getMessage());
+          }
+        }
 
-            reportItem.setPluginState(pluginResultState);
+        ConversionContext context = new ConversionContext(aip.getId(), null, // No specific source representation
+            newRepresentationID, aipReportItem, newRepresentations);
 
-            if (reportState.equals(PluginState.SUCCESS)) {
-              if (ignoreFiles && !validationReport.getIssues().isEmpty()) {
-                reportItem.setHtmlPluginDetails(true)
-                    .setPluginDetails(validationReport.toHtml(false, false, false, "Ignored files"));
-              }
-            }
+        try {
+          CloseableIterable<OptionalWithCause<File>> allFiles = CloseableIterables
+              .fromList(allFilesFromAllRepresentations);
 
-            if (hasUnacceptedFormatFiles) {
-              reportItem.setPluginDetails(
-                  "Source files include formats that are not accepted by this plugin and the plugin was not set to ignore these files. The conversion was not run.");
-            }
+          ConversionResult result = processFilesForConversion(index, model, storage, allFiles, job, context, report);
 
-            // add unchanged files to the new representation if created
-            if (!alteredFiles.isEmpty() && !createDIP) {
-              createNewFilesOnRepresentation(storage, model, unchangedFiles, newRepresentationID, job.getUsername(),
-                  notify);
-            }
+          // accumulate results for AIP-level event creation
+          alteredFiles.addAll(result.alteredFiles);
+          newFiles.addAll(result.newFiles);
 
-          } catch (RuntimeException | NotFoundException | GenericException | RequestNotValidException
-              | AuthorizationDeniedException | IOException | AlreadyExistsException | PluginException e) {
-            LOGGER.error("Error processing AIP " + aip.getId() + ": " + e.getMessage(), e);
-            pluginResultState = PluginState.FAILURE;
-            reportState = pluginResultState;
-            reportItem.setPluginState(pluginResultState).setPluginDetails(e.getMessage());
-          } finally {
-            report.addReport(reportItem);
-            PluginHelper.updatePartialJobReport(this, model, reportItem, true, job);
+        } catch (RuntimeException | NotFoundException | GenericException | RequestNotValidException
+            | AuthorizationDeniedException | IOException | AlreadyExistsException | PluginException e) {
+          LOGGER.error("Error processing AIP " + aip.getId() + ": " + e.getMessage(), e);
+          reportState = PluginState.FAILURE;
+          aipReportItem.setPluginState(reportState).setPluginDetails(e.getMessage());
+        } finally {
+          report.addReport(aipReportItem);
+          PluginHelper.updatePartialJobReport(this, model, aipReportItem, true, job);
 
-            if (!createDIP) {
-              try {
-                Representation rep = model.retrieveRepresentation(aip.getId(), newRepresentationID);
-                createPremisSkeletonOnRepresentation(model, aip.getId(), rep, job.getUsername());
-              } catch (RequestNotValidException | GenericException | NotFoundException | AuthorizationDeniedException
-                  | ValidationException | IOException e) {
-                LOGGER.error("Error running premis skeleton on new representation: {}", e.getMessage());
-              }
+          if (!createDIP && !alteredFiles.isEmpty()) {
+            try {
+              Representation rep = model.retrieveRepresentation(aip.getId(), newRepresentationID);
+              createPremisSkeletonOnRepresentation(model, aip.getId(), rep, job.getUsername());
+            } catch (RequestNotValidException | GenericException | NotFoundException | AuthorizationDeniedException
+                | ValidationException | IOException e) {
+              LOGGER.error("Error running premis skeleton on new representation: {}", e.getMessage());
             }
           }
         }
@@ -453,15 +492,11 @@ public abstract class AbstractConvertPlugin<T extends IsRODAObject> extends Abst
     String aipId = null;
 
     for (Representation representation : list) {
-      List<File> unchangedFiles = new ArrayList<>();
-      String newRepresentationID = IdUtils.createUUID();
-      List<File> alteredFiles = new ArrayList<>();
-      List<File> newFiles = new ArrayList<>();
-      List<DIPFile> newDIPFiles = new ArrayList<>();
       aipId = representation.getAipId();
-      PluginState reportState = PluginState.SUCCESS;
-      PluginState pluginResultState = PluginState.SUCCESS;
       boolean notify = true;
+      PluginState reportState = PluginState.SUCCESS;
+
+      String newRepresentationID = IdUtils.createUUID();
 
       Report reportItem = PluginHelper.initPluginReportItem(this, IdUtils.getRepresentationId(representation),
           Representation.class, AIPState.ACTIVE);
@@ -469,158 +504,33 @@ public abstract class AbstractConvertPlugin<T extends IsRODAObject> extends Abst
         reportItem.setOutcomeObjectClass(DIP.class.getName());
       }
 
-      ValidationReport validationReport = new ValidationReport();
-      boolean hasNonPdfFiles = false;
-
       try (CloseableIterable<OptionalWithCause<File>> allFiles = model.listFilesUnder(representation.getAipId(),
           representation.getId(), true)) {
         LOGGER.debug("Processing representation {}", representation);
 
-        for (OptionalWithCause<File> oFile : allFiles) {
-          String newFileId = null;
-          if (oFile.isPresent()) {
-            File file = oFile.get();
-            LOGGER.debug("Processing file {}", file);
+        ConversionContext context = new ConversionContext(aipId, representation.getId(),
+            newRepresentationID, reportItem, newRepresentations);
 
-            if (!file.isDirectory()) {
-              if (FSUtils.isManifestOfExternalFiles(file.getId())) {
-                processShallowFile(index, file, job, newRepresentationID, model, pluginResultState, reportItem, notify,
-                    storage, newFileId, newDIPFiles, newFiles, reportState, report);
-              } else {
-                IndexedFile ifile = index.retrieve(IndexedFile.class, IdUtils.getFileId(file),
-                    RodaConstants.FILE_FORMAT_FIELDS_TO_RETURN);
-                String fileMimetype = ifile.getFileFormat().getMimeType();
-                String filePronom = ifile.getFileFormat().getPronom();
-                String fileFormat = ifile.getId().substring(ifile.getId().lastIndexOf('.') + 1);
-                List<String> applicableTo = getApplicableTo();
-                List<String> convertableTo = getConvertableTo();
-                Map<String, List<String>> pronomToExtension = getPronomToExtension();
-                Map<String, List<String>> mimetypeToExtension = getMimetypeToExtension();
+        ConversionResult result = processFilesForConversion(index, model, storage, allFiles, job, context, report);
 
-                if (doPluginExecute(fileFormat, filePronom, fileMimetype, applicableTo, convertableTo,
-                    pronomToExtension, mimetypeToExtension)) {
-
-                  fileFormat = getNewFileFormat(fileFormat, filePronom, fileMimetype, applicableTo, pronomToExtension,
-                      mimetypeToExtension);
-
-                  StoragePath fileStoragePath = ModelUtils.getFileStoragePath(file);
-                  DirectResourceAccess directAccess = storage.getDirectAccess(fileStoragePath);
-
-                  LOGGER.debug("Running a ConvertPlugin ({} to {}) on {}", fileFormat, outputFormat, file.getId());
-                  try {
-                    Path pluginResult = Files.createTempFile(getWorkingDirectory(), "converted",
-                        "." + FilenameUtils.normalize(getOutputFormat()));
-                    String result = executePlugin(directAccess.getPath(), pluginResult, fileFormat);
-                    ContentPayload payload = new FSPathContentPayload(pluginResult);
-
-                    if (!newRepresentations.contains(newRepresentationID)) {
-                      LOGGER.debug("Creating a new representation {} on AIP {}", newRepresentationID, aipId);
-                      boolean original = false;
-                      newRepresentations.add(newRepresentationID);
-
-                      if (createDIP) {
-                        FileLink fileLink = new FileLink(file.getAipId(), file.getRepresentationId(), file.getPath(),
-                            file.getId());
-                        List<FileLink> links = new ArrayList<>();
-                        links.add(fileLink);
-
-                        AIP aip = model.retrieveAIP(aipId);
-
-                        DIP dip = new DIP();
-                        dip.setId(IdUtils.createUUID());
-                        dip.setFileIds(links);
-                        dip.setPermissions(aip.getPermissions());
-                        dip.setTitle(dipTitle);
-                        dip.setDescription(dipDescription);
-                        dip.setType(RodaConstants.DIP_TYPE_CONVERSION);
-                        dip = model.createDIP(dip, true);
-                        newRepresentationID = dip.getId();
-                      } else {
-                        // INFO will be a parameter
-                        String newRepresentationType = RodaConstants.REPRESENTATION_TYPE_MIXED;
-
-                        if (StringUtils.isNotBlank(representationType)) {
-                          newRepresentationType = representationType;
-                        }
-
-                        List<String> state = Collections.emptyList();
-                        if (markAsPreservation) {
-                          state = List.of("PRESERVATION");
-                        }
-
-                        model.createRepresentation(aipId, newRepresentationID, original, newRepresentationType, notify,
-                            job.getUsername(), state);
-                        reportItem.setSourceAndOutcomeObjectId(reportItem.getSourceObjectId(),
-                            IdUtils.getRepresentationId(representation.getAipId(), newRepresentationID));
-                      }
-                    }
-
-                    newFileId = file.getId().replaceFirst("[.][^.]+$", "." + outputFormat);
-                    if (createDIP) {
-                      DIPFile f = model.createDIPFile(newRepresentationID, file.getPath(), newFileId,
-                          directAccess.getPath().toFile().length(), payload, notify);
-                      newDIPFiles.add(f);
-                    } else {
-                      File newFile = model.createFile(aipId, newRepresentationID, file.getPath(), newFileId, payload,
-                          job.getUsername(), notify);
-                      newFiles.add(newFile);
-                    }
-
-                    alteredFiles.add(file);
-                    IOUtils.closeQuietly(directAccess);
-
-                    Report fileReportItem = PluginHelper.initPluginReportItem(this, file.getId(), File.class,
-                        AIPState.ACTIVE);
-                    fileReportItem.setPluginState(PluginState.SUCCESS).setPluginDetails(result);
-                    reportItem.addReport(fileReportItem);
-
-                  } catch (CommandException e) {
-                    reportState = PluginState.FAILURE;
-                    reportItem.setPluginState(reportState).addPluginDetails(getOutputMessage(e));
-
-                    LOGGER.debug("Conversion ({} to {}) failed on file {} of representation {} from AIP {}", fileFormat,
-                        outputFormat, file.getId(), representation.getId(), representation.getAipId());
-                  }
-                } else {
-                  unchangedFiles.add(file);
-
-                  if (ignoreFiles) {
-                    validationReport.addIssue(new ValidationIssue(file.getId()));
-                  } else {
-                    reportState = PluginState.FAILURE;
-                    hasNonPdfFiles = true;
-                  }
-                }
-              }
-            }
+        // add unchanged files to the new representation
+        if (!result.alteredFiles.isEmpty()) {
+          if (createDIP) {
+            createNewFilesOnDIP(storage, model, new ArrayList<>(), newRepresentationID, notify);
           } else {
-            LOGGER.error("Cannot process AIP representation file", oFile.getCause());
+            createNewFilesOnRepresentation(storage, model, new ArrayList<>(), newRepresentationID, job.getUsername(),
+                notify);
           }
-        }
-
-        reportItem.setPluginState(reportState);
-        if (reportState.equals(PluginState.SUCCESS) && ignoreFiles && !validationReport.getIssues().isEmpty()) {
-          reportItem.setHtmlPluginDetails(true)
-              .setPluginDetails(validationReport.toHtml(false, false, false, "Ignored files"));
-        }
-
-        if (hasNonPdfFiles) {
-          reportItem.setPluginDetails(
-              "Source files include formats that are not accepted by this plugin and the plugin was not set to ignore these files. The conversion was not run.");
         }
 
         report.addReport(reportItem);
         PluginHelper.updatePartialJobReport(this, model, reportItem, true, job);
 
-        // add unchanged files to the new representation
-        if (!alteredFiles.isEmpty()) {
-          if (createDIP) {
-            createNewFilesOnDIP(storage, model, unchangedFiles, newRepresentationID, notify);
-          } else {
-            createNewFilesOnRepresentation(storage, model, unchangedFiles, newRepresentationID, job.getUsername(),
-                notify);
-          }
-        }
+        jobPluginInfo.incrementObjectsProcessed(reportState);
+        LOGGER.debug("Creating convert plugin event for the representation " + representation.getId());
+        boolean notifyEvent = false;
+        createEvent(model, index, aipId, representation.getId(), null, null, outputFormat, result.state,
+            result.alteredFiles, result.newFiles, notifyEvent, job);
 
       } catch (RuntimeException | NotFoundException | GenericException | RequestNotValidException
           | AuthorizationDeniedException | IOException | AlreadyExistsException e) {
@@ -630,12 +540,6 @@ public abstract class AbstractConvertPlugin<T extends IsRODAObject> extends Abst
         reportItem.setPluginState(PluginState.FAILURE).setPluginDetails(e.getMessage());
         report.addReport(reportItem);
       }
-
-      jobPluginInfo.incrementObjectsProcessed(reportState);
-      LOGGER.debug("Creating convert plugin event for the representation " + representation.getId());
-      boolean notifyEvent = false;
-      createEvent(model, index, aipId, representation.getId(), null, null, outputFormat, reportState, alteredFiles,
-          newFiles, notifyEvent, job);
 
       if (!createDIP) {
         try {
@@ -661,15 +565,10 @@ public abstract class AbstractConvertPlugin<T extends IsRODAObject> extends Abst
   protected Report executeOnFile(IndexService index, ModelService model, StorageService storage, Report report,
       JobPluginInfo jobPluginInfo, List<File> list, Job job) throws PluginException {
 
-    Map<String, String> changedRepresentationsOnAIPs = new HashMap<>();
-    boolean notify = true;
-    String newRepresentationID = null;
-    String newFileId = null;
-    ArrayList<File> newFiles = new ArrayList<>();
-    ArrayList<DIPFile> newDIPFiles = new ArrayList<>();
+    List<String> newRepresentations = new ArrayList<>();
+    String newRepresentationID = IdUtils.createUUID();
     Report reportItem = null;
     PluginState reportState = PluginState.SUCCESS;
-    PluginState pluginResultState = PluginState.SUCCESS;
 
     for (File file : list) {
       try {
@@ -678,11 +577,8 @@ public abstract class AbstractConvertPlugin<T extends IsRODAObject> extends Abst
             executeOnFile(index, model, storage, report, jobPluginInfo, Arrays.asList(fileShallows.get()), job);
           }
         } else {
-          StorageService tmpStorageService = null;
           try {
             LOGGER.debug("Processing file {}", file.getId());
-            newRepresentationID = IdUtils.createUUID();
-            pluginResultState = PluginState.SUCCESS;
 
             reportItem = PluginHelper.initPluginReportItem(this, IdUtils.getFileId(file), File.class, AIPState.ACTIVE);
             if (createDIP) {
@@ -690,155 +586,53 @@ public abstract class AbstractConvertPlugin<T extends IsRODAObject> extends Abst
             }
 
             if (!file.isDirectory()) {
-              IndexedFile ifile = index.retrieve(IndexedFile.class, IdUtils.getFileId(file),
-                  RodaConstants.FILE_FORMAT_FIELDS_TO_RETURN);
-              String fileMimetype = ifile.getFileFormat().getMimeType();
-              String filePronom = ifile.getFileFormat().getPronom();
-              String fileFormat = ifile.getId().substring(ifile.getId().lastIndexOf('.') + 1);
-              List<String> applicableTo = getApplicableTo();
-              List<String> convertableTo = getConvertableTo();
-              Map<String, List<String>> pronomToExtension = getPronomToExtension();
-              Map<String, List<String>> mimetypeToExtension = getMimetypeToExtension();
-
-              if (doPluginExecute(fileFormat, filePronom, fileMimetype, applicableTo, convertableTo, pronomToExtension,
-                  mimetypeToExtension)) {
-
-                fileFormat = getNewFileFormat(fileFormat, filePronom, fileMimetype, applicableTo, pronomToExtension,
-                    mimetypeToExtension);
-
-                StoragePath fileStoragePath = ModelUtils.getFileStoragePath(file);
-                DirectResourceAccess directAccess = storage.getDirectAccess(fileStoragePath);
-                if (file.isReference()) {
-                  tmpStorageService = ModelUtils.resolveTemporaryResourceShallow(job.getId(), storage,
-                      ModelUtils.getAIPStoragePath(file.getAipId()));
-                  directAccess = tmpStorageService.getDirectAccess(fileStoragePath);
+              // Process single file using helper method
+              CloseableIterable<OptionalWithCause<File>> files = new CloseableIterable<OptionalWithCause<File>>() {
+                @Override
+                public java.util.Iterator<OptionalWithCause<File>> iterator() {
+                  return Arrays.asList(OptionalWithCause.of(file)).iterator();
                 }
 
-                LOGGER.debug("Running a ConvertPlugin ({} to {}) on {}", fileFormat, outputFormat, file.getId());
-                try {
-                  Path pluginResult = Files.createTempFile(getWorkingDirectory(), "converted",
-                      "." + FilenameUtils.normalize(getOutputFormat()));
-                  String result = executePlugin(directAccess.getPath(), pluginResult, fileFormat);
-
-                  ContentPayload payload = new FSPathContentPayload(pluginResult);
-                  StoragePath storagePath = ModelUtils.getRepresentationStoragePath(file.getAipId(),
-                      file.getRepresentationId());
-
-                  // create a new representation if it does not exist
-                  LOGGER.debug("Creating a new representation {} on AIP {}", newRepresentationID, file.getAipId());
-                  boolean original = false;
-                  if (createDIP) {
-                    FileLink fileLink = new FileLink(file.getAipId(), file.getRepresentationId(), file.getPath(),
-                        file.getId());
-                    List<FileLink> links = new ArrayList<>();
-                    links.add(fileLink);
-
-                    AIP aip = model.retrieveAIP(file.getAipId());
-
-                    DIP dip = new DIP();
-                    dip.setId(IdUtils.createUUID());
-                    dip.setFileIds(links);
-                    dip.setPermissions(aip.getPermissions());
-                    dip.setTitle(dipTitle);
-                    dip.setDescription(dipDescription);
-                    dip.setType(RodaConstants.DIP_TYPE_CONVERSION);
-                    dip = model.createDIP(dip, true);
-                    newRepresentationID = dip.getId();
-                  } else {
-                    // INFO will be a parameter
-                    String newRepresentationType = RodaConstants.REPRESENTATION_TYPE_MIXED;
-
-                    if (StringUtils.isNotBlank(representationType)) {
-                      newRepresentationType = representationType;
-                    }
-
-                    List<String> state = Collections.emptyList();
-                    if (markAsPreservation) {
-                      state = List.of("PRESERVATION");
-                    }
-
-                    model.createRepresentation(file.getAipId(), newRepresentationID, original,
-                        newRepresentationType,
-                        model.getStorage(), storagePath, true, job.getUsername());
-
-                    model.changeRepresentationStates(file.getAipId(), newRepresentationID, state, job.getUsername());
-                    index.commit(IndexedRepresentation.class);
-                  }
-
-                  // update file on new representation
-                  newFileId = file.getId().replaceFirst("[.][^.]+$", "." + outputFormat);
-
-                  if (createDIP) {
-                    DIPFile f = model.createDIPFile(newRepresentationID, file.getPath(), newFileId,
-                        directAccess.getPath().toFile().length(), payload, notify);
-                    newDIPFiles.add(f);
-                  } else {
-                    model.deleteFile(file.getAipId(), newRepresentationID, file.getPath(), file.getId(),
-                        job.getUsername(), notify);
-                    File f = model.createFile(file.getAipId(), newRepresentationID, file.getPath(), newFileId, payload,
-                        job.getUsername(), notify);
-                    newFiles.add(f);
-                    reportItem.setSourceAndOutcomeObjectId(reportItem.getSourceObjectId(), IdUtils.getFileId(f));
-                    changedRepresentationsOnAIPs.put(file.getRepresentationId(), file.getAipId());
-                  }
-
-                  Report fileReportItem = PluginHelper.initPluginReportItem(this, file.getId(), File.class,
-                      AIPState.ACTIVE);
-                  fileReportItem.setPluginState(PluginState.SUCCESS).setPluginDetails(result);
-                  reportItem.addReport(fileReportItem);
-
-                } catch (CommandException e) {
-                  pluginResultState = PluginState.FAILURE;
-                  Report fileReportItem = PluginHelper.initPluginReportItem(this, file.getId(), File.class,
-                      AIPState.ACTIVE);
-                  fileReportItem.setPluginState(PluginState.FAILURE).setPluginDetails(getOutputMessage(e));
-                  reportItem.addReport(fileReportItem);
-
-                  LOGGER.debug("Conversion ({} to {}) failed on file {} of representation {} from AIP {}", fileFormat,
-                      outputFormat, file.getId(), file.getRepresentationId(), file.getAipId());
+                @Override
+                public void close() throws IOException {
+                  // Nothing to close
                 }
+              };
+
+              ConversionContext context = new ConversionContext(file.getAipId(), file.getRepresentationId(),
+                  newRepresentationID, reportItem, newRepresentations);
+              // Note: For executeOnFile, we don't set createPerFileContainer anymore since
+              // containers are created lazily
+
+              ConversionResult result = processFilesForConversion(index, model, storage, files, job, context, report);
+
+              if (!result.state.equals(PluginState.SUCCESS)) {
+                reportState = PluginState.FAILURE;
+                jobPluginInfo.incrementObjectsProcessedWithFailure();
               } else {
-                if (ignoreFiles) {
-                  reportItem.setPluginDetails("This file was ignored.");
-                } else {
-                  pluginResultState = PluginState.FAILURE;
-                  reportItem.setPluginDetails(
-                      "This file was not ignored and it is not listed on the supported input file formats.");
-                }
+                jobPluginInfo.incrementObjectsProcessedWithSuccess();
               }
-            }
-
-            if (!pluginResultState.equals(PluginState.SUCCESS)) {
-              reportState = PluginState.FAILURE;
-              jobPluginInfo.incrementObjectsProcessedWithFailure();
-            } else {
-              jobPluginInfo.incrementObjectsProcessedWithSuccess();
             }
 
           } catch (RuntimeException | NotFoundException | GenericException | RequestNotValidException
               | AuthorizationDeniedException | IOException | AlreadyExistsException e) {
             LOGGER.error("Error processing File {}: {}", file.getId(), e.getMessage(), e);
             reportState = PluginState.FAILURE;
-            reportItem.setPluginDetails(e.getMessage());
+            if (reportItem != null) {
+              reportItem.setPluginDetails(e.getMessage());
+            }
             jobPluginInfo.incrementObjectsProcessedWithFailure();
           } finally {
-            if (file.isReference() && tmpStorageService != null) {
-              try {
-                if (!job.getPluginType().equals(PluginType.INGEST)) {
-                  ModelUtils.removeTemporaryResourceShallow(job.getId(), ModelUtils.getAIPStoragePath(file.getAipId()));
-                }
-              } catch (RequestNotValidException | IOException e) {
-                LOGGER.error("Error on removing temporary AIP " + file.getAipId(), e);
-              }
+            if (reportItem != null) {
+              reportItem.setPluginState(PluginState.SUCCESS); // This should be set based on actual result
+              report.addReport(reportItem);
+              PluginHelper.updatePartialJobReport(this, model, reportItem, true, job);
             }
-            reportItem.setPluginState(pluginResultState);
-            report.addReport(reportItem);
-            PluginHelper.updatePartialJobReport(this, model, reportItem, true, job);
           }
 
           boolean notifyEvent = true;
           createEvent(model, index, file.getAipId(), file.getRepresentationId(), file.getPath(), file.getId(),
-              outputFormat, reportState, Arrays.asList(file), newFiles, notifyEvent, job);
+              outputFormat, reportState, Arrays.asList(file), new ArrayList<>(), notifyEvent, job);
 
           if (!createDIP) {
             try {
@@ -852,7 +646,9 @@ public abstract class AbstractConvertPlugin<T extends IsRODAObject> extends Abst
         }
       } catch (NotFoundException | GenericException | RequestNotValidException | AuthorizationDeniedException e) {
         reportState = PluginState.FAILURE;
-        reportItem.setPluginDetails(e.getMessage());
+        if (reportItem != null) {
+          reportItem.setPluginDetails(e.getMessage());
+        }
         jobPluginInfo.incrementObjectsProcessedWithFailure();
       }
     }
@@ -970,8 +766,6 @@ public abstract class AbstractConvertPlugin<T extends IsRODAObject> extends Abst
                 String result = executePlugin(directAccess.getPath(), pluginResult, fileFormat);
 
                 ContentPayload payload = new FSPathContentPayload(pluginResult);
-                StoragePath storagePath = ModelUtils.getRepresentationStoragePath(file1.getAipId(),
-                    file1.getRepresentationId());
 
                 // create a new representation if it does not exist
                 LOGGER.debug("Creating a new representation {} on AIP {}", newRepresentationID, file1.getAipId());
@@ -1007,14 +801,19 @@ public abstract class AbstractConvertPlugin<T extends IsRODAObject> extends Abst
                   }
 
                   model.createRepresentation(file1.getAipId(), newRepresentationID, original,
-                      newRepresentationType,
-                      model.getStorage(), storagePath, true, job.getUsername());
-                  model.changeRepresentationStates(file1.getAipId(), newRepresentationID, state, job.getUsername());
-                  index.commit(IndexedRepresentation.class);
+                      newRepresentationType, true, job.getUsername(), state);
                 }
 
                 // update file on new representation
-                newFileId = file1.getId().replaceFirst("[.][^.]+$", "." + outputFormat);
+                if (outputFormat.equalsIgnoreCase(FilenameUtils.getExtension(file1.getId()))) {
+                  // Same format, keep original filename
+                  newFileId = file1.getId();
+                } else {
+                  // Different format, include original extension to avoid conflicts
+                  String originalBaseName = FilenameUtils.getBaseName(file1.getId());
+                  String originalExtension = FilenameUtils.getExtension(file1.getId());
+                  newFileId = originalBaseName + "_" + originalExtension + "." + outputFormat;
+                }
 
                 if (createDIP) {
                   DIPFile f = model.createDIPFile(newRepresentationID, file1.getPath(), newFileId,
@@ -1159,6 +958,102 @@ public abstract class AbstractConvertPlugin<T extends IsRODAObject> extends Abst
       ContentPayload payload = new FSPathContentPayload(uriPath);
       model.createDIPFile(newRepresentationID, f.getPath(), f.getId(), uriPath.toFile().length(), payload, notify);
     }
+  }
+
+  private String determineRepresentationId(IndexService index, ModelService model, String aipId,
+      String baseRepresentationId,
+      String desiredType, String username, boolean markAsPreservation) throws RequestNotValidException,
+      GenericException, AuthorizationDeniedException, NotFoundException, AlreadyExistsException {
+
+    String desiredRepresentationType = StringUtils.isNotBlank(desiredType) ? desiredType
+        : RodaConstants.REPRESENTATION_TYPE_MIXED;
+
+    // If marking as preservation, check for existing preservation representations
+    // with matching type
+    try {
+      Filter filter = new Filter();
+      filter.add(new SimpleFilterParameter(RodaConstants.REPRESENTATION_AIP_ID, aipId));
+      filter.add(new SimpleFilterParameter(RodaConstants.REPRESENTATION_TYPE, desiredRepresentationType));
+      
+      if (markAsPreservation) {
+        filter.add(new SimpleFilterParameter(RodaConstants.REPRESENTATION_STATES, "PRESERVATION"));
+      }
+      
+      Sorter sorter = new Sorter();
+      sorter.add(new SortParameter(RodaConstants.REPRESENTATION_CREATED_ON, false)); // ascending (oldest first)
+
+      Sublist sublist = new Sublist(0, 1); // Get only the first result
+
+      IndexResult<IndexedRepresentation> result = index.find(IndexedRepresentation.class, filter, sorter, sublist,
+          null, null, false, Arrays.asList(RodaConstants.REPRESENTATION_ID));
+
+      if (result.getTotalCount() > 0 && !result.getResults().isEmpty()) {
+        IndexedRepresentation existingPreservationRep = result.getResults().get(0);
+        String existingRepId = existingPreservationRep.getId();
+        LOGGER.debug("Found existing preservation representation '{}' with type '{}' on AIP {}, reusing it",
+            existingRepId, desiredRepresentationType, aipId);
+        return existingRepId;
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Error querying for existing preservation representations on AIP {}: {}", aipId, e.getMessage());
+      // Continue with normal logic if query fails
+    }
+
+    try {
+      Representation existingRep = model.retrieveRepresentation(aipId, baseRepresentationId);
+
+      if (desiredRepresentationType.equals(existingRep.getType())) {
+        // If marking as preservation, ensure the representation has PRESERVATION state
+        if (markAsPreservation) {
+          List<String> currentStates = existingRep.getRepresentationStates();
+          if (currentStates == null || !currentStates.contains("PRESERVATION")) {
+            // Add PRESERVATION state to existing representation
+            List<String> newStates = new ArrayList<>();
+            if (currentStates != null) {
+              newStates.addAll(currentStates);
+            }
+            if (!newStates.contains("PRESERVATION")) {
+              newStates.add("PRESERVATION");
+            }
+            model.changeRepresentationStates(aipId, baseRepresentationId, newStates, username);
+            LOGGER.debug("Added PRESERVATION state to existing representation '{}' with type '{}' on AIP {}",
+                baseRepresentationId, desiredRepresentationType, aipId);
+          }
+        }
+        LOGGER.debug("Reusing existing representation '{}' with matching type '{}' on AIP {}", baseRepresentationId,
+            desiredRepresentationType, aipId);
+        return baseRepresentationId;
+      } else {
+        // Type mismatch - create a new representation with unique ID
+        String newRepresentationId = IdUtils.createUUID();
+        LOGGER.debug(
+            "Creating new representation '{}' (type: '{}') because existing '{}' has different type '{}' on AIP {}",
+            newRepresentationId, desiredRepresentationType, baseRepresentationId, existingRep.getType(), aipId);
+
+        createNewRepresentation(model, aipId, newRepresentationId, desiredRepresentationType, username,
+            markAsPreservation);
+        return newRepresentationId;
+      }
+    } catch (NotFoundException e) {
+      // Base representation doesn't exist, create it
+      LOGGER.debug("Creating base representation '{}' with type '{}' on AIP {}", baseRepresentationId,
+          desiredRepresentationType, aipId);
+      createNewRepresentation(model, aipId, baseRepresentationId, desiredRepresentationType, username,
+          markAsPreservation);
+      return baseRepresentationId;
+    }
+  }
+
+  private void createNewRepresentation(ModelService model, String aipId, String representationId, String type,
+      String username, boolean markAsPreservation) throws RequestNotValidException, GenericException,
+      AuthorizationDeniedException, NotFoundException, AlreadyExistsException {
+    boolean original = false;
+    List<String> state = Collections.emptyList();
+    if (markAsPreservation) {
+      state = List.of("PRESERVATION");
+    }
+
+    model.createRepresentation(aipId, representationId, original, type, true, username, state);
   }
 
   private String getOutputMessage(CommandException exception) {
