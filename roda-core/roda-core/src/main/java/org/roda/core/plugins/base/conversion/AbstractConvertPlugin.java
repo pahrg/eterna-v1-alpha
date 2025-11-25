@@ -79,7 +79,6 @@ import org.roda.core.util.IdUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 public abstract class AbstractConvertPlugin<T extends IsRODAObject> extends AbstractAIPComponentsPlugin<T> {
   private static final Logger LOGGER = LoggerFactory.getLogger(AbstractConvertPlugin.class);
   private static Map<String, PluginParameter> pluginParameters = new HashMap<>();
@@ -267,7 +266,6 @@ public abstract class AbstractConvertPlugin<T extends IsRODAObject> extends Abst
         "convert", "allplugins", "hasPartialSuccessOnOutcome"));
   }
 
-
   /**
    * Helper method to process files for conversion
    */
@@ -321,7 +319,7 @@ public abstract class AbstractConvertPlugin<T extends IsRODAObject> extends Abst
                 String result = executePlugin(directAccess.getPath(), pluginResult, fileFormat);
 
                 newFileId = file.getId().replaceFirst("[.][^.]+$", "." + outputFormat);
-                
+
                 ContentPayload payload = new FSPathContentPayload(pluginResult);
 
                 if (createDIP) {
@@ -329,17 +327,19 @@ public abstract class AbstractConvertPlugin<T extends IsRODAObject> extends Abst
                       directAccess.getPath().toFile().length(), payload, true);
                   newDIPFiles.add(f);
                 } else {
-                // Create file in existing representation
-                String actualRepresentationId = context.newRepresentationId;
-                if (!context.newRepresentations.contains(actualRepresentationId)) {
-                  // Determine the appropriate representation ID based on existing reps and desired type
-                  actualRepresentationId = determineRepresentationId(index, model, context.aipId, context.newRepresentationId,
-                      representationType, job.getUsername(), markAsPreservation);
-
+                  // Create file in existing representation
+                  String actualRepresentationId = context.newRepresentationId;
                   if (!context.newRepresentations.contains(actualRepresentationId)) {
-                    context.newRepresentations.add(actualRepresentationId);
+                    // Determine the appropriate representation ID based on existing reps and
+                    // desired type
+                    actualRepresentationId = determineRepresentationId(index, model, context.aipId,
+                        context.newRepresentationId,
+                        representationType, job.getUsername(), markAsPreservation);
+
+                    if (!context.newRepresentations.contains(actualRepresentationId)) {
+                      context.newRepresentations.add(actualRepresentationId);
+                    }
                   }
-                }
 
                   File f = model.updateFile(context.aipId, actualRepresentationId, file.getPath(), newFileId,
                       payload, true, job.getUsername(), true);
@@ -405,7 +405,8 @@ public abstract class AbstractConvertPlugin<T extends IsRODAObject> extends Abst
       List<File> alteredFiles = new ArrayList<>();
       List<File> newFiles = new ArrayList<>();
       if (aip.getRepresentations() != null && !aip.getRepresentations().isEmpty()) {
-        // Create a single "converted" representation for all files from all representations
+        // Create a single "converted" representation for all files from all
+        // representations
         Report aipReportItem = PluginHelper.initPluginReportItem(this, aip.getId(),
             aip.getId(), AIP.class, AIPState.ACTIVE);
         if (createDIP) {
@@ -430,7 +431,8 @@ public abstract class AbstractConvertPlugin<T extends IsRODAObject> extends Abst
             newRepresentationID, aipReportItem, newRepresentations);
 
         try {
-          CloseableIterable<OptionalWithCause<File>> allFiles = CloseableIterables.fromList(allFilesFromAllRepresentations);
+          CloseableIterable<OptionalWithCause<File>> allFiles = CloseableIterables
+              .fromList(allFilesFromAllRepresentations);
 
           ConversionResult result = processFilesForConversion(index, model, storage, allFiles, job, context, report);
 
@@ -599,7 +601,8 @@ public abstract class AbstractConvertPlugin<T extends IsRODAObject> extends Abst
 
               ConversionContext context = new ConversionContext(file.getAipId(), file.getRepresentationId(),
                   newRepresentationID, reportItem, newRepresentations);
-              // Note: For executeOnFile, we don't set createPerFileContainer anymore since containers are created lazily
+              // Note: For executeOnFile, we don't set createPerFileContainer anymore since
+              // containers are created lazily
 
               ConversionResult result = processFilesForConversion(index, model, storage, files, job, context, report);
 
@@ -957,40 +960,43 @@ public abstract class AbstractConvertPlugin<T extends IsRODAObject> extends Abst
     }
   }
 
-  private String determineRepresentationId(IndexService index, ModelService model, String aipId, String baseRepresentationId,
+  private String determineRepresentationId(IndexService index, ModelService model, String aipId,
+      String baseRepresentationId,
       String desiredType, String username, boolean markAsPreservation) throws RequestNotValidException,
       GenericException, AuthorizationDeniedException, NotFoundException, AlreadyExistsException {
 
     String desiredRepresentationType = StringUtils.isNotBlank(desiredType) ? desiredType
         : RodaConstants.REPRESENTATION_TYPE_MIXED;
 
-    // If marking as preservation, check for existing preservation representations with matching type
-    if (markAsPreservation) {
-      try {
-        Filter filter = new Filter();
-        filter.add(new SimpleFilterParameter(RodaConstants.REPRESENTATION_AIP_ID, aipId));
+    // If marking as preservation, check for existing preservation representations
+    // with matching type
+    try {
+      Filter filter = new Filter();
+      filter.add(new SimpleFilterParameter(RodaConstants.REPRESENTATION_AIP_ID, aipId));
+      filter.add(new SimpleFilterParameter(RodaConstants.REPRESENTATION_TYPE, desiredRepresentationType));
+      
+      if (markAsPreservation) {
         filter.add(new SimpleFilterParameter(RodaConstants.REPRESENTATION_STATES, "PRESERVATION"));
-        filter.add(new SimpleFilterParameter(RodaConstants.REPRESENTATION_TYPE, desiredRepresentationType));
-
-        Sorter sorter = new Sorter();
-        sorter.add(new SortParameter(RodaConstants.REPRESENTATION_CREATED_ON, false)); // ascending (oldest first)
-
-        Sublist sublist = new Sublist(0, 1); // Get only the first result
-
-        IndexResult<IndexedRepresentation> result = index.find(IndexedRepresentation.class, filter, sorter, sublist,
-            null, null, false, Arrays.asList(RodaConstants.REPRESENTATION_ID));
-
-        if (result.getTotalCount() > 0 && !result.getResults().isEmpty()) {
-          IndexedRepresentation existingPreservationRep = result.getResults().get(0);
-          String existingRepId = existingPreservationRep.getId();
-          LOGGER.debug("Found existing preservation representation '{}' with type '{}' on AIP {}, reusing it",
-              existingRepId, desiredRepresentationType, aipId);
-          return existingRepId;
-        }
-      } catch (Exception e) {
-        LOGGER.warn("Error querying for existing preservation representations on AIP {}: {}", aipId, e.getMessage());
-        // Continue with normal logic if query fails
       }
+      
+      Sorter sorter = new Sorter();
+      sorter.add(new SortParameter(RodaConstants.REPRESENTATION_CREATED_ON, false)); // ascending (oldest first)
+
+      Sublist sublist = new Sublist(0, 1); // Get only the first result
+
+      IndexResult<IndexedRepresentation> result = index.find(IndexedRepresentation.class, filter, sorter, sublist,
+          null, null, false, Arrays.asList(RodaConstants.REPRESENTATION_ID));
+
+      if (result.getTotalCount() > 0 && !result.getResults().isEmpty()) {
+        IndexedRepresentation existingPreservationRep = result.getResults().get(0);
+        String existingRepId = existingPreservationRep.getId();
+        LOGGER.debug("Found existing preservation representation '{}' with type '{}' on AIP {}, reusing it",
+            existingRepId, desiredRepresentationType, aipId);
+        return existingRepId;
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Error querying for existing preservation representations on AIP {}: {}", aipId, e.getMessage());
+      // Continue with normal logic if query fails
     }
 
     try {
@@ -1020,17 +1026,20 @@ public abstract class AbstractConvertPlugin<T extends IsRODAObject> extends Abst
       } else {
         // Type mismatch - create a new representation with unique ID
         String newRepresentationId = IdUtils.createUUID();
-        LOGGER.debug("Creating new representation '{}' (type: '{}') because existing '{}' has different type '{}' on AIP {}",
+        LOGGER.debug(
+            "Creating new representation '{}' (type: '{}') because existing '{}' has different type '{}' on AIP {}",
             newRepresentationId, desiredRepresentationType, baseRepresentationId, existingRep.getType(), aipId);
 
-        createNewRepresentation(model, aipId, newRepresentationId, desiredRepresentationType, username, markAsPreservation);
+        createNewRepresentation(model, aipId, newRepresentationId, desiredRepresentationType, username,
+            markAsPreservation);
         return newRepresentationId;
       }
     } catch (NotFoundException e) {
       // Base representation doesn't exist, create it
       LOGGER.debug("Creating base representation '{}' with type '{}' on AIP {}", baseRepresentationId,
           desiredRepresentationType, aipId);
-      createNewRepresentation(model, aipId, baseRepresentationId, desiredRepresentationType, username, markAsPreservation);
+      createNewRepresentation(model, aipId, baseRepresentationId, desiredRepresentationType, username,
+          markAsPreservation);
       return baseRepresentationId;
     }
   }
