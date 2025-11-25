@@ -460,7 +460,7 @@ public class PluginParameterPanel extends Composite {
     dropdown.addStyleName(FORM_SELECTBOX);
     dropdown.addStyleName(FORM_TEXTBOX_SMALL);
 
-    BrowserService.Util.getInstance().retrieveDropdownPluginItems(parameter.getId(),
+    BrowserService.Util.getInstance().retrieveDropdownPluginItems(pluginId, parameter.getId(),
       LocaleInfo.getCurrentLocale().getLocaleName(), new AsyncCallback<Set<Pair<String, String>>>() {
 
         @Override
@@ -470,14 +470,18 @@ public class PluginParameterPanel extends Composite {
 
         @Override
         public void onSuccess(Set<Pair<String, String>> result) {
-          Set<Pair<String, String>> treeSet = new TreeSet<>(
-            (p1, p2) -> p1.getFirst().compareToIgnoreCase(p2.getFirst()));
+          int i = 0;
+          int selectedIndex = 0;
+          for (Pair<String, String> item : result) {
+            if(parameter.getDefaultValue().equals(item.getSecond())) {
+              selectedIndex = i;
+            }
 
-          treeSet.addAll(result);
-          for (Pair<String, String> item : treeSet) {
             dropdown.addItem(item.getFirst(), item.getSecond());
+            i++;
           }
 
+          dropdown.setSelectedIndex(selectedIndex);
           value = dropdown.getSelectedValue();
         }
       });
@@ -486,8 +490,8 @@ public class PluginParameterPanel extends Composite {
 
     dropdown.setTitle(OBJECT_BOX);
     layout.add(parameterName);
-    layout.add(dropdown);
     addHelp();
+    layout.add(dropdown);
   }
 
   private FlowPanel createConversionProfileLayout(String repOrDip, String pluginId) {
