@@ -197,7 +197,7 @@ public interface BrowserService extends RemoteService {
 
   Set<Pair<String, String>> retrieveReindexPluginObjectClasses();
 
-  Set<Pair<String, String>> retrieveDropdownPluginItems(String parameterId, String localeString);
+  Set<Pair<String, String>> retrieveDropdownPluginItems(String pluginId, String parameterId, String localeString);
 
   Set<ConversionProfile> retrieveConversionProfilePluginItems(String pluginId, String repOrDip, String localeString);
 

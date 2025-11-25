@@ -8,6 +8,7 @@
 - Change PluginManager to expect an ETERNA-plugin manifest entry, has a fallback to support RODA plugins
 - Ensure parent directories exist when creating a new file in FileStorageService
 - Refactored AbstractConvertPlugin to enhance file conversion process with new ConversionContext and ConversionResult classes, improved file processing logic, enhanced error handling, and consistent representation ID handling
+- Fixed internationalization of DROPDOWN values in PluginParameters for external plugins
 
 ## v0.4.2 (2025-10-14)
 #### New features

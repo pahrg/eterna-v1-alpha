@@ -135,7 +135,7 @@ public interface BrowserServiceAsync {
 
   void retrieveReindexPluginObjectClasses(AsyncCallback<Set<Pair<String, String>>> asyncCallback);
 
-  void retrieveDropdownPluginItems(String parameterId, String localeString,
+  void retrieveDropdownPluginItems(String pluginId, String parameterId, String localeString,
     AsyncCallback<Set<Pair<String, String>>> asyncCallback);
 
   void retrieveConversionProfilePluginItems(String pluginId, String repOrDip, String localeString,
