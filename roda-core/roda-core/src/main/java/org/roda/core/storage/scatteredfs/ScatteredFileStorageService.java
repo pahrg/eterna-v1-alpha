@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.FileTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -584,6 +585,12 @@ public class ScatteredFileStorageService extends FileStorageService  {
         // nothing to do
       }
     };
+  }
+
+  @Override
+  public FileTime getCreationTime(StoragePath storagePath) throws IOException {
+    Path path = ScatteredFSUtils.getEntityPath(basePath, storagePath);
+    return (FileTime) Files.getAttribute(path, "creationTime");
   }
 
   @Override

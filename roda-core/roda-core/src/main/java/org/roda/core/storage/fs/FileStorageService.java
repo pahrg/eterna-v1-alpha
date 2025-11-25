@@ -15,6 +15,7 @@ import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -640,6 +641,12 @@ public class FileStorageService implements StorageService {
         // nothing to do
       }
     };
+  }
+
+  @Override
+  public FileTime getCreationTime(StoragePath storagePath) throws IOException {
+    Path path = FSUtils.getEntityPath(basePath, storagePath);
+    return (FileTime) Files.getAttribute(path, "creationTime");
   }
 
   @Override

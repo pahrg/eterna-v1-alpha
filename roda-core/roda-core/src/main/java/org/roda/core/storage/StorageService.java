@@ -7,7 +7,9 @@
  */
 package org.roda.core.storage;
 
+import java.io.IOException;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.util.List;
 import java.util.Map;
 
@@ -76,7 +78,7 @@ public interface StorageService {
   /**
    * Get an existing container.
    *
-   * @param name
+   * @param storagePath
    *          storage path that identifies the container.
    *
    * @throws GenericException
@@ -333,7 +335,7 @@ public interface StorageService {
    * Copy resources from another (or the same) storage service.
    *
    * @param fromService
-   * @param fromContainer
+   * @param fromStoragePath
    * @param toStoragePath
    *
    * @throws GenericException
@@ -367,6 +369,8 @@ public interface StorageService {
     AuthorizationDeniedException;
 
   DirectResourceAccess getDirectAccess(StoragePath storagePath);
+
+  FileTime getCreationTime(StoragePath storagePath) throws IOException;
 
   CloseableIterable<BinaryVersion> listBinaryVersions(StoragePath storagePath)
     throws GenericException, RequestNotValidException, NotFoundException, AuthorizationDeniedException;

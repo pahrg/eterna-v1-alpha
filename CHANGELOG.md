@@ -9,6 +9,7 @@
 - Ensure parent directories exist when creating a new file in FileStorageService
 - Refactored AbstractConvertPlugin to enhance file conversion process with new ConversionContext and ConversionResult classes, improved file processing logic, enhanced error handling, and consistent representation ID handling
 - Fixed internationalization of DROPDOWN values in PluginParameters for external plugins
+- Added a getCreationTime method to StorageService to be able to fetch a file or folders creation time
 
 ## v0.4.2 (2025-10-14)
 #### New features

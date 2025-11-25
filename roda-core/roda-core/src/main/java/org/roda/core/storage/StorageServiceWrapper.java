@@ -7,7 +7,9 @@
  */
 package org.roda.core.storage;
 
+import java.io.IOException;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.util.List;
 import java.util.Map;
 
@@ -194,6 +196,10 @@ public class StorageServiceWrapper implements StorageService {
   @Override
   public DirectResourceAccess getDirectAccess(StoragePath storagePath) {
     return storageService.getDirectAccess(storagePath);
+  }
+
+  public FileTime getCreationTime(StoragePath storagePath) throws IOException {
+    return storageService.getCreationTime(storagePath);
   }
 
   @Override
