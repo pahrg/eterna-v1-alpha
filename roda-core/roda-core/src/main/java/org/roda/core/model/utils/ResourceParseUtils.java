@@ -162,6 +162,32 @@ public class ResourceParseUtils {
     return ret;
   }
 
+  private static DescriptiveMetadata convertResourceToDescriptiveMetadata(Resource resource) throws RequestNotValidException {
+    if (resource == null) {
+      throw new RequestNotValidException(RESOURCE_CANNOT_BE_NULL);
+    }
+
+    StoragePath resourcePath = resource.getStoragePath();
+    String filename = resourcePath.getName();
+
+    String aipId = ModelUtils.extractAipId(resourcePath).orElse(null);
+    String representationId = ModelUtils.extractRepresentationId(resourcePath).orElse(null);
+    String type = representationId != null
+            ? ModelUtils.extractTypeFromRepresentationDescriptiveMetadata(resourcePath).orElse(null)
+            : ModelUtils.extractTypeFromAipDescriptiveMetadata(resourcePath).orElse(null);
+    String version = representationId != null
+            ? ModelUtils.extractVersionFromRepresentationDescriptiveMetadata(resourcePath).orElse(null)
+            : ModelUtils.extractVersionFromAipDescriptiveMetadata(resourcePath).orElse(null);
+
+    DescriptiveMetadata dm = new DescriptiveMetadata();
+    dm.setAipId(aipId);
+    dm.setRepresentationId(representationId);
+    dm.setId(filename);
+    dm.setType(type);
+    dm.setVersion(version);
+    return dm;
+  }
+
   private static PreservationMetadata convertResourceToPreservationMetadata(Resource resource)
     throws RequestNotValidException {
 
@@ -301,6 +327,8 @@ public class ResourceParseUtils {
         ret = OptionalWithCause.of(classToReturn.cast(convertResourceToRepresentation(resource)));
       } else if (classToReturn.equals(File.class)) {
         ret = OptionalWithCause.of(classToReturn.cast(convertResourceToFile(resource)));
+      } else if (classToReturn.equals(DescriptiveMetadata.class)) {
+        ret = OptionalWithCause.of(classToReturn.cast(convertResourceToDescriptiveMetadata(resource)));
       } else if (classToReturn.equals(PreservationMetadata.class)) {
         ret = OptionalWithCause.of(classToReturn.cast(convertResourceToPreservationMetadata(resource)));
       } else if (classToReturn.equals(OtherMetadata.class)) {

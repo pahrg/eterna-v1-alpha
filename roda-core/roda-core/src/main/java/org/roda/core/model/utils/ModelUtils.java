@@ -417,6 +417,104 @@ public final class ModelUtils {
     return new ArrayList<>();
   }
 
+  public static Optional<String> extractTypeFromAipDescriptiveMetadata(StoragePath path) {
+    // AIP/[aipId]/metadata/descriptive/[type]_[version].xml
+    String container = path.getContainerName();
+    List<String> directoryPath = path.getDirectoryPath();
+
+    if (container.equals(RodaConstants.STORAGE_CONTAINER_AIP) && directoryPath.size() == 3
+            && directoryPath.get(1).equals(RodaConstants.STORAGE_DIRECTORY_METADATA)
+            && directoryPath.get(2).equals(RodaConstants.STORAGE_DIRECTORY_DESCRIPTIVE)) {
+
+      String fileName = path.getName();
+      int lastIndexOfVersionSep = fileName.lastIndexOf("_");
+      int lastIndexOfDot = fileName.lastIndexOf(".");
+
+      if (lastIndexOfVersionSep > -1) {
+        return Optional.of(fileName.substring(0, lastIndexOfVersionSep));
+      } else if(lastIndexOfDot > -1) {
+        return Optional.of(fileName.substring(0, lastIndexOfDot));
+      }
+    }
+
+    return Optional.empty();
+  }
+
+  public static Optional<String> extractTypeFromRepresentationDescriptiveMetadata(StoragePath path) {
+    // AIP/[aipId]/representations/[representationId]/metadata/descriptive/[type]_[version].xml
+    String container = path.getContainerName();
+    List<String> directoryPath = path.getDirectoryPath();
+
+    if (container.equals(RodaConstants.STORAGE_CONTAINER_AIP) && directoryPath.size() == 5
+            && directoryPath.get(1).equals(RodaConstants.STORAGE_DIRECTORY_REPRESENTATIONS)
+            && directoryPath.get(3).equals(RodaConstants.STORAGE_DIRECTORY_METADATA)
+            && directoryPath.get(4).equals(RodaConstants.STORAGE_DIRECTORY_DESCRIPTIVE)) {
+
+      String fileName = path.getName();
+      int lastIndexOfVersionSep = fileName.lastIndexOf("_");
+      int lastIndexOfDot = fileName.lastIndexOf(".");
+
+      if (lastIndexOfVersionSep > -1) {
+        return Optional.of(fileName.substring(0, lastIndexOfVersionSep));
+      } else if(lastIndexOfDot > -1) {
+        return Optional.of(fileName.substring(0, lastIndexOfDot));
+      }
+    }
+
+    return Optional.empty();
+  }
+
+  public static Optional<String> extractVersionFromAipDescriptiveMetadata(StoragePath path) {
+    // AIP/[aipId]/metadata/descriptive/[type]_[version].xml
+    String container = path.getContainerName();
+    List<String> directoryPath = path.getDirectoryPath();
+
+    if (container.equals(RodaConstants.STORAGE_CONTAINER_AIP) && directoryPath.size() == 3
+            && directoryPath.get(1).equals(RodaConstants.STORAGE_DIRECTORY_METADATA)
+            && directoryPath.get(2).equals(RodaConstants.STORAGE_DIRECTORY_DESCRIPTIVE)) {
+
+      String fileName = path.getName();
+      int lastIndexOfVersionSep = fileName.lastIndexOf("_");
+      int lastIndexOfDot = fileName.lastIndexOf(".");
+
+      if (lastIndexOfVersionSep > -1 && lastIndexOfVersionSep < fileName.length() - 1) {
+        if(lastIndexOfDot > -1) {
+          return Optional.of(fileName.substring(lastIndexOfVersionSep + 1, lastIndexOfDot));
+        } else {
+          return Optional.of(fileName.substring(lastIndexOfVersionSep + 1));
+        }
+      }
+    }
+
+    return Optional.empty();
+  }
+
+  public static Optional<String> extractVersionFromRepresentationDescriptiveMetadata(StoragePath path) {
+    // AIP/[aipId]/representations/[representationId]/metadata/descriptive/[type]_[version].xml
+    String container = path.getContainerName();
+    List<String> directoryPath = path.getDirectoryPath();
+
+    if (container.equals(RodaConstants.STORAGE_CONTAINER_AIP) && directoryPath.size() == 5
+            && directoryPath.get(1).equals(RodaConstants.STORAGE_DIRECTORY_REPRESENTATIONS)
+            && directoryPath.get(3).equals(RodaConstants.STORAGE_DIRECTORY_METADATA)
+            && directoryPath.get(4).equals(RodaConstants.STORAGE_DIRECTORY_DESCRIPTIVE)) {
+
+      String fileName = path.getName();
+      int lastIndexOfVersionSep = fileName.lastIndexOf("_");
+      int lastIndexOfDot = fileName.lastIndexOf(".");
+
+      if (lastIndexOfVersionSep > -1 && lastIndexOfVersionSep < fileName.length() - 1) {
+        if(lastIndexOfDot > -1) {
+          return Optional.of(fileName.substring(lastIndexOfVersionSep + 1, lastIndexOfDot));
+        } else {
+          return Optional.of(fileName.substring(lastIndexOfVersionSep + 1));
+        }
+      }
+    }
+
+    return Optional.empty();
+  }
+
   public static List<String> extractFilePathFromAipPreservationMetadata(StoragePath path) {
     // AIP/[aipId]/metadata/preservation/.../file.bin
 
