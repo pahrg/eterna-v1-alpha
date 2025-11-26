@@ -16,7 +16,8 @@ import java.util.Optional;
 
 import gov.loc.premis.v3.AgentComplexType;
 import gov.loc.premis.v3.EventComplexType;
-import gov.loc.premis.v3.PremisComplexType;
+import gov.loc.premis.v3.ObjectComplexType;
+import gov.loc.premis.v3.RightsComplexType;
 import jakarta.xml.bind.JAXBElement;
 import org.apache.commons.io.FilenameUtils;
 import org.roda.core.common.PremisV3Utils;
@@ -208,40 +209,63 @@ public class EARKSIP2ToAIPPluginUtils {
       IPFileInterface file = pm.getMetadata();
       ContentPayload fileContentPayload = new FSPathContentPayload(file.getPath());
 
-      if (representationId.isPresent()) {
-        model.createPreservationMetadata(PreservationMetadataType.OTHER, aipId, representationId.get(),
-          file.getRelativeFolders(), file.getFileName(), fileContentPayload, username, notify);
-      } else {
-        try {
-          Object object = PremisV3Utils.binaryToGenericPremis(fileContentPayload, false);
-          if (((JAXBElement<?>) object).getValue() instanceof AgentComplexType agentComplexType) {
-            ContentPayload premisAgentBinary = PremisV3Utils.createPremisAgentBinary(
-              agentComplexType.getAgentIdentifier().getFirst().getAgentIdentifierValue(),
-              agentComplexType.getAgentName().getFirst().getValue(),
-              RodaConstants.getPreservationAgentType(agentComplexType.getAgentType().getValue().toUpperCase()), null,
-              !agentComplexType.getAgentNote().isEmpty() ? agentComplexType.getAgentNote().getFirst() : null,
-              agentComplexType.getVersion());
+      try {
+        Object object = PremisV3Utils.binaryToGenericPremis(fileContentPayload, false);
+        if (((JAXBElement<?>) object).getValue() instanceof AgentComplexType agentComplexType) {
+          ContentPayload premisAgentBinary = PremisV3Utils.createPremisAgentBinary(
+            agentComplexType.getAgentIdentifier().getFirst().getAgentIdentifierValue(),
+            agentComplexType.getAgentName().getFirst().getValue(),
+            RodaConstants.getPreservationAgentType(agentComplexType.getAgentType().getValue().toUpperCase()), null,
+            !agentComplexType.getAgentNote().isEmpty() ? agentComplexType.getAgentNote().getFirst() : null,
+            agentComplexType.getVersion());
 
-            try {
-              if (model.retrievePreservationAgent(
-                agentComplexType.getAgentIdentifier().getFirst().getAgentIdentifierValue()) != null) {
-                model.updatePreservationMetadata(PreservationMetadataType.AGENT,
-                  agentComplexType.getAgentIdentifier().getFirst().getAgentIdentifierValue(), premisAgentBinary, true);
-              } else {
-                model.createPreservationMetadata(PreservationMetadataType.AGENT,
-                  agentComplexType.getAgentIdentifier().getFirst().getAgentIdentifierValue(), premisAgentBinary, true);
-              }
-            } catch (NotFoundException e) {
+          try {
+            if (model.retrievePreservationAgent(
+              agentComplexType.getAgentIdentifier().getFirst().getAgentIdentifierValue()) != null) {
+              model.updatePreservationMetadata(PreservationMetadataType.AGENT,
+                agentComplexType.getAgentIdentifier().getFirst().getAgentIdentifierValue(), premisAgentBinary, true);
+            } else {
               model.createPreservationMetadata(PreservationMetadataType.AGENT,
                 agentComplexType.getAgentIdentifier().getFirst().getAgentIdentifierValue(), premisAgentBinary, true);
             }
-          } else if (((JAXBElement<?>) object).getValue() instanceof EventComplexType) {
-            model.createPreservationMetadata(PreservationMetadataType.EVENT, aipId, file.getRelativeFolders(),
-              file.getFileName(), fileContentPayload, username, notify);
+          } catch (NotFoundException e) {
+            model.createPreservationMetadata(PreservationMetadataType.AGENT,
+              agentComplexType.getAgentIdentifier().getFirst().getAgentIdentifierValue(), premisAgentBinary, true);
           }
-        } catch (ValidationException e) {
-          throw new GenericException(e);
+        } else if (((JAXBElement<?>) object).getValue() instanceof EventComplexType) {
+          if (representationId.isPresent()) {
+            String id = IdUtils.getPreservationId(PreservationMetadataType.EVENT, aipId, representationId.get(),
+              file.getRelativeFolders(), file.getFileName(), RODAInstanceUtils.getLocalInstanceIdentifier());
+
+            model.createPreservationMetadata(PreservationMetadataType.EVENT, id, aipId, representationId.get(),
+              file.getRelativeFolders(), file.getFileName(), fileContentPayload, username, notify);
+          } else {
+            model.createPreservationMetadata(PreservationMetadataType.EVENT, aipId, file.getRelativeFolders(),
+                    file.getFileName(), fileContentPayload, username, notify);
+          }
+        } else if (((JAXBElement<?>) object).getValue() instanceof ObjectComplexType objectComplexType) {
+          PreservationMetadataType preservationMetadataType = switch(objectComplexType) {
+            case gov.loc.premis.v3.IntellectualEntity premisIntellectualEntity -> PreservationMetadataType.INTELLECTUAL_ENTITY;
+            case gov.loc.premis.v3.Representation premisRepresentation -> PreservationMetadataType.REPRESENTATION;
+            case gov.loc.premis.v3.File premisFile -> PreservationMetadataType.FILE;
+            case gov.loc.premis.v3.Bitstream premisBitstream -> PreservationMetadataType.BITSTREAM;
+
+            default -> PreservationMetadataType.OTHER;
+          };
+
+          model.createPreservationMetadata(preservationMetadataType, aipId, representationId.orElse(null),
+            file.getRelativeFolders(), file.getFileName(), fileContentPayload, username, notify);
+        } else if (((JAXBElement<?>) object).getValue() instanceof RightsComplexType rightsComplexType) {
+          // RightComplexType actually contains a list of RightsStatementComplexType or ExtensionComplexType, here we handle it as a single thing
+          model.createPreservationMetadata(PreservationMetadataType.RIGHTS_STATEMENT, aipId, representationId.orElse(null),
+                  file.getRelativeFolders(), file.getFileName(), fileContentPayload, username, notify);
+        } else {
+          model.createPreservationMetadata(PreservationMetadataType.OTHER, aipId, representationId.orElse(null),
+                  file.getRelativeFolders(), file.getFileName(), fileContentPayload, username, notify);
         }
+      } catch (ValidationException e) {
+        model.createPreservationMetadata(PreservationMetadataType.OTHER, aipId, representationId.orElse(null),
+          file.getRelativeFolders(), file.getFileName(), fileContentPayload, username, notify);
       }
     }
   }

@@ -23,6 +23,7 @@ public final class URNUtils {
   }
 
   private static final int URN_INSTANCE_IDENTIFIER_POSITION = 2;
+  private static final int URN_FILE_ID_POSITION = 4;
 
   private static final int URN_LENGTH_WITH_INSTANCE_IDENTIFIER = 6;
   private static final int URN_LENGTH_WITHOUT_INSTANCE_IDENTIFIER = 5;
@@ -157,6 +158,16 @@ public final class URNUtils {
   public static String extractInstanceIdentifierFromId(String id) {
     String[] fields = id.split(RodaConstants.URN_SEPARATOR);
     return fields[URN_INSTANCE_IDENTIFIER_POSITION];
+  }
+
+  public static String extractFileIdFromId(String id) {
+    String[] fields = id.split(RodaConstants.URN_SEPARATOR);
+    String fileId = fields[URN_FILE_ID_POSITION];
+    if (fileId.toLowerCase().endsWith(".xml")) {
+      fileId = fileId.substring(0, fileId.length() - 4);
+    }
+
+    return fileId;
   }
 
   public static boolean hasInstanceId(String id) {
