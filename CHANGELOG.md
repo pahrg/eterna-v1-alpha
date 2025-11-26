@@ -1,5 +1,5 @@
 # ETERNA Changelog
-## v0.5.0-dev (2025-10-23)
+## v0.5.0-dev (2025-11-26)
 #### Updates
 - Added Swedish and English SVG credentials images
 - Updated default admin password to 'eterna'
@@ -10,6 +10,10 @@
 - Refactored AbstractConvertPlugin to enhance file conversion process with new ConversionContext and ConversionResult classes, improved file processing logic, enhanced error handling, and consistent representation ID handling
 - Fixed internationalization of DROPDOWN values in PluginParameters for external plugins
 - Added a getCreationTime method to StorageService to be able to fetch a file or folders creation time
+- Updates commons-ip dependency to fix problems with incorrect parsing of METS metadata types
+- Fix problems in processing `Preservation Metadata` when ingesting E-ARK SIPs
+- Fixed missing handling of `Descriptive Metadata` in ResourceParseUtils.convertResourceTo that caused ModelService#listDescriptiveMetadata to fail
+- Fixed incorrect naming of PREMIS:FILE metadata when ingesting from E-ARK SIPs
 
 ## v0.4.2 (2025-10-14)
 #### New features
