@@ -162,7 +162,7 @@ public final class URNUtils {
 
   public static String extractFileIdFromId(String id) {
     String[] fields = id.split(RodaConstants.URN_SEPARATOR);
-    String fileId = fields[URN_FILE_ID_POSITION];
+    String fileId = fields.length > URN_FILE_ID_POSITION ? fields[URN_FILE_ID_POSITION] : id;
     if (fileId.toLowerCase().endsWith(".xml")) {
       fileId = fileId.substring(0, fileId.length() - 4);
     }
@@ -172,7 +172,8 @@ public final class URNUtils {
 
   public static boolean hasInstanceId(String id) {
     String[] fields = id.split(RodaConstants.URN_SEPARATOR);
-    return !fields[URN_INSTANCE_IDENTIFIER_POSITION].equals(RodaConstants.PREMIS_METADATA_TYPE);
+    return fields.length > URN_INSTANCE_IDENTIFIER_POSITION
+      && !fields[URN_INSTANCE_IDENTIFIER_POSITION].equals(RodaConstants.PREMIS_METADATA_TYPE);
   }
 
   public static boolean verifyPremisPrefix(PreservationMetadataType type, String filename) {
