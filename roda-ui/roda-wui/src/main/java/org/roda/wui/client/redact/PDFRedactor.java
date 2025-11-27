@@ -1,11 +1,18 @@
 package org.roda.wui.client.redact;
 
 import com.google.gwt.core.client.Callback;
+import com.google.gwt.core.client.GWT;
 import com.google.gwt.core.client.JavaScriptObject;
 import com.google.gwt.i18n.client.LocaleInfo;
+import com.google.gwt.uibinder.client.UiBinder;
+import com.google.gwt.uibinder.client.UiField;
 import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.google.gwt.user.client.ui.Composite;
+import com.google.gwt.user.client.ui.FlowPanel;
 import com.google.gwt.user.client.ui.Widget;
+import org.roda.wui.client.browse.bundle.BrowseFileBundle;
+import org.roda.wui.client.common.NavigationToolbar;
+import org.roda.wui.common.client.widgets.wcag.AccessibleFocusPanel;
 import elemental2.dom.Blob;
 import elemental2.dom.FormData;
 import elemental2.dom.RequestInit;
@@ -23,7 +30,6 @@ import org.roda.core.data.v2.ip.IndexedFile;
 import org.roda.core.data.v2.ip.IndexedRepresentation;
 import org.roda.core.data.v2.jobs.Job;
 import org.roda.wui.client.browse.BrowserService;
-import org.roda.wui.client.browse.bundle.BrowseFileBundle;
 import org.roda.wui.client.common.PromiseAsyncCallback;
 import org.roda.wui.client.common.PromiseWrapper;
 import org.roda.wui.client.common.UserLogin;
@@ -43,6 +49,11 @@ import java.util.List;
 import static elemental2.dom.DomGlobal.fetch;
 
 public class PDFRedactor extends Composite {
+  interface MyUiBinder extends UiBinder<Widget, PDFRedactor> {
+  }
+
+  private static MyUiBinder uiBinder = GWT.create(MyUiBinder.class);
+
   public static final String JS_PATH = "webjars/pdf-redactor/1.0.1/pdf-redactor.js";
   public static final String CSS_PATH = "webjars/pdf-redactor/1.0.1/pdf-redactor.css";
   public static String[] requiredRoles = new String[]{"representation.view", "representation.read", "representation.create", "representation.update"};
@@ -80,10 +91,22 @@ public class PDFRedactor extends Composite {
   private static final Sorter findRedactedRepresentationSorter = new Sorter(new SortParameter(RodaConstants.REPRESENTATION_ID, false));
 
   private boolean initialized;
-  private PDFRedactorPanel pdfRedactorPanel;
+
+  @UiField
+  AccessibleFocusPanel keyboardFocus;
+
+  @UiField
+  NavigationToolbar<IndexedFile> navigationToolbar;
+
+  @UiField
+  FlowPanel center;
+
+  @UiField
+  PDFRedactorPanel pdfRedactorPanel;
 
   private PDFRedactor() {
     initialized = false;
+    initWidget(uiBinder.createAndBindUi(this));
   }
 
   public static native void consoleLog(String text) /*-{
@@ -121,8 +144,6 @@ public class PDFRedactor extends Composite {
       initialized = true;
 
       new CssFileInjector(CSS_PATH).setWindow(CssFileInjector.TOP_WINDOW).inject();
-
-      pdfRedactorPanel = new PDFRedactorPanel();
 
       ScriptModuleInjector scriptModuleInjector = new ScriptModuleInjector(JS_PATH);
 
@@ -235,6 +256,14 @@ public class PDFRedactor extends Composite {
     return changeRepTypeJobCallback.getPromise();
   }
 
+  private void setupNavigation(BrowseFileBundle bundle) {
+    navigationToolbar.withObject(bundle.getFile())
+      .withPermissions(bundle.getAip().getPermissions())
+      .build();
+    navigationToolbar.updateBreadcrumb(bundle);
+    keyboardFocus.setFocus(true);
+  }
+
   public void resolve(List<String> historyTokens, AsyncCallback<Widget> callback) {
     if (historyTokens.size() > 2) {
       final String aipId = historyTokens.get(0);
@@ -250,8 +279,10 @@ public class PDFRedactor extends Composite {
 
         @Override
         public void onSuccess(final BrowseFileBundle bundle) {
-          init(bundle.getFile());
-          callback.onSuccess(pdfRedactorPanel);
+          PDFRedactor pdfRedactor = getInstance();
+          pdfRedactor.init(bundle.getFile());
+          pdfRedactor.setupNavigation(bundle);
+          callback.onSuccess(pdfRedactor);
         }
       });
     } else {

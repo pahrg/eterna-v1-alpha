@@ -14,6 +14,7 @@
 - Fix problems in processing `Preservation Metadata` when ingesting E-ARK SIPs
 - Fixed missing handling of `Descriptive Metadata` in ResourceParseUtils.convertResourceTo that caused ModelService#listDescriptiveMetadata to fail
 - Fixed incorrect naming of PREMIS:FILE metadata when ingesting from E-ARK SIPs
+- Added breadcrumb navigation to PDF redactor page to match the navigation pattern used by other file viewing pages
 
 ## v0.4.2 (2025-10-14)
 #### New features
