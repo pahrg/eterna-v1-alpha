@@ -120,7 +120,12 @@ public class PluginParameterPanel extends Composite {
 
   private void updateLayout() {
     if (PluginParameterType.BOOLEAN.equals(parameter.getType())) {
-      createBooleanLayout(parameter);
+      // Hide "Ignore other files" parameter for conversion layouts but keep default value
+      if (conversionPanel && RodaConstants.PLUGIN_PARAMS_IGNORE_OTHER_FILES.equals(parameter.getId())) {
+        value = parameter.getDefaultValue();
+      } else {
+        createBooleanLayout(parameter);
+      }
     } else if (PluginParameterType.STRING.equals(parameter.getType())) {
       createStringLayout(parameter);
     } else if (PluginParameterType.PLUGIN_SIP_TO_AIP.equals(parameter.getType())) {
