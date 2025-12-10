@@ -39,4 +39,4 @@ Guider för systemadministratörer och ansvariga för arkivet.
 ### Utvecklarresurser
 Dokumentation för utvecklare som vill bidra till eller utöka ETERNA.
 
-- **[Utvecklarguide](#theme/development/Developers_Guide.md)** - Guide för utvecklare
+- **[Utvecklarguide](#theme/development/Developers_Guide_sv_SE.md)** - Guide för utvecklare
