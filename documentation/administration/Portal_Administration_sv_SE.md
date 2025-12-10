@@ -2,7 +2,7 @@
 
 ## Översikt
 
-Denna dokumentation beskriver administrationen av den dedikerade API-användaren som används för åtkomst till det externa portalen. Denna användare är kritisk för systemets säkerhet och kräver noggrann hantering av behörigheter.
+Denna dokumentation beskriver administrationen av API-användaren som möjliggör åtkomst till den externa portalen. Det denna användare har behörighet till kommer att kunna visas på den publika portalen. Det är väldigt viktigt att behörighetshanteringen av denna användare sköts korrekt för att inte tillgängligöra sekretessbelagd information.
 
 ## Portal-API-användaren
 
@@ -16,7 +16,7 @@ Portal-API-användaren är ett särskilt användarkonto som skapats specifikt f�
 ## Behörigheter och säkerhetsrisker
 
 ### Rekommenderade behörigheter
-- Portal-API-användaren bör ej tillhöra grupper
+- Portal-API-användaren bör ej tillhöra någon grupp
 - Grundläggande läsbehörighet till publika dokument
 - Ingen administrativ åtkomst
 
@@ -34,16 +34,16 @@ Portal-API-användaren är ett särskilt användarkonto som skapats specifikt f�
 - Lista och hämta beskrivande metadata
 
 
-### ⚠️ **Kritiska säkerhetsrisker**
+### ⚠️ **OBS! Kritiska säkerhetsrisker**
 
-Att placera Portal-API-användaren i grupper med utökade behörigheter utgör allvarliga säkerhetsrisker:
+Att placera Portal-API-användaren i grupper med utökade behörigheter eller på fel del av katalogen utgör allvarliga säkerhetsrisker såsom: 
 
-#### Risker med behörigheter:
-- **Dataexponering**: Om portalen komprometteras kan känsliga arkivdokument läcka
-- **Efterlevnadsbrott**: Överträdelser av dataskyddsregler (GDPR, etc.)
+- **Dataexponering**: Om portalen komprometteras kan känsliga arkivdokument läckas.
+- **Efterlevnadsbrott**: Överträdelser av dataskyddsregler (Dataskyddslagen, GDPR, etc.)
+- **Brott mot offentlighets- och sekretesslagen**: Om uppgifter som innefattas av sekretess publiceras offentligt. 
 
 ## Administrationsriktlinjer
-
+Det är viktigt att verksamheten har en administratör för behörighetshantering. Detta kan till exempel vara e-arkivarien.
 ### Regelbundna kontroller
 Som administratör ansvarar du för att regelbundet granska:
 - Användarens gruppmedlemskap

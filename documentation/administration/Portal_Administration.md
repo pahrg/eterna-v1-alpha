@@ -42,6 +42,7 @@ Placing the Portal API user in groups with extended permissions poses serious se
 - **Compliance Violations**: Breaches of data protection regulations (GDPR, etc.)
 
 ## Administration Guidelines
+It is important that the organization has an administrator responsible for permission management. This may, for example, be the e-archivist.
 
 ### Regular Checks
 As administrator, you are responsible for regularly reviewing:
