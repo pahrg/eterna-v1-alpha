@@ -8,14 +8,6 @@ The pre-ingest process usually comprises some or all of the following activities
 
 This activity consists of the definition of the terms, pre-conditions and requirements for content, and accompanying information (e.g. metadata, documentation, contracts, etc.), to be sent to the repository by the Producer. It is materialised in a written agreement between the Producer and the Repository that specifies the type of content and all the legal and technical requirements that both parties are expected to comply.
 
-## Classification plan
-
-During the signing of the submission agreement, the Producer must have agreed to a base Classification Scheme (or list of Collections) on which she will have explicit authorisation to deposit new information.
-
-The base Classification Scheme is usually created by the Repository and can be downloaded in this section in machine readable format. The downloaded file can be loaded into RODA-in to better arrange and prepare Submission Information Packages before transferring them to the repository to be ingested.
-
-[Download classification scheme](/api/v1/classification_plans) (note: downloading the classification scheme requires a ETERNA instance)
-
 ## Submission Information Packages (SIP)
 
 This activity consists of preparing of one or more Submission Information Packages (SIP) according to the technical and non-technical requirements defined on the Submission Agreement. To facilitate the creation of SIPs, Producers may take advantage of the RODA-in tool. 
