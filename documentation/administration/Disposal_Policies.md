@@ -52,7 +52,7 @@ When a record’s disposal action is set to review, it is not immediately subjec
 
 #### Destruction life cycle
 
-The destruction of records is subject to particular constraints. How records are destroyed will depend on the nature of the content of their components. ETERNA allows to prune descriptive metadata using [XSLT (eXtensible Stylesheet Language Transformations)](http://www.w3.org/standards/xml/transformation.html). All the files associated to the record are destroyed leaving the record in a destroyed state. 
+The destruction of records is subject to particular constraints. How records are destroyed will depend on the nature of the content of their components. ETERNA allows to prune descriptive metadata using [XSLT (eXtensible Stylesheet Language Transformations)](https://www.w3.org/Style/XSL/). All the files associated to the record are destroyed leaving the record in a destroyed state. 
 
 ![Desctuction life cycle](../images/destruction_life_cycle.png "Destruction life cycle")
 
