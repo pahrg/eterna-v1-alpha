@@ -16,7 +16,7 @@ Specialformat behöver specialvisare eller konverterare som kan omvandla dem til
 
 ### Vilka beskrivande metadata supporteras av ETERNA?
 
-Alla beskrivande metadataformat supporteras så länge det finns grammatik i ett XML-Schema (XSD) som kan validera det.  Som standard kommer ETERNA konfigurerat med Dublin Core och Encoded Archival Description 2002. Fler scheman kan läggas till.
+Alla beskrivande metadataformat supporteras så länge det finns grammatik i ett XML-Schema (XSD) som kan validera det. Som standard kommer ETERNA konfigurerat med Dublin Core, EAD3 och Encoded Archival Description 2002. 
 
 ### Kan ETERNA stödja flera klassificeringsscheman?
 
@@ -70,13 +70,13 @@ Ja. Du kan navigera i åtgärdsloggen (hela uppsättningen av åtgärder som utf
 
 ## Bevarande
 
-### Beskriv hur karantänmiljön fungerar.
+### Hur fungerar karantänmiljön?
 
 När SIP:ar under bearbetningen av inleveransen inte accepteras, flyttas de till en speciell mapp i filsystemet. Inleveransprocessen genererar en detaljerad rapport som beskriver orsakerna till avslaget. Vidare steg behöver ske via manuell hantering.
 
 ### Hur stödjer systemet bevarande?
 
-Detta är en komplex fråga som inte kan besvaras med bara några rader text. Med det sagt kan vi säga att systemet hanterar bevarande på flera sätt:
+Detta är en komplex fråga som inte kan besvaras med bara med några få rader, men systemet hanterar bevarande på flera sätt: 
 
 - Det finns åtgärder som utför regelbundna beständighetskontroller av de inlevererade filerna och varnar förvaltarna om något problem upptäcks
 - Systemet levereras med ett inbyggt riskhanteringsgränssnitt (dvs riskregister)
@@ -93,9 +93,9 @@ Ja. Varje aktivitet i systemet loggas.
 
 ## Krav
 
-### Finns det några systemkrav på klientsidan för de som konsulterar arkiven?
+### Finns det några systemkrav på klientsidan för de som använder arkivet?
 
-Inte riktigt. En modern webbläsare räcker.
+Nej, det räcker med en modern webbläsare.
 
 
 ### Hur sätter man upp en utvecklingsmiljö för ETERNA?
