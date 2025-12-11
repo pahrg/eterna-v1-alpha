@@ -4,7 +4,7 @@ Den här sidan ger information om hur du konfigurerar ny statistik baserat på d
 
 Statistik fungerar genom att frågor skickas till ETERNA med hjälp av dess API (läs API-dokumentationen för mer information), samla in resultaten och presentera dem grafiskt. Hela processen görs på klientsidan av Javascript.
 
-Följande avsnitt tillhandahåller kodsnuttar som man kan använda för att visa statistik om e-arkivets statistik. Man behöver bara inkludera kodsnuttarna på en ny HTML-sida, så kommer medföljande Javascript-motorn att hantera all kommunikation, arbetsbelastning och presentation. Ny grafer och statistik kan skapas genom att ändra frågeparametrarna för "data" som ingår i utdragen (t.ex. datakälla-filter).
+Följande avsnitt tillhandahåller kodexempel som man kan använda för att visa statistik om e-arkivets statistik. Man behöver bara inkludera kodexempel på en ny HTML-sida, så kommer medföljande Javascript-motorn att hantera all kommunikation, arbetsbelastning och presentation. Ny grafer och statistik kan skapas genom att ändra frågeparametrarna för "data" som ingår i utdragen (t.ex. datakälla-filter).
 
 ## AIP Index
 
@@ -31,7 +31,7 @@ Följande avsnitt tillhandahåller kodsnuttar som man kan använda för att visa
 
 **Distribution av beskrivandenivåer**
 
-![Distribution of description levels](../images/distribution_of_description_levels_pie.png "Distribution av beskrivandenivåer")
+![Distribution of description levels](images/distribution_of_description_levels_pie.png "Distribution av beskrivandenivåer")
 
 ```html
 <canvas class="statistic"
@@ -58,7 +58,7 @@ Följande avsnitt tillhandahåller kodsnuttar som man kan använda för att visa
 
 **Distribution av representationstyper**
 
-![Distribution of representation types](../images/distribution_of_representation_types_bar.png "Distribution av representationstyper")
+![Distribution of representation types](images/distribution_of_representation_types_bar.png "Distribution av representationstyper")
 
 ```html
 <canvas class="statistic"
@@ -85,7 +85,7 @@ Följande avsnitt tillhandahåller kodsnuttar som man kan använda för att visa
 
 **Distribution av mimetyper**
 
-![Distribution of mimetypes](../images/distribution_of_mimetypes_pie.png "Distribution av mimetyper")
+![Distribution of mimetypes](images/distribution_of_mimetypes_pie.png "Distribution av mimetyper")
 
 ```html
 <canvas class="statistic"
@@ -100,7 +100,7 @@ Följande avsnitt tillhandahåller kodsnuttar som man kan använda för att visa
 
 **Distribution av PRONOM ID:s**
 
-![Distribution of PRONOM IDs](../images/distribution_of_pronom_ids_doughnut.png "Distribution av PRONOM ID:s")
+![Distribution of PRONOM IDs](images/distribution_of_pronom_ids_doughnut.png "Distribution av PRONOM ID:s")
 
 ```html
 <canvas class="statistic"
@@ -153,7 +153,7 @@ Följande avsnitt tillhandahåller kodsnuttar som man kan använda för att visa
 
 **Lyckade vs misslyckade inloggningar**
 
-![Successful vs failed logins](../images/successful_vs_failed_logins_pie.png "Lyckade vs misslyckade inloggningar")
+![Successful vs failed logins](images/successful_vs_failed_logins_pie.png "Lyckade vs misslyckade inloggningar")
 
 ```html
 <canvas class="statistic"
@@ -173,7 +173,7 @@ Följande avsnitt tillhandahåller kodsnuttar som man kan använda för att visa
 
 **Beskrivningsnivådistribution**
 
-![Beskrivningsnivådistribution](../images/description_level_distribution_line.png "Beskrivningsnivådistribution")
+![Beskrivningsnivådistribution](images/description_level_distribution_line.png "Beskrivningsnivådistribution")
 
 ```html
 <canvas class="statistic"
@@ -190,7 +190,7 @@ Följande avsnitt tillhandahåller kodsnuttar som man kan använda för att visa
 
 **Pronomformatdistribution**
 
-![Pronomformatdistribution](../images/pronom_format_distribution_radar.png "Pronomformatdistribution")
+![Pronomformatdistribution](images/pronom_format_distribution_radar.png "Pronomformatdistribution")
 
 ```html
 <canvas class="statistic"
@@ -207,7 +207,7 @@ Följande avsnitt tillhandahåller kodsnuttar som man kan använda för att visa
 
 **Pronomformatdistribution**
 
-![Pronomformatdistribution](../images/pronom_format_distribution_polararea.png "Pronomformatdistribution")
+![Pronomformatdistribution](images/pronom_format_distribution_polararea.png "Pronomformatdistribution")
 
 ```html
 <canvas class="statistic"
@@ -224,7 +224,7 @@ Följande avsnitt tillhandahåller kodsnuttar som man kan använda för att visa
 
 **Pronomformatdistribution**
 
-![Pronomformatdistribution](../images/pronom_format_distribution_function.png "Pronomformatdistribution")
+![Pronomformatdistribution](images/pronom_format_distribution_function.png "Pronomformatdistribution")
 
 ```html
 <canvas class="statistic"
@@ -271,7 +271,7 @@ Följande avsnitt tillhandahåller kodsnuttar som man kan använda för att visa
 
 **Bubbeldiagram**
 
-![Bubble chart](../images/bubble_chart.png "Bubbeldiagram")
+![Bubble chart](images/bubble_chart.png "Bubbeldiagram")
 
 ```html
 <canvas class="statistic"

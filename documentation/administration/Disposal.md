@@ -2,18 +2,17 @@
 
 ## Disposal Schedule
 
-Please refer to *Help* > *Usage* > *Disposal policies* for more information about disposal schedules. 
+Please refer to [Disposal Policies](#theme/administration/Disposal_Policies.md) for more information about disposal schedules. 
 
-### 1. Configure ETERNA to show fields in retention trigger element identifier
+### Configure ETERNA to show fields in retention trigger element identifier
 
-The retention trigger element identifier is populated using the advanced search field items. From those fields the ones that have `date_interval` type will be selected and used in the calculation of retention period.
-Please refer to *Help* > *Usage* > *Advanced search* for more information about add a new advanced search field item. 
+The retention trigger element identifier is populated using the advanced search field items. From those fields the ones that have date_interval type will be selected and used in the calculation of retention period.  
 
 ## Disposal rule
 
-Please refer to *Help* > *Usage* > *Disposal policies* for more information about disposal rules. 
+Please refer to [Disposal Policies](#theme/administration/Disposal_Policies.md) for more information about disposal rules. 
 
-### 1. Configure ETERNA to show fields in selection method 'metadata field'
+### Configure ETERNA to show fields in selection method 'metadata field'
 
 The metadata field is populated using the advanced search field items. From those fields the ones that have `text` type will be selected. ETERNA can be configured to ignore some of these fields. In order to do that, change your `roda-wui.properties` to add a new blacklist metadata. By default, ETERNA shows all `text` type descriptive metadata.
 
@@ -21,6 +20,6 @@ The metadata field is populated using the advanced search field items. From thos
 ui.disposal.rule.blacklist.condition = description
 ```
 
-Please refer to *Help* > *Usage* > *Advanced search* for more information about add a new advanced search field item.
+Please refer to [Advanced Search](#theme/usage/Advanced_Search.md) for more information about add a new advanced search field item.
 
-Please refer to *Help* > *Configuration* > *Metadata formats* for more information about descriptive metadata configuration on ETERNA.
+Please refer to [Metadata Formats](#theme/reference/Metadata_Formats.md) for more information about descriptive metadata configuration on ETERNA.

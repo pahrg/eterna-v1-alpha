@@ -1,6 +1,6 @@
 # Extern autentisering via CAS
 
-ETERNA stöder integration med extern autentisering med [Apereo CAS](https://apereo.github.io/cas/). ETERNA kan konfigureras för extern autentisering med [CAS-protokollet]. (https://apereo.github.io/cas/6.6.x/protocol/CAS-Protocol.html). 
+ETERNA stöder integration med extern autentisering med [Apereo CAS](https://apereo.github.io/cas/). ETERNA kan konfigureras för extern autentisering med [CAS-protokollet](https://apereo.github.io/cas/7.3.x/protocol/CAS-Protocol.html). 
 CAS kan sedan användas för att ansluta till många autentiseringsprotokoll och källor. För information om hur du installerar och konfigurerar en Apereo CAS-instans, se [Apereo CAS officiella dokumentation](https://apereo.github.io/cas/).
 
 ## Professionell support

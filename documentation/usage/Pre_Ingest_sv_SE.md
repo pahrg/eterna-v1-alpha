@@ -1,20 +1,12 @@
 #  Leveransförberedelse
 
-Processen för leveransförberedelse åskådliggör möjligheten för en arkivbildare att skapa Submission Information Packages (SIP) som innehåller data och metadata (i en tydligt definierad struktur) för att kunna överlämna dem till systemet för inleverans. SIP:arna som skapas förväntas följa policys som är fastställda av eller överenskomna med systemet. 
+Processen för leveransförberedelse åskådliggör möjligheten att skapa Submission Information Packages (SIP) som innehåller data och metadata (i en tydligt definierad struktur) för att kunna överlämna dem till systemet för inleverans. SIP:arna som skapas förväntas följa policys som är fastställda av eller överenskomna med systemet. 
 
 Leveransförberedelserna omfattar vanligtvis följande aktiviteter:
 
-## Inlämningskontrakt
+## Leveransöverenskommelse
 
-Denna aktivitet består av att definiera villkoren, förutsättningar och krav för innehållet och för åtföljande information (t.ex. metadata, dokument, kontrakt etc.), som kommer att levereras till systemet av arkivbildaren. Det skapas en skriftlig överenskommelse mellan arkivbildare och systemet som specificerar typ av innehåll och juridiska- samt tekniska krav som båda parter förväntas följa. 
-
-## Klassificering
-
-Vid undertecknande av inlämningskontraktet måste producenten ha godkänt en klassificeringsstruktur (eller lista över samlingar) där hen kommer ha tillstånd att lagra ny information. 
-
-Grundklassificeringsschemat skapas vanligtvis av arkivarien och kan laddas ner på den här sidan i ett maskinläsbart format. Den nedladdade filen kan läsas in i RODA-in för att på ett bättre sätt kunna förbereda SIP:arna inför inläsning i systemet. 
-
-[Ladda ner klassificeringsstruktur](/api/v1/classification_plans) (notera: för att ladda ner klassificeringsstrukturen krävs en ETERNA instans)
+Denna aktivitet består av att definiera villkoren, förutsättningar och krav för innehållet och för åtföljande information (t.ex. metadata, dokument, kontrakt etc.), som kommer att levereras till systemet av arkivbildaren. Det skapas en skriftlig överenskommelse mellan arkivbildare och systemet som specificerar typ av innehåll och juridiska- samt tekniska krav som båda parter förväntas följa.
 
 ## Submission Information Packages (SIP)
 
