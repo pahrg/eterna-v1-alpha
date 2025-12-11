@@ -10,7 +10,7 @@ This refers to the descriptive metadata scheme that will be used, and by default
 * **[Key-value](https://github.com/ETERNA-earkiv/ETERNA/blob/main/roda-core/roda-core/src/main/resources/config/schemas/key-value.xsd)**: An ETERNA internal simple description schema for key-value metadata definition, where the metadata key identifies the element (e.g. "title") and the value the content of the metadata element.
 *  **Other**: Generic XML type where no schema is defined.
 
-New metadata types can be added to ETERNA following the documentation [Metadata formats](Metadata_Formats.md).
+New metadata types can be added to ETERNA following the documentation [Metadata formats](#theme/reference/Metadata_Formats.md).
 
 | Descriptive metadata type | Validation           | Indexing         | Visualization         | Edition      |
 |---------------------------|----------------------|------------------|-----------------------|--------------|
