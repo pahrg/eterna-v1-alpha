@@ -85,7 +85,7 @@ Detta är en komplex fråga som inte kan besvaras med bara med några få rader,
 
 ### Hur stödjer systemet infromationsvärderingar, val av bevarandeperioder och gallringsfrister?
 
-ETERNA tillhandahåller ett komplext arbetsflöde för gallring av poster. Se [Gallring](../administration/Disposal_sv_SE.md) för mer information.
+ETERNA tillhandahåller ett komplext arbetsflöde för gallring av poster. Se [Gallring](#theme/administration/Disposal_sv_SE.md) för mer information.
 
 ### Loggar systemet sökinteraktioner?
 
@@ -100,4 +100,4 @@ Nej, det räcker med en modern webbläsare.
 
 ### Hur sätter man upp en utvecklingsmiljö för ETERNA?
 
-Fullständiga instruktioner för hur man sätter upp en utvecklingsmiljö finns på: [Developers guide](../development/Developers_Guide.md).
+Fullständiga instruktioner för hur man sätter upp en utvecklingsmiljö finns på: [Developers guide](#theme/development/Developers_Guide_sv_SE.md).
