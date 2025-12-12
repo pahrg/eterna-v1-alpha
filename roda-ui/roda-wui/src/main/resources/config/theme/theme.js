@@ -1,5 +1,3 @@
-var FOOTER_ADDED = false;
-
 $(document).ready(function () {
     // getUrlParameters function based on
     // from https://stackoverflow.com/a/2880929/1483200
@@ -24,11 +22,9 @@ $(document).ready(function () {
         urlParams['branding'] = 'nobranding';
     }
 
-    let brandingsToInsert = [];
-
+    var brandingsToInsert = [];
     if ((typeof urlParams['branding']) === 'string') {
         var brandings = urlParams['branding'].split(',');
-
         brandings.forEach(function (branding) {
             if (/^([a-z0-9]+)$/.test(branding)) {
                 brandingsToInsert.push(branding.concat(".css"));
@@ -36,38 +32,57 @@ $(document).ready(function () {
         });
     }
 
-    $(document).on('DOMNodeInserted', ".gwt-HTML", function (e) {
-        elem = e.target;
-        if ($(elem).find('.footer').length > 0) {
+    var footerProcessed = false;
+
+    var observer = new MutationObserver(function(mutations) {
+        if (footerProcessed) return;
+
+        var footer = document.querySelector('.footer');
+        if (footer) {
+            footerProcessed = true;
+            observer.disconnect();
+
             brandingsToInsert.forEach(function (branding) {
-                $("head").append('<link rel="stylesheet" type="text/css" href="api/v1/theme?resource_id=' + branding + '">');
+                var link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.type = 'text/css';
+                link.href = 'api/v1/theme?resource_id=' + branding;
+                document.head.appendChild(link);
             });
+
+            loadVersionInfo();
         }
     });
 
-    // necessary to pass on the accessibility test
-    $(document).on('DOMNodeInserted', "thead", function (e) {
-        $("img").each(function (index) {
-            var imageAlt = $(this).attr('alt');
-            if (!(typeof attr !== typeof undefined && attr !== false)) {
-                $(this).attr('alt', 'img_alt');
-            }
+    observer.observe(document.body, { 
+        childList: true, 
+        subtree: true 
+    });
+
+    var altObserver = new MutationObserver(function() {
+        $("img:not([alt])").attr('alt', 'img_alt');
+    });
+
+    var thead = document.querySelector('thead');
+    if (thead) {
+        altObserver.observe(thead, { 
+            childList: true, 
+            subtree: true 
         });
-    });
+    }
 
-    $(document).on('DOMNodeInserted', '.gwt-HTML', function (e) {
-        elem = e.target;
-
-        if (!FOOTER_ADDED && $(elem).find('.footer').length > 0) {
-            var pathname = window.location.pathname;
-            $.get(pathname + "version.json", function (data) {
+    function loadVersionInfo() {
+        var pathname = window.location.pathname;
+        $.get(pathname + "version.json", function (data) {
+            if (data && data["git.build.version"]) {
                 $("div#version").append(
-                  "<div style='color:rgba(255, 255, 255, 0.5); class='built_time'>Version " +
-                  data["git.build.version"] +
-                  "</div>"
-                 );
-                FOOTER_ADDED = true;
-            });
-        }
-    });
+                    "<div style='color:rgba(255, 255, 255, 0.5);' class='built_time'>Version " +
+                    data["git.build.version"] +
+                    "</div>"
+                );
+            }
+        }).fail(function() {
+            console.warn("Failed to load version.json");
+        });
+    }
 });
