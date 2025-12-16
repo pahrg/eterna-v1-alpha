@@ -23,9 +23,11 @@ docker compose logs -f --tail=100
 ```
 
 When the services load, they should be available on the Web browser:
-* ETERNA will be at [http://localhost:8080](http://localhost:8080) (user: admin, password: roda)
+* ETERNA will be at [http://localhost:8080](http://localhost:8080) (user: admin, password: eterna)
 * REST-API documentation will be at [http://localhost:8081](http://localhost:8081) (same passwords as in ETERNA)
 * Indexing backend (Solr) will be at [http://localhost:8983](http://localhost:8983) (not protected, must be protected in production)
+
+Note: If you are upgrading an existing installation, the change to the default admin password only applies to fresh deployments where the LDAP directory is initialized from scratch. Existing installations keep their current credentials; change them manually if needed via the UI or LDAP tools.
 
 When finished, stop the services:
 ```sh

@@ -134,4 +134,4 @@ ETERNA can be controlled via a REST API. This is great to develop external servi
 
 ### Developing 3rd party integrations
 
-If you are interested in developing an integration with ETERNA via the REST API, please contact the product team for further information by leaving a question or a comment on https://github.com/ETERNA-earkiv/ETERNA/issues.
+If you are interested in developing an integration with ETERNA via the REST API, please contact us at earkiv@whitered.se.

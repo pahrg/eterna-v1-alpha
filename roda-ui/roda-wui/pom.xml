@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.roda-project</groupId>
         <artifactId>roda-ui</artifactId>
-        <version>0.4.2</version>
+        <version>0.5.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     <properties>
@@ -268,6 +268,10 @@
                                 <!-- Remove after upgrade to spring-boot 3-->
                                 -Dorg.springframework.boot.logging.LoggingSystem=none
                                 <!-- Remove -->
+
+                                -Djavax.net.ssl.trustStore=/Users/filiph.ps/projects/eterna-environments/solr-tls/solr/solr-tls-keystore.p12
+                                -Djavax.net.ssl.trustStorePassword=changeit
+
                                 -Droda.environment.collect.version=false
                                 --add-opens java.base/java.util=ALL-UNNAMED
                                 --add-opens java.base/java.lang=ALL-UNNAMED

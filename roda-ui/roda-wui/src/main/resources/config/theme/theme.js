@@ -1,73 +1,42 @@
-var FOOTER_ADDED = false;
+document.addEventListener('DOMContentLoaded', () => {
+    let footerProcessed = false;
 
-$(document).ready(function () {
-    // getUrlParameters function based on
-    // from https://stackoverflow.com/a/2880929/1483200
-    var urlParams = (function () {
-        var urlParams,
-            match,
-            pl = /\+/g,  // Regex for replacing addition symbol with a space
-            search = /([^&=]+)=?([^&]*)/g,
-            decode = function (s) {
-                return decodeURIComponent(s.replace(pl, " "));
-            },
-            query = window.location.search.substring(1);
+    const observer = new MutationObserver(() => {
+        if (footerProcessed) return;
 
-        urlParams = {};
-        while (match = search.exec(query))
-            urlParams[decode(match[1])] = decode(match[2]);
-        return urlParams;
-    })();
-
-    // keep branding=false retrocompatibility
-    if (urlParams['branding'] === 'false') {
-        urlParams['branding'] = 'nobranding';
-    }
-
-    let brandingsToInsert = [];
-
-    if ((typeof urlParams['branding']) === 'string') {
-        var brandings = urlParams['branding'].split(',');
-
-        brandings.forEach(function (branding) {
-            if (/^([a-z0-9]+)$/.test(branding)) {
-                brandingsToInsert.push(branding.concat(".css"));
-            }
-        });
-    }
-
-    $(document).on('DOMNodeInserted', ".gwt-HTML", function (e) {
-        elem = e.target;
-        if ($(elem).find('.footer').length > 0) {
-            brandingsToInsert.forEach(function (branding) {
-                $("head").append('<link rel="stylesheet" type="text/css" href="api/v1/theme?resource_id=' + branding + '">');
-            });
+        const footer = document.querySelector('.footer');
+        if (footer) {
+            footerProcessed = true;
+            observer.disconnect();
+            loadVersionInfo();
         }
     });
 
-    // necessary to pass on the accessibility test
-    $(document).on('DOMNodeInserted', "thead", function (e) {
-        $("img").each(function (index) {
-            var imageAlt = $(this).attr('alt');
-            if (!(typeof attr !== typeof undefined && attr !== false)) {
-                $(this).attr('alt', 'img_alt');
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+
+    async function loadVersionInfo() {
+        const pathname = window.location.pathname;
+        try {
+            const response = await fetch(pathname + "version.json");
+            if (!response.ok) {
+                throw new Error('Failed to load version.json');
             }
-        });
-    });
-
-    $(document).on('DOMNodeInserted', '.gwt-HTML', function (e) {
-        elem = e.target;
-
-        if (!FOOTER_ADDED && $(elem).find('.footer').length > 0) {
-            var pathname = window.location.pathname;
-            $.get(pathname + "version.json", function (data) {
-                $("div#version").append(
-                  "<div style='color:rgba(255, 255, 255, 0.5); class='built_time'>Version " +
-                  data["git.build.version"] +
-                  "</div>"
-                 );
-                FOOTER_ADDED = true;
-            });
+            const data = await response.json();
+            if (data && data["git.build.version"]) {
+                const versionDiv = document.querySelector('div#version');
+                if (versionDiv) {
+                    const versionElement = document.createElement('div');
+                    versionElement.style.color = 'rgba(255, 255, 255, 0.5)';
+                    versionElement.className = 'built_time';
+                    versionElement.textContent = `Version ${data["git.build.version"]}`;
+                    versionDiv.appendChild(versionElement);
+                }
+            }
+        } catch (error) {
+            console.warn("Failed to load version.json:", error);
         }
-    });
+    }
 });

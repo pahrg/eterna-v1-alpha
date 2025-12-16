@@ -1434,6 +1434,22 @@ pre code {
     display: none;
 }
 
+.my-asyncdatagrid-page-size-selector {
+    display: flex;
+    gap: 4px;
+    margin: 4px 8px;
+    float: right;
+}
+
+.my-asyncdatagrid-page-size-selector select{
+    padding: 0px 2px;
+    height: 20px;
+}
+
+.page-size-label{
+    font-size: 13px;
+}
+
 .table-empty .my-asyncdatagrid-pager-results {
     display: none;
 }
@@ -6516,8 +6532,22 @@ td.datePickerMonth, td.datePickerYear {
 }
 .stat_col_card {
 	background: #eee;
-	padding: 0 2em 4em 2em;
+	padding: 0 2em 1em 2em;   /* reduced bottom padding */
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-start; 
+	position: relative;
 }
+
+.stat_col_card .description {
+	position: absolute;
+	bottom: 10px;             /* stick to bottom */
+	left: 2em;
+	right: 2em;
+	font-size: 13px;
+	color: #555;
+}
+
 .statistic {
 	white-space: nowrap;
 }

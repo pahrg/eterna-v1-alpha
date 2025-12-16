@@ -4,18 +4,6 @@ In the search page you can search for Intellectual Entities, Representations or 
 
 The search engine locates only whole words. If you want to search for partial terms you should use the '*' operator.
 
-## Search operators
-
-The following search operators are at your disposal:
-
-- Exact sentence (e.g. "Miguel Ferreira")
-- Terms begin with (e.g. Miguel F*)
-- Ignore character (e.g. Miguel Ferreir?)
-- Exclude term (e.g. -Miguel Ferreira)
-- Similar terms (e.g. Ferreir~)
-- Number range (e.g. 1900..2000)
-- Term reunion (e.g. Miguel OR Ferreira)
-
 ## Search custom metadata fields
 
 There are several steps to do it:
@@ -52,7 +40,7 @@ Rules:
 - There are some reserved field names, specially `title`, `dateInitial` and `dateFinal`, that define what appear on the lists
 - You can add new specific fields, but must always add a suffix for the data type. The most used suffixes are "\_txt" (any string tokenized), "\_ss" (non-tokenized strings for identifiers), "\_dd" for ISO1601 dates.
 - The definition of the reserved fields names is made [here](https://github.com/ETERNA-earkiv/ETERNA/blob/main/roda-core/roda-core/src/main/java/org/roda/core/index/schema/collections/AIPCollection.java#L61) but you may need to also access [here](https://github.com/ETERNA-earkiv/ETERNA/blob/main/roda-common/roda-common-data/src/main/java/org/roda/core/data/common/RodaConstants.java#L604) to find out the final name.
-- A complete list of suffixes and fields types is available at the [SOLR base schema](https://github.com/ETERNA-earkiv/ETERNA/blob/main/roda-core/roda-core/src/main/resources/config/index/common/conf/managed-schema).
+- A complete list of suffixes and fields types is available at the [SOLR base schema](https://github.com/ETERNA-earkiv/ETERNA/blob/main/roda-core/roda-core/src/main/resources/config/index/common/conf/managed-schema.xml).
 
 To apply the changes on the stylesheet you must ingest new content or re-index existing content.
 

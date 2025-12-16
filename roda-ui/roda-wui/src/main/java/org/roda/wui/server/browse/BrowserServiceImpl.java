@@ -14,6 +14,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -603,17 +604,30 @@ public class BrowserServiceImpl extends RemoteServiceServlet implements BrowserS
   }
 
   @Override
-  public Set<Pair<String, String>> retrieveDropdownPluginItems(String parameterId, String localeString) {
-    Set<Pair<String, String>> items = new HashSet<>();
+  public Set<Pair<String, String>> retrieveDropdownPluginItems(String pluginId, String parameterId, String localeString) {
+    Set<Pair<String, String>> items = new LinkedHashSet<>();
     List<String> dropdownItems = RodaUtils
       .copyList(RodaCoreFactory.getRodaConfiguration().getList("core.plugins.dropdown." + parameterId + "[]"));
     Locale locale = ServerTools.parseLocale(localeString);
+    ResourceBundle pluginMessages = RodaCoreFactory.getPluginMessages(pluginId, locale);
     Messages messages = RodaCoreFactory.getI18NMessages(locale);
 
     for (String item : dropdownItems) {
       String i18nProperty = RodaCoreFactory.getRodaConfiguration()
         .getString("core.plugins.dropdown." + parameterId + "[]." + item + ".i18n");
-      items.add(Pair.of(messages.getTranslation(i18nProperty, item), item));
+
+      String title;
+      try {
+        title = pluginMessages.getString(i18nProperty);
+      } catch (MissingResourceException e) {
+        if (messages != null) {
+          title = messages.getTranslation(i18nProperty, item);
+        } else {
+          title = item;
+        }
+      }
+
+      items.add(Pair.of(title, item));
     }
 
     return items;

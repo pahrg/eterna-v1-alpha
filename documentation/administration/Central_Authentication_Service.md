@@ -1,6 +1,6 @@
 # External authentication with CAS
 
-ETERNA supports integration with external authentication using [Apereo CAS](https://apereo.github.io/cas/). ETERNA can be configured for external authentication using the [CAS protocol](https://apereo.github.io/cas/6.6.x/protocol/CAS-Protocol.html). 
+ETERNA supports integration with external authentication using [Apereo CAS](https://apereo.github.io/cas/). ETERNA can be configured for external authentication using the [CAS protocol](https://apereo.github.io/cas/7.3.x/protocol/CAS-Protocol.html). 
 CAS can then be used to connect to many authentication protocols and sources. For information on to install and configure an Apereo CAS instance, see the [Apereo CAS official documentation](https://apereo.github.io/cas/).
 
 ## Professional support

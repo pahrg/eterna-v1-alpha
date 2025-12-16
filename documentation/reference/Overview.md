@@ -21,7 +21,7 @@ ETERNA also implements a series of specifications and standards. To know more ab
 * Integrated format registry
 * Uses native file system for data storage
 * 100% compatible with E-ARK SIP, AIP, and DIP specifications
-* Support for themess
+* Support for themes
 
 For more information, please feel free to visit the ETERNA website:
 **<https://www.whitered.se/eterna>**

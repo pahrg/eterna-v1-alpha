@@ -1077,4 +1077,19 @@ public class FSUtils {
     }
   }
 
+  public static Map<String, Object> formatSize(long sizeInBytes, String keyPrefix) {
+    Map<String, Object> map = new HashMap<>();
+    long sizeInMB = sizeInBytes / (1024 * 1024);
+
+    if (sizeInMB < 1024) {
+      map.put(keyPrefix, sizeInMB);
+      map.put(keyPrefix + "Unit", "MB");
+    } else {
+      double sizeInGB = sizeInMB / 1024.0;
+      map.put(keyPrefix, Math.round(sizeInGB * 100.0) / 100.0);
+      map.put(keyPrefix + "Unit", "GB");
+    }
+    return map;
+  }
+
 }

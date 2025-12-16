@@ -7,7 +7,9 @@
  */
 package org.roda.core.storage;
 
+import java.io.IOException;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.util.List;
 import java.util.Map;
 
@@ -196,6 +198,10 @@ public class StorageServiceWrapper implements StorageService {
     return storageService.getDirectAccess(storagePath);
   }
 
+  public FileTime getCreationTime(StoragePath storagePath) throws IOException {
+    return storageService.getCreationTime(storagePath);
+  }
+
   @Override
   public CloseableIterable<BinaryVersion> listBinaryVersions(StoragePath storagePath)
     throws GenericException, RequestNotValidException, NotFoundException, AuthorizationDeniedException {
@@ -244,6 +250,11 @@ public class StorageServiceWrapper implements StorageService {
   @Override
   public List<StoragePath> getShallowFiles(StoragePath storagePath) throws NotFoundException, GenericException {
     return storageService.getShallowFiles(storagePath);
+  }
+
+  @Override
+  public Map<String, Object> getStorageStats() throws GenericException {
+    return storageService.getStorageStats();
   }
 
 }

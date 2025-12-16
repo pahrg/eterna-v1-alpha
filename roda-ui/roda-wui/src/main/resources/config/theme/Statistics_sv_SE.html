@@ -1,277 +1,166 @@
 <div id="statistics" class="static-page max-width">
-	<h1>Rapportering</h1>
+    <h1>Rapportering</h1>
 
-	<p>Den här sidan visar en instrumentpanel med statistik som rör flera olika
-		delar av systemet. Statistiken är organiserad efter sektioner där 
-		var och en av dessa fokuserar på en viss aspekt av systemet, t.ex. 
-		frågor som har med metadata, information, statistik som rör inleverans samt 
-		 bevarandeprocesser, användarstatistik och frågor rörande autentisering,
-		 bevarandehändelser, riskhantering och aviseringar.</p>
+    <p>Den här sidan visar en instrumentpanel med statistik som rör flera olika
+        aspekter av systemet. Statistiken är organiserad efter sektioner där
+        var och en fokuserar på en viss aspekt av systemet, t.ex.
+        frågor som rör metadata och data, statistik för inleverans och bevarandeprocesser,
+        användare och autentisering, bevarandehändelser, riskhantering och aviseringar.</p>
 
-	<div class="collapsable-card-panel" id="panelStatistic">
-		<h5 class="collapsable-card-panel-title">Rapporteringstjänster</h5>
-		<button class="collapsable-card-panel-close" id="closeButton">
-			<i class="fas fa-times"></i>
-		</button>
-		<p class="collapsable-card-panel-body">Anpassningsbara instrumentpaneler för organisationer att stödja kvalificerat
-			beslutsfattande och strategisk planering. Denna funktion möjliggör spårning av nyckelprestanda
-			indikatorer (KPI), riskanalys och andra viktiga uppgifter för databedömning, tillhandahåller ledning
-			 med den information som behövs för att fatta välgrundade beslut och framgång för bevarandeprocessen.</p>
-		<button type="button" id="reporting-action-button" class="btn collapsable-card-panel-action">Läs mer</button>
-	</div>
+    <div class="collapsable-card-panel" id="panelStatistic">
+        <h5 class="collapsable-card-panel-title">Rapporteringstjänster</h5>
+        <button class="collapsable-card-panel-close" id="closeButton">
+            <i class="fas fa-times"></i>
+        </button>
+        <p class="collapsable-card-panel-body">
+            Anpassningsbara instrumentpaneler för organisationer för att stödja kvalificerat
+            beslutsfattande och strategisk planering. Denna funktion möjliggör spårning av nyckelprestandaindikatorer (KPI),
+            riskanalys och andra viktiga uppgifter för databedömning, och tillhandahåller ledningen
+            den information som behövs för att fatta välgrundade beslut och säkerställa framgång för bevarandeprocessen.
+        </p>
+        <button type="button" id="reporting-action-button" class="btn collapsable-card-panel-action">Läs mer</button>
+    </div>
 
-	<h2>Metadata</h2>
+    <h2>Data</h2>
 
-	<div class="row full_width">
-		<div class="col_4 stat_col_card">
-			<h4>Antal logiska enheter</h4>
-			<div class="textfill"><span class="statistic" data-source="index" data-source-filters="any" data-source-class="org.roda.core.data.v2.ip.IndexedAIP" data-source-only-active="true" data-view="text" data-view-field="totalCount"></span></div>
-		</div>
-		<div class="col_8 chart_col_card">
-			<h4>Distribution av beskrivningsnivåer (topp 10)</h4>
-			<canvas id="stat-desc-levels" class="statistic" data-source="index" data-source-filters="any" data-source-class="org.roda.core.data.v2.ip.IndexedAIP" data-source-facets="level" data-view="chart" data-view-field="facetResults" data-view-type="pie" data-view-limit="10"></canvas><span class="statistic toolbarLink" data-ref="stat-desc-levels" data-view="download" data-view-filename="description-levels.csv">
+    <div class="row full_width">
+        <div class="col_4 stat_col_card">
+            <h4>Antal filer</h4>
+            <div class="textfill">
+				<span class="statistic" data-source="index" data-source-filters="any"
+                      data-source-class="org.roda.core.data.v2.ip.IndexedFile"
+                      data-view="text" data-view-field="totalCount"></span>
+            </div>
+        </div>
+
+        <div class="col_8 chart_col_card">
+            <h4>Fördelning av fil-PRONOM (topp 10)</h4>
+            <canvas id="file-formats-pronom" class="statistic" data-source="index" data-source-filters="any"
+                    data-source-class="org.roda.core.data.v2.ip.IndexedFile" data-source-facets="formatPronom"
+                    data-view="chart" data-view-field="facetResults" data-view-type="horizontalBar"
+                    data-view-limit="10"></canvas>
+            <span class="statistic toolbarLink" data-ref="file-formats-pronom" data-view="download"
+                  data-view-filename="file-formats-pronom.csv">
 				<i class="fa fa-download" aria-hidden="true"></i>
 			</span>
-		</div>
-	</div>
+        </div>
+    </div>
 
-	<div class="row full_width">
-		<div class="col_6 chart_col_card">
-			<h4>Användarnas rörelsemöster (topp 10)</h4>
-			<canvas id="user-move-actions" class="statistic" data-source="index" data-source-class="org.roda.core.data.v2.log.LogEntry" data-source-facets="username" data-view="chart" data-source-filters="actionMethod=moveAIPInHierarchy" data-view-field="facetResults" data-view-type="pie" data-view-limit="10"></canvas><span class="statistic toolbarLink" data-ref="user-move-actions" data-view="download" data-view-filename="user-move-actions.csv">
+    <div class="row full_width">
+        <div class="col_12 chart_col_card">
+            <h4>Fördelning av filformat (topp 10)</h4>
+            <canvas id="file-formats-description" class="statistic" data-source="index" data-source-filters="any"
+                    data-source-class="org.roda.core.data.v2.ip.IndexedFile" data-source-facets="fileFormat"
+                    data-view="chart" data-view-field="facetResults" data-view-type="horizontalBar"
+                    data-view-limit="10"></canvas>
+            <span class="statistic toolbarLink" data-ref="file-formats-description" data-view="download"
+                  data-view-filename="file-formats-description.csv">
 				<i class="fa fa-download" aria-hidden="true"></i>
 			</span>
-		</div>
-		<div class="col_6 chart_col_card">
-			<h4>Användarbeskrivande metadata (topp 10)</h4>
-			<canvas id="user-desc-creations" class="statistic" data-source="index" data-source-class="org.roda.core.data.v2.log.LogEntry" data-source-facets="username" data-view="chart" data-source-filters="actionMethod=createDescriptiveMetadataFile" data-view-field="facetResults" data-view-type="pie" data-view-limit="10"></canvas><span class="statistic toolbarLink" data-ref="user-desc-creations" data-view="download" data-view-filename="user-desc-creations.csv">
+        </div>
+    </div>
+
+    <div class="row full_width">
+        <div class="col_12 chart_col_card">
+            <h4>Fördelning av MIME-typer (topp 10)</h4>
+            <canvas id="file-formats-mimetypes" class="statistic" data-source="index" data-source-filters="any"
+                    data-source-class="org.roda.core.data.v2.ip.IndexedFile" data-source-facets="formatMimetype"
+                    data-view="chart" data-view-field="facetResults" data-view-type="horizontalBar"
+                    data-view-limit="10"></canvas>
+            <span class="statistic toolbarLink" data-ref="file-formats-mimetypes" data-view="download"
+                  data-view-filename="file-formats-mimetypes.csv">
 				<i class="fa fa-download" aria-hidden="true"></i>
 			</span>
-		</div>
-	</div>
+        </div>
+    </div>
 
-	<div class="row full_width">
-		<div class="col_6 chart_col_card">
-			<h4>Uppdateringar av användarbeskrivande metadata (topp 10)</h4>
-			<canvas id="user-desc-updates" class="statistic" data-source="index" data-source-class="org.roda.core.data.v2.log.LogEntry" data-source-facets="username" data-view="chart" data-source-filters="actionMethod=updateDescriptiveMetadataFile" data-view-field="facetResults" data-view-type="pie" data-view-limit="10"></canvas><span class="statistic toolbarLink" data-ref="user-desc-updates" data-view="download" data-view-filename="user-desc-updates.csv">
+    <div class="row full_width">
+        <div class="col_4 stat_col_card">
+            <h4>Totalt lagringsutrymme</h4>
+            <div class="textfill">
+				<span id="total-disk" class="statistic" data-source="function" data-function="customDiskStats"
+                      data-view="text" data-view-field="total"></span>
+            </div>
+            <p class="description">Den totala lagringskapaciteten som finns tillgänglig i systemet.</p>
+        </div>
+
+        <div class="col_4 stat_col_card">
+            <h4>Använt lagringsutrymme</h4>
+            <div class="textfill">
+				<span id="used-disk" class="statistic" data-source="function" data-function="customDiskStats"
+                      data-view="text" data-view-field="used"></span>
+            </div>
+            <p class="description">Den del av det totala lagringsutrymmet som för närvarande används.</p>
+        </div>
+
+        <div class="col_4 chart_col_card">
+            <h4>Diskanvändning (använt vs tillgängligt)</h4>
+            <canvas id="disk-usage" class="statistic" data-source="function" data-function="customDiskStats"
+                    data-view="chart" data-view-field="facetResults" data-view-type="pie"></canvas>
+            <span class="statistic toolbarLink" data-ref="disk-usage" data-source="function"
+                  data-function="customDiskStats" data-view="download" data-view-field="facetResults"
+                  data-view-filename="disk-usage.csv">
 				<i class="fa fa-download" aria-hidden="true"></i>
 			</span>
-		</div>
-		<div class="col_6 chart_col_card">
-			<h4>Borttagning av användarbeskrivande metadata (topp 10)</h4>
-			<canvas id="user-desc-deletes" class="statistic" data-source="index" data-source-class="org.roda.core.data.v2.log.LogEntry" data-source-facets="username" data-view="chart" data-source-filters="actionMethod=deleteDescriptiveMetadataFile" data-view-field="facetResults" data-view-type="pie" data-view-limit="10"></canvas><span class="statistic toolbarLink" data-ref="user-desc-deletes" data-view="download" data-view-filename="user-desc-deletes.csv">
+        </div>
+    </div>
+
+    <div class="row full_width">
+        <div class="col_4 stat_col_card">
+            <h4>Totalt antal AIP:er</h4>
+            <div class="textfill">
+                <span class="statistic" data-source="index" data-source-filters="any"
+                      data-source-class="org.roda.core.data.v2.ip.IndexedAIP" data-view="text"
+                      data-view-field="totalCount"> </span>
+            </div>
+            <p class="description">Det totala antalet arkiverade informationspaket.</p>
+        </div>
+
+        <div class="col_8 chart_col_card">
+            <h4>AIP:er tillagda per månad (senaste 12 månaderna)</h4>
+           <canvas id="aip-added-monthly" class="statistic" data-source="function" data-function="customAipStats"
+                    data-view="chart" data-source-facets="createdOn" data-view-field="facetResults" data-view-type="bar" data-label-function="formatMonthLabel"></canvas>
+                       <span class="statistic toolbarLink" data-ref="aip-added-monthly"  data-view="download"  data-function="customAipStats" data-source-facets="createdOn"
+                  data-view-filename="aip-per-month.csv"> <i class="fa fa-download" aria-hidden="true"></i>
+            </span>
+        </div>
+    </div>
+
+    <h2>Användare</h2>
+
+    <div class="row full_width">
+        <div class="col_4 stat_col_card">
+            <h4>Antal användare</h4>
+            <div class="textfill">
+				<span class="statistic" data-source="index"
+                      data-source-class="org.roda.core.data.v2.user.RODAMember"
+                      data-view="text" data-source-filters="isUser=true" data-view-field="totalCount"></span>
+            </div>
+            <p class="description">Totalt antal registrerade användarkonton som för närvarande finns i systemet.</p>
+        </div>
+
+        <div class="col_4 stat_col_card">
+            <h4>Antal autentiseringar</h4>
+            <div class="textfill">
+				<span class="statistic" data-source="index"
+                      data-source-class="org.roda.core.data.v2.log.LogEntry"
+                      data-source-filters="actionComponent=org.roda.wui.api.controllers.UserLogin, actionMethod=login, state=SUCCESS"
+                      data-view="text" data-view-field="totalCount"></span>
+            </div>
+            <p class="description">Kumulativt antal lyckade användarinloggningar i systemet.</p>
+        </div>
+
+        <div class="col_4 chart_col_card">
+            <h4>Lyckade vs misslyckade inloggningar</h4>
+            <canvas id="logins-state" class="statistic" data-source="index"
+                    data-source-class="org.roda.core.data.v2.log.LogEntry"
+                    data-source-filters="actionComponent=org.roda.wui.api.controllers.UserLogin, actionMethod=login"
+                    data-source-facets="state" data-view="chart" data-view-field="facetResults"
+                    data-view-type="pie"></canvas>
+            <span class="statistic toolbarLink" data-ref="logins-state" data-view="download"
+                  data-view-filename="logins-state.csv">
 				<i class="fa fa-download" aria-hidden="true"></i>
 			</span>
-		</div>
-	</div>
-
-	<h2>Data</h2>
-
-
-	<div class="row full_width">
-		<div class="col_4 stat_col_card">
-			<h4>Antal representationer</h4>
-			<div class="textfill"><span class="statistic" data-source="index" data-source-filters="any" data-source-class="org.roda.core.data.v2.ip.IndexedRepresentation" data-view="text" data-view-field="totalCount"></span></div>
-		</div>
-		<div class="col_8 chart_col_card">
-			<h4>Distribution av representationstyper</h4>
-			<canvas id="representation-types" class="statistic" data-source="index" data-source-filters="any" data-source-class="org.roda.core.data.v2.ip.IndexedRepresentation" data-source-facets="type" data-view="chart" data-view-field="facetResults" data-view-type="horizontalBar"></canvas><span class="statistic toolbarLink" data-ref="representation-types" data-view="download" data-view-filename="representation-types.csv">
-				<i class="fa fa-download" aria-hidden="true"></i>
-			</span>
-		</div>
-	</div>
-
-	<div class="row full_width">
-		<div class="col_4 stat_col_card">
-			<h4>Antal filer</h4>
-			<div class="textfill"><span class="statistic" data-source="index" data-source-filters="any" data-source-class="org.roda.core.data.v2.ip.IndexedFile" data-view="text" data-view-field="totalCount"></span></div>
-		</div>
-		<div class="col_8 chart_col_card">
-			<h4>Distribution av PRONOM-filer (topp 10)</h4>
-			<canvas id="file-formats-pronom" class="statistic" data-source="index" data-source-filters="any" data-source-class="org.roda.core.data.v2.ip.IndexedFile" data-source-facets="formatPronom" data-view="chart" data-view-field="facetResults" data-view-type="horizontalBar" data-view-limit="10"></canvas><span class="statistic toolbarLink" data-ref="file-formats-pronom" data-view="download" data-view-filename="file-formats-pronom.csv">
-				<i class="fa fa-download" aria-hidden="true"></i>
-			</span>
-		</div>
-	</div>
-	<div class="row full_width">
-		<div class="col_12 chart_col_card">
-			<h4>Distribution av filformat (topp 10)</h4>
-			<canvas id="file-formats-description" class="statistic" data-source="index" data-source-filters="any" data-source-class="org.roda.core.data.v2.ip.IndexedFile" data-source-facets="fileFormat" data-view="chart" data-view-field="facetResults" data-view-type="horizontalBar" data-view-limit="10"></canvas><span class="statistic toolbarLink" data-ref="file-formats-description" data-view="download" data-view-filename="file-formats-description.csv"> <i class="fa fa-download" aria-hidden="true"></i></span>
-		</div>
-	</div>
-	<div class="row full_width">
-		<div class="col_12 chart_col_card">
-			<h4>Distribution av MIME-typsfiler (topp 10)</h4>
-			<canvas id="file-formats-mimetypes" class="statistic" data-source="index" data-source-filters="any" data-source-class="org.roda.core.data.v2.ip.IndexedFile" data-source-facets="formatMimetype" data-view="chart" data-view-field="facetResults" data-view-type="horizontalBar" data-view-limit="10"></canvas><span class="statistic toolbarLink" data-ref="file-formats-mimetypes" data-view="download" data-view-filename="file-formats-mimetypes.csv">
-				<i class="fa fa-download" aria-hidden="true"></i>
-			</span>
-		</div>
-	</div>
-
-
-	<h2>Processer</h2>
-
-	<div class="row full_width">
-		<div class="col_4 stat_col_card">
-			<h4>Antal åtgärdsprocesser</h4>
-			<div class="textfill"><span class="statistic" data-source="index" data-source-class="org.roda.core.data.v2.jobs.Job" data-view="text" data-source-filters="!pluginType=INGEST" data-view-field="totalCount"></span></div>
-		</div>
-		<div class="col_4 chart_col_card">
-			<h4>Distrubution av åtgärdsprocessstatus</h4>
-			<canvas id="process-action-status" class="statistic" data-source="index" data-source-class="org.roda.core.data.v2.jobs.Job" data-source-facets="state" data-view="chart" data-source-filters="!pluginType=INGEST" data-view-field="facetResults" data-view-type="pie"></canvas><span class="statistic toolbarLink" data-ref="process-action-status" data-view="download" data-view-filename="process-action-status.csv">
-				<i class="fa fa-download" aria-hidden="true"></i>
-			</span>
-		</div>
-		<div class="col_4 chart_col_card">
-			<h4>Distribution av åtgärdsprocesstyper</h4>
-			<canvas id="process-action-type" class="statistic" data-source="index" data-source-class="org.roda.core.data.v2.jobs.Job" data-source-facets="pluginType" data-view="chart" data-source-filters="!pluginType=INGEST" data-view-field="facetResults" data-view-type="pie"></canvas><span class="statistic toolbarLink" data-ref="process-action-type" data-view="download" data-view-filename="process-action-type.csv">
-				<i class="fa fa-download" aria-hidden="true"></i>
-			</span>
-		</div>
-	</div>
-
-	<div class="row full_width">
-		<div class="col_4 stat_col_card">
-			<h4>Antal inleveransprocesser</h4>
-			<div class="textfill"><span class="statistic" data-source="index" data-source-class="org.roda.core.data.v2.jobs.Job" data-view="text" data-source-filters="pluginType=INGEST" data-view-field="totalCount"></span></div>
-		</div>
-		<div class="col_4 chart_col_card">
-			<h4>Distribution av processtatus</h4>
-			<canvas id="process-ingest-status" class="statistic" data-source="index" data-source-class="org.roda.core.data.v2.jobs.Job" data-source-facets="state" data-view="chart" data-source-filters="pluginType=INGEST" data-view-field="facetResults" data-view-type="pie"></canvas><span class="statistic toolbarLink" data-ref="process-ingest-status" data-view="download" data-view-filename="process-ingest-status.csv">
-				<i class="fa fa-download" aria-hidden="true"></i>
-			</span>
-		</div>
-		<div class="col_4 chart_col_card">
-			<h4>Antal värderingar (topp 10)</h4>
-			<canvas id="appraisal" class="statistic" data-source="index" data-source-class="org.roda.core.data.v2.log.LogEntry" data-source-facets="username" data-view="chart" data-source-filters="actionMethod=appraisal" data-view-field="facetResults" data-view-type="pie" data-view-limit="10"></canvas><span class="statistic toolbarLink" data-ref="appraisal" data-view="download" data-view-filename="appraisal.csv"> <i class="fa fa-download" aria-hidden="true"></i>
-			</span>
-		</div>
-	</div>
-
-	<div class="row full_width">
-		<div class="col_4 stat_col_card">
-			<h4>Antal rapporter</h4>
-			<div class="textfill"><span class="statistic" data-source="index" data-source-filters="any" data-source-class="org.roda.core.data.v2.jobs.IndexedReport" data-view="text" data-view-field="totalCount"></span></div>
-		</div>
-		<div class="col_8 chart_col_card">
-			<h4>Distribution av rapportplugin (topp 5)</h4>
-			<canvas id="process-reports-plugin" class="statistic" data-source="index" data-source-class="org.roda.core.data.v2.jobs.IndexedReport" data-source-facets="pluginName" data-view="chart" data-source-filters="!plugin=org.roda.core.plugins.base.ingest.AutoAcceptSIPPlugin" data-view-field="facetResults" data-view-type="horizontalBar" data-view-limit="5"></canvas><span class="statistic toolbarLink" data-ref="process-reports-plugin" data-view="download" data-view-filename="process-reports-plugin.csv">
-				<i class="fa fa-download" aria-hidden="true"></i>
-			</span>
-		</div>
-	</div>
-
-	<div class="row full_width">
-		<div class="col_4 chart_col_card">
-			<h4>Distribution av rapportpluginstatus</h4>
-			<canvas id="process-reports-plugin-state" class="statistic" data-source="index" data-source-filters="any" data-source-class="org.roda.core.data.v2.jobs.IndexedReport" data-source-facets="pluginState" data-view="chart" data-view-field="facetResults" data-view-type="pie"></canvas><span class="statistic toolbarLink" data-ref="process-reports-plugin-state" data-view="download" data-view-filename="process-reports-plugin-state.csv"> <i class="fa fa-download" aria-hidden="true"></i>
-			</span>
-		</div>
-
-		<div class="col_8 chart_col_card">
-			<h4>Användare som startade fler processer (topp 5)</h4>
-			<canvas id="process-users" class="statistic" data-source="index" data-source-class="org.roda.core.data.v2.log.LogEntry" data-source-facets="username" data-view="chart" data-source-filters="actionMethod=createJob" data-view-field="facetResults" data-view-type="horizontalBar" data-view-limit="5"></canvas><span class="statistic toolbarLink" data-ref="process-users" data-view="download" data-view-filename="process-users.csv">
-				<i class="fa fa-download" aria-hidden="true"></i>
-			</span>
-		</div>
-	</div>
-
-	<h2>Användare</h2>
-
-	<div class="row full_width">
-		<div class="col_4 stat_col_card">
-			<h4>Antal användare</h4>
-			<div class="textfill"><span class="statistic" data-source="index" data-source-class="org.roda.core.data.v2.user.RODAMember" data-view="text" data-source-filters="isUser=true" data-view-field="totalCount"></span></div>
-		</div>
-		<div class="col_4 stat_col_card">
-			<h4>Antal autentiseringar</h4>
-			<div class="textfill"><span class="statistic" data-source="index" data-source-class="org.roda.core.data.v2.log.LogEntry" data-source-filters="actionComponent=org.roda.wui.api.controllers.UserLogin, actionMethod=login, state=SUCCESS" data-view="text" data-view-field="totalCount"></span></div>
-		</div>
-		<div class="col_4 chart_col_card">
-			<h4>Lyckade och misslyckade inloggningar</h4>
-			<canvas id="logins-state" class="statistic" data-source="index" data-source-class="org.roda.core.data.v2.log.LogEntry" data-source-filters="actionComponent=org.roda.wui.api.controllers.UserLogin, actionMethod=login" data-source-facets="state" data-view="chart" data-view-field="facetResults" data-view-type="pie"></canvas><span class="statistic toolbarLink" data-ref="logins-state" data-view="download" data-view-filename="logins-state.csv"> <i class="fa fa-download" aria-hidden="true"></i>
-			</span>
-		</div>
-	</div>
-
-	<h2>Resurser för inleverans</h2>
-
-	<div class="row full_width">
-		<div class="col_4 stat_col_card">
-			<h4>Antal uppladdade resurser</h4>
-			<div class="textfill"><span class="statistic" data-source="index" data-source-filters="any" data-source-class="org.roda.core.data.v2.ip.TransferredResource" data-view="text" data-view-field="totalCount"></span></div>
-		</div>
-		<div class="col_4 stat_col_card">
-			<h4>Lyckade inleveranser</h4>
-			<div class="textfill"><span class="statistic" data-source="index" data-source-class="org.roda.core.data.v2.ip.TransferredResource" data-view="text" data-view-field="totalCount" data-source-filters="ancestors=PROCESSED/SUCCESSFULLY_INGESTED"></span></div>
-		</div>
-		<div class="col_4 stat_col_card">
-			<h4>Misslyckade inleveranser</h4>
-			<div class="textfill"><span class="statistic" data-source="index" data-source-class="org.roda.core.data.v2.ip.TransferredResource" data-view="text" data-view-field="totalCount" data-source-filters="ancestors=PROCESSED/UNSUCCESSFULLY_INGESTED"></span></div>
-		</div>
-	</div>
-
-	<h2>Bevarandehändelser</h2>
-
-	<div class="row full_width">
-		<div class="col_4 stat_col_card">
-			<h4>Antal bevarandehändelser</h4>
-			<div class="textfill"><span class="statistic" data-source="index" data-source-filters="any" data-source-class="org.roda.core.data.v2.ip.metadata.IndexedPreservationEvent" data-view="text" data-view-field="totalCount"></span></div>
-		</div>
-		<div class="col_8 chart_col_card">
-			<h4>Typ av bevarandeaktör (topp 5)</h4>
-			<canvas id="preservation-agents-type" class="statistic" data-source="index" data-source-filters="any" data-source-class="org.roda.core.data.v2.ip.metadata.IndexedPreservationEvent" data-source-facets="eventType" data-view="chart" data-view-field="facetResults" data-view-type="pie" data-view-limit="5"></canvas><span class="statistic toolbarLink" data-ref="preservation-agents-type" data-view="download" data-view-filename="preservation-agents-type.csv"> <i class="fa fa-download" aria-hidden="true"></i>
-			</span>
-		</div>
-
-	</div>
-
-	<h2>Risker</h2>
-
-	<div class="row full_width">
-		<div class="col_4 stat_col_card">
-			<h4>Antal risker</h4>
-			<div class="textfill"><span class="statistic" data-source="index" data-source-filters="any" data-source-class="org.roda.core.data.v2.risks.IndexedRisk" data-view="text" data-view-field="totalCount"></span></div>
-		</div>
-		<div class="col_8 chart_col_card">
-			<h4>Risker fördelat på åtgärdshantering</h4>
-			<canvas id="risk-severity" class="statistic" data-source="index" data-source-filters="any" data-source-class="org.roda.core.data.v2.risks.IndexedRisk" data-source-facets="currentSeverityLevel" data-view="chart" data-view-field="facetResults" data-view-type="pie"></canvas><span class="statistic toolbarLink" data-ref="risk-severity" data-view="download" data-view-filename="risk-severity.csv">
-				<i class="fa fa-download" aria-hidden="true"></i>
-			</span>
-		</div>
-	</div>
-
-	<h2>Riskincidenter</h2>
-
-	<div class="row full_width">
-		<div class="col_4 stat_col_card">
-			<h4>Antal riskincidenser</h4>
-			<div class="textfill"><span class="statistic" data-source="index" data-source-filters="any" data-source-class="org.roda.core.data.v2.risks.RiskIncidence" data-view="text" data-view-field="totalCount"></span></div>
-		</div>
-		<div class="col_4 chart_col_card">
-			<h4>Riskincidenter fördelat på allvarlighetsgrad</h4>
-			<canvas id="risk-incidence-severity" class="statistic" data-source="index" data-source-filters="any" data-source-class="org.roda.core.data.v2.risks.RiskIncidence" data-source-facets="severity" data-view="chart" data-view-field="facetResults" data-view-type="pie"></canvas><span class="statistic toolbarLink" data-ref="risk-incidence-severity" data-view="download" data-view-filename="risk-incidence-severity.csv"> <i class="fa fa-download" aria-hidden="true"></i>
-			</span>
-		</div>
-		<div class="col_4 chart_col_card">
-			<h4>Riskincidenter fördelat på status</h4>
-			<canvas id="risk-incidence-status" class="statistic" data-source="index" data-source-filters="any" data-source-class="org.roda.core.data.v2.risks.RiskIncidence" data-source-facets="status" data-view="chart" data-view-field="facetResults" data-view-type="pie"></canvas><span class="statistic toolbarLink" data-ref="risk-incidence-status" data-view="download" data-view-filename="risk-incidence-status.csv">
-				<i class="fa fa-download" aria-hidden="true"></i>
-			</span>
-		</div>
-	</div>
-
-	<h2>Notis</h2>
-
-	<div class="row full_width">
-		<div class="col_4 stat_col_card">
-			<h4>Antal notiser</h4>
-			<div class="textfill"><span class="statistic" data-source="index" data-source-filters="any" data-source-class="org.roda.core.data.v2.notifications.Notification" data-view="text" data-view-field="totalCount"></span></div>
-		</div>
-		<div class="col_8 chart_col_card">
-			<h4>Bekräftade notiser</h4>
-			<canvas id="notification-acknowledge" class="statistic" data-source="index" data-source-filters="any" data-source-class="org.roda.core.data.v2.notifications.Notification" data-source-facets="isAcknowledged" data-view="chart" data-view-field="facetResults" data-view-type="pie"></canvas><span class="statistic toolbarLink" data-ref="notification-acknowledge" data-view="download" data-view-filename="notification-acknowledge.csv"> <i class="fa fa-download" aria-hidden="true"></i>
-			</span>
-		</div>
-	</div>
+        </div>
+    </div>
 </div>
