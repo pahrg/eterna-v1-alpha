@@ -1,10 +1,10 @@
 # ETERNA Changelog
-## v0.5.0-dev (2025-11-26)
+## v0.5.0 (2025-12-16)
 #### Updates
 - Added Swedish and English SVG credentials images
 - Updated default admin password to 'eterna'
 - Updated LDAP configuration for admin user with new password and details
-- Updated documentation to reflect the new default admin password
+- Updated documentation
 - Change PluginManager to expect an ETERNA-plugin manifest entry, has a fallback to support RODA plugins
 - Ensure parent directories exist when creating a new file in FileStorageService
 - Refactored AbstractConvertPlugin to enhance file conversion process with new ConversionContext and ConversionResult classes, improved file processing logic, enhanced error handling, and consistent representation ID handling
@@ -15,6 +15,8 @@
 - Fixed missing handling of `Descriptive Metadata` in ResourceParseUtils.convertResourceTo that caused ModelService#listDescriptiveMetadata to fail
 - Fixed incorrect naming of PREMIS:FILE metadata when ingesting from E-ARK SIPs
 - Added breadcrumb navigation to PDF redactor page to match the navigation pattern used by other file viewing pages
+- Fixed missing version number in footer
+- Added support for communicating with SOLR over TLS
 
 ## v0.4.2 (2025-10-14)
 #### New features
