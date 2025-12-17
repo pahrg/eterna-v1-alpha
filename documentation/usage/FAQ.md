@@ -16,7 +16,7 @@ Special formats need special viewers or converters to adapt them to existing vie
 
 ### What descriptive metadata formats are supported by ETERNA?
 
-All descriptive metadata formats are supported as long as there is a grammar in XML Schema (XSD) to validate it. By default, ETERNA comes configured with Dublin Core and Encoded Archival Description 2002. More schemas can be added.
+All descriptive metadata formats are supported as long as there is a grammar in XML Schema (XSD) to validate it. By default, ETERNA comes configured with Dublin Core, EAD3 and Encoded Archival Description 2002.
 
 ### Can ETERNA support multiple classification schemes?
 
@@ -70,7 +70,7 @@ Yes. You can navigate on the actions log (entire set of actions performed on the
 
 ## Preservation
 
-### Describe the functioning of the quarantaine environment.
+### How does the quarantaine environment work?.
 
 When SIPs are being processed during ingest, if they fail to be accepted they are moved to a special folder on the filesystem. The ingest process generates a detailed report that describes the reasons for the rejection. Manual care must be taken from that point on.
 
@@ -85,7 +85,7 @@ This is a complex question that cannot be answered in just a few lines of text. 
 
 ### How does the application support appraisal, selection the definition of retention periods?
 
-ETERNA provides a complex workflow for disposal of records. Please refer to [Disposal](../administration/Disposal.md) for more information.
+ETERNA provides a complex workflow for disposal of records. Please refer to [Disposal](administration/Disposal.md) for more information.
 
 ### Is the system logging search interactions?
 
@@ -99,4 +99,4 @@ Not really. A modern browser is sufficient.
 
 ### How to set up the development environment for ETERNA?
 
-Complete instructions on how to set up the development environment are available at: [Developers guide](../development/Developers_Guide.md).
+Complete instructions on how to set up the development environment are available at: [Developers guide](development/Developers_Guide.md).

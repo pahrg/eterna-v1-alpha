@@ -4,18 +4,6 @@ På söksidan kan du söka efter logiska enheter, representationer eller filer (
 
 Sökmotorn hittar bara hela ord. Om du vill söka efter deltermer bör du använda asterisk '*'.
 
-## Sökparametrar
-
-Följande sökparametrar är möjliga:
-
-- Exakt mening (t.ex. "Miguel Ferreira")
-- Termer börjar med (t.ex. Miguel F*)
-- Ignorera tecken (t.ex. Miguel Ferreir?)
-- Exkludera term (t.ex. -Miguel Ferreira)
-- Liknande termer (t.ex. Ferreir~)
-- Nummerintervall (t.ex. 1900...2000)
-- Antingen eller (t.ex. Miguel OR Ferreira)
-
 ## Sök efter anpassade metadatafält
 
 Det finns flera steg för att göra det:
@@ -52,7 +40,7 @@ Regler:
 - Det finns några reserverade fältnamn; `titel`, `dateInitial` och `dateFinal`, som definierar vad som visas på listorna
 - Du kan lägga till nya specifika fält, men du måste alltid lägga till ett suffix för datatypen. De mest använda suffixen är "\_txt" (valfri sträng tokeniserad), "\_ss" (icke-tokeniserade strängar för identifierare), "\_dd" för ISO1601-datum.
 - Definitionen av de reserverade fältnamnen görs [här](https://github.com/ETERNA-earkiv/ETERNA/blob/main/roda-core/roda-core/src/main/java/org/roda/core/index/schema/collections/AIPCollection.java#L61) men du kan behöva komma åt [här](https://github.com/ETERNA-earkiv/ETERNA/blob/main/roda-common/roda-common-data/src/main/java/org/roda/core/data/common/RodaConstants.java#L604) för att ta reda på det slutliga namnet.
-- En komplett lista över suffix och fälttyper finns på [SOLR base schema](https://github.com/ETERNA-earkiv/ETERNA/blob/main/roda-core/roda-core/src/main/resources/config/index/common/conf/managed-schema).
+- En komplett lista över suffix och fälttyper finns på [SOLR base schema](https://github.com/ETERNA-earkiv/ETERNA/blob/main/roda-core/roda-core/src/main/resources/config/index/common/conf/managed-schema.xml).
 
 För att tillämpa ändringarna på visningsmallen måste du leverera in nytt innehåll eller indexera om befintligt innehåll.
 
