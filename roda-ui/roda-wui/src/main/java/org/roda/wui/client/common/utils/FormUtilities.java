@@ -58,7 +58,7 @@ public class FormUtilities {
   }
 
   public static void create(FlowPanel panel, Set<MetadataValue> bundle, boolean addStyle,
-    final Callable<Void> onChange) {
+      final Callable<Void> onChange) {
     if (bundle != null) {
       for (MetadataValue mv : bundle) {
         boolean mandatory = mv.get("mandatory") != null && "true".equalsIgnoreCase(mv.get("mandatory"));
@@ -73,33 +73,34 @@ public class FormUtilities {
           layout.addStyleName("metadata-form-field");
         }
 
-      String controlType = mv.get("type");
-      if (controlType == null) {
-        addTextField(panel, layout, mv, mandatory, onChange);
-      } else {
-        switch (controlType) {
-          case "textarea":
-          case "big-text":
-          case "text-area":
-            addTextArea(panel, layout, mv, mandatory, onChange);
-            break;
-          case "rich-text-area":
-            addRichTextArea(panel, layout, mv, mandatory, onChange);
-            break;
-          case "list":
-            addList(panel, layout, mv, mandatory, onChange);
-            break;
-          case "date":
-            addDatePicker(panel, layout, mv, mandatory, onChange);
-            break;
-          case "separator":
-            layout.addStyleName("form-separator");
-            addSeparator(panel, layout, mv);
-            break;
-          case "text":
-          default:
-            addTextField(panel, layout, mv, mandatory, onChange);
-            break;
+        String controlType = mv.get("type");
+        if (controlType == null) {
+          addTextField(panel, layout, mv, mandatory, onChange);
+        } else {
+          switch (controlType) {
+            case "textarea":
+            case "big-text":
+            case "text-area":
+              addTextArea(panel, layout, mv, mandatory, onChange);
+              break;
+            case "rich-text-area":
+              addRichTextArea(panel, layout, mv, mandatory, onChange);
+              break;
+            case "list":
+              addList(panel, layout, mv, mandatory, onChange);
+              break;
+            case "date":
+              addDatePicker(panel, layout, mv, mandatory, onChange);
+              break;
+            case "separator":
+              layout.addStyleName("form-separator");
+              addSeparator(panel, layout, mv);
+              break;
+            case "text":
+            default:
+              addTextField(panel, layout, mv, mandatory, onChange);
+              break;
+          }
         }
       }
     }
@@ -190,7 +191,7 @@ public class FormUtilities {
   }
 
   private static void addTextField(FlowPanel panel, final FlowPanel layout, final MetadataValue mv,
-    final boolean mandatory, final Callable<Void> onChange) {
+      final boolean mandatory, final Callable<Void> onChange) {
     // Top label
     Label mvLabel = new Label(getFieldLabel(mv));
     mvLabel.addStyleName("form-label");
@@ -240,7 +241,7 @@ public class FormUtilities {
   }
 
   private static void addTextArea(FlowPanel panel, final FlowPanel layout, final MetadataValue mv,
-    final boolean mandatory, final Callable<Void> onChange) {
+      final boolean mandatory, final Callable<Void> onChange) {
     // Top label
     Label mvLabel = new Label(getFieldLabel(mv));
     mvLabel.addStyleName("form-label");
@@ -290,7 +291,7 @@ public class FormUtilities {
   }
 
   private static void addRichTextArea(FlowPanel panel, final FlowPanel layout, final MetadataValue mv,
-    final boolean mandatory, final Callable<Void> onChange) {
+      final boolean mandatory, final Callable<Void> onChange) {
     // Top label
     Label mvLabel = new Label(getFieldLabel(mv));
     mvLabel.addStyleName("form-label");
@@ -347,7 +348,7 @@ public class FormUtilities {
   }
 
   private static void addList(FlowPanel panel, final FlowPanel layout, final MetadataValue mv, final boolean mandatory,
-    final Callable<Void> onChange) {
+      final Callable<Void> onChange) {
     // Top Label
     Label mvLabel = new Label(getFieldLabel(mv));
     mvLabel.addStyleName("form-label");
@@ -486,7 +487,7 @@ public class FormUtilities {
   }
 
   private static void addDatePicker(FlowPanel panel, final FlowPanel layout, final MetadataValue mv,
-    final boolean mandatory, final Callable<Void> onChange) {
+      final boolean mandatory, final Callable<Void> onChange) {
     // Top label
     final DateTimeFormat dateTimeFormat = DateTimeFormat.getFormat("yyyy-MM-dd");
     Label mvLabel = new Label(getFieldLabel(mv));
