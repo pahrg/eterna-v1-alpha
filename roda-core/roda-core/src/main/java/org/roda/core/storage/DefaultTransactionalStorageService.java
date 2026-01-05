@@ -10,6 +10,7 @@ package org.roda.core.storage;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -1023,5 +1024,17 @@ public class DefaultTransactionalStorageService implements TransactionalStorageS
       throw new GenericException("[transactionId:" + transaction.getId()
         + "] Failed to get effective storage service for storage path: " + storagePath, e);
     }
+  }
+
+  @Override
+  public FileTime getCreationTime(StoragePath storagePath) throws IOException {
+    // TODO Auto-generated method stub
+    throw new UnsupportedOperationException("Unimplemented method 'getCreationTime'");
+  }
+
+  @Override
+  public Map<String, Object> getStorageStats() throws GenericException {
+    // TODO Auto-generated method stub
+    throw new UnsupportedOperationException("Unimplemented method 'getStorageStats'");
   }
 }

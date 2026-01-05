@@ -46,6 +46,7 @@ import org.roda.core.storage.ContentPayload;
 import org.roda.core.storage.ExternalFileManifestContentPayload;
 import org.roda.core.storage.StorageService;
 import org.roda.core.storage.fs.FSPathContentPayload;
+import org.roda.core.storage.utils.RODAInstanceUtils;
 import org.roda.core.util.IdUtils;
 import org.roda_project.commons_ip2.mets_v1_12.beans.FileType;
 import org.roda_project.commons_ip2.model.IPDescriptiveMetadata;

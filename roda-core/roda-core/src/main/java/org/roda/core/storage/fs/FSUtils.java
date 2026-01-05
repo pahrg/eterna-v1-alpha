@@ -597,6 +597,56 @@ public class FSUtils {
    * @throws NotFoundException
    * @throws GenericException
    */
+
+    public static CloseableIterable<Resource> listPath(final Path basePath, final Path path)
+    throws NotFoundException, GenericException {
+    CloseableIterable<Resource> resourceIterable;
+    try {
+      final DirectoryStream<Path> directoryStream = Files.newDirectoryStream(path);
+      final Iterator<Path> pathIterator = directoryStream.iterator();
+      resourceIterable = new CloseableIterable<Resource>() {
+
+        @Override
+        public Iterator<Resource> iterator() {
+          return new Iterator<Resource>() {
+
+            @Override
+            public boolean hasNext() {
+              return pathIterator.hasNext();
+            }
+
+            @Override
+            public Resource next() {
+              Path next = pathIterator.next();
+              Resource ret;
+              try {
+                ret = convertPathToResource(basePath, next);
+              } catch (GenericException | NotFoundException | RequestNotValidException e) {
+                LOGGER.error("Error while list path " + basePath + " while parsing resource " + next, e);
+                ret = null;
+              }
+
+              return ret;
+            }
+
+          };
+        }
+
+        @Override
+        public void close() throws IOException {
+          directoryStream.close();
+        }
+      };
+
+    } catch (NoSuchFileException e) {
+      throw new NotFoundException("Could not list contents of entity because it doesn't exist: " + path, e);
+    } catch (IOException e) {
+      throw new GenericException("Could not list contents of entity at: " + path, e);
+    }
+
+    return resourceIterable;
+  }
+  
   public static CloseableIterable<Resource> listPathResources(final Path basePath, final Path path)
     throws NotFoundException, GenericException {
     CloseableIterable<Resource> resourceIterable;

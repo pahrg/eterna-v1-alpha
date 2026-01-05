@@ -376,22 +376,7 @@ public interface ModelService extends ModelObservable {
   PreservationMetadata createPreservationMetadata(PreservationMetadata.PreservationMetadataType type, String aipId,
     String representationId, List<String> fileDirectoryPath, String fileId, ContentPayload payload, String username,
     boolean notify) throws GenericException, NotFoundException, RequestNotValidException, AuthorizationDeniedException,
-    AlreadyExistsException {
-    RodaCoreFactory.checkIfWriteIsAllowedAndIfFalseThrowException(nodeType);
-
-    String identifier = fileId;
-    if (PreservationMetadataType.FILE.equals(type)) {
-      if (URNUtils.verifyPremisPrefix(type, fileId)) {
-        identifier = URNUtils.extractFileIdFromId(fileId);
-      }
-    } else {
-      identifier = IdUtils.getFileId(aipId, representationId, fileDirectoryPath, fileId);
-    }
-
-    String urn = URNUtils.createRodaPreservationURN(type, identifier, RODAInstanceUtils.getLocalInstanceIdentifier());
-    return createPreservationMetadata(type, urn, aipId, representationId, fileDirectoryPath, fileId, payload, username,
-      notify);
-  }
+    AlreadyExistsException;
 
   public void createTechnicalMetadata(String aipId, String representationId, String metadataType, String fileId,
     ContentPayload payload, String createdBy, boolean notify) throws AuthorizationDeniedException,
