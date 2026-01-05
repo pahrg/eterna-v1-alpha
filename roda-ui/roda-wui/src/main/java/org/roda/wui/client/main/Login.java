@@ -20,6 +20,7 @@ import org.roda.core.data.exceptions.InactiveUserException;
 import org.roda.core.data.v2.notifications.NotificationState;
 import org.roda.core.data.v2.user.User;
 import org.roda.wui.client.common.NoAsyncCallback;
+import org.roda.wui.client.common.UpSalePanel;
 import org.roda.wui.client.common.UserLogin;
 import org.roda.wui.client.common.dialogs.Dialogs;
 import org.roda.wui.client.common.utils.JavascriptUtils;
