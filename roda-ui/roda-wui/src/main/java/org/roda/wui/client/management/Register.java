@@ -12,19 +12,21 @@ package org.roda.wui.client.management;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 
 import org.roda.core.data.common.RodaConstants;
 import org.roda.core.data.common.SecureString;
 import org.roda.core.data.exceptions.EmailAlreadyExistsException;
 import org.roda.core.data.exceptions.UserAlreadyExistsException;
+import org.roda.core.data.v2.generics.MetadataValue;
 import org.roda.core.data.v2.user.User;
-import org.roda.wui.client.browse.bundle.UserExtraBundle;
+import org.roda.core.data.v2.user.requests.RegisterUserRequest;
 import org.roda.wui.client.common.UserLogin;
 import org.roda.wui.client.common.dialogs.Dialogs;
-import org.roda.wui.client.common.utils.JavascriptUtils;
 import org.roda.wui.client.main.Login;
 import org.roda.wui.client.management.recaptcha.RecaptchaException;
 import org.roda.wui.client.management.recaptcha.RecaptchaWidget;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.client.welcome.Welcome;
 import org.roda.wui.common.client.ClientLogger;
 import org.roda.wui.common.client.HistoryResolver;
@@ -122,16 +124,12 @@ public class Register extends Composite {
    */
   public Register() {
     this.userDataPanel = new UserDataPanel(true, false, false, false);
-
-    UserManagementService.Util.getInstance().retrieveDefaultExtraBundle(new AsyncCallback<UserExtraBundle>() {
-      @Override
-      public void onFailure(Throwable caught) {
-        errorMessage(caught);
-      }
-
-      @Override
-      public void onSuccess(UserExtraBundle result) {
-        setExtra(result);
+    Services services = new Services("Get User extra", "get");
+    services.membersResource(s -> s.getDefaultUserExtra()).whenComplete((userExtra, error) -> {
+      if (userExtra != null) {
+        setExtra(userExtra.getExtraFormFields());
+      } else if (error != null) {
+        errorMessage(error);
       }
     });
 
@@ -146,14 +144,8 @@ public class Register extends Composite {
     }
   }
 
-  @Override
-  protected void onLoad() {
-    super.onLoad();
-    JavascriptUtils.stickSidebar();
-  }
-
-  void setExtra(UserExtraBundle b) {
-    this.userDataPanel.setExtraBundle(b);
+  void setExtra(Set<MetadataValue> b) {
+    this.userDataPanel.setUserExtra(b);
   }
 
   @UiHandler("buttonApply")
@@ -166,21 +158,17 @@ public class Register extends Composite {
 
       User user = userDataPanel.getUser();
       user.setActive(false);
-      String pwd = userDataPanel.getPassword();
       try (SecureString password = new SecureString(userDataPanel.getPassword().toCharArray())) {
         final String recaptcha = recaptchaResponse;
 
-        UserManagementService.Util.getInstance().registerUser(user, password, recaptcha, userDataPanel.getExtra(),
-          LocaleInfo.getCurrentLocale().getLocaleName(), new AsyncCallback<User>() {
-
-            @Override
-            public void onFailure(Throwable caught) {
-              errorMessage(caught);
-            }
-
-            @Override
-            public void onSuccess(final User registeredUser) {
-              if (registeredUser.isActive()) {
+        Services services = new Services("Register RODA user", "register");
+        RegisterUserRequest userRequest = new RegisterUserRequest(user.getEmail(), user.getName(), user.getFullName(),
+          password, userDataPanel.getUserExtra());
+        services
+          .membersResource(s -> s.registerUser(userRequest, LocaleInfo.getCurrentLocale().getLocaleName(), recaptcha))
+          .whenComplete((registedUser, error) -> {
+            if (registedUser != null) {
+              if (registedUser.isActive()) {
                 Dialogs.showInformationDialog(messages.registerSuccessDialogTitle(),
                   messages.registerSuccessDialogMessageActive(), messages.registerSuccessDialogButton(), false,
                   new AsyncCallback<Void>() {
@@ -211,6 +199,8 @@ public class Register extends Composite {
                     }
                   });
               }
+            } else if (error != null) {
+              errorMessage(error);
             }
           });
       }

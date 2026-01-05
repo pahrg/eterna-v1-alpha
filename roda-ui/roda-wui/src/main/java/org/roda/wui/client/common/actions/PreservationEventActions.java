@@ -12,7 +12,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.roda.core.data.common.RodaConstants;
+import org.roda.core.data.v2.ip.metadata.IndexedPreservationAgent;
 import org.roda.core.data.v2.ip.metadata.IndexedPreservationEvent;
 import org.roda.wui.client.common.actions.model.ActionableBundle;
 import org.roda.wui.client.common.actions.model.ActionableGroup;
@@ -47,31 +47,6 @@ public class PreservationEventActions extends AbstractActionable<IndexedPreserva
     this.fileUUID = fileUUID;
   }
 
-  public enum PreservationEventAction implements Action<IndexedPreservationEvent> {
-    DOWNLOAD();
-
-    private List<String> methods;
-
-    PreservationEventAction(String... methods) {
-      this.methods = Arrays.asList(methods);
-    }
-
-    @Override
-    public List<String> getMethods() {
-      return this.methods;
-    }
-  }
-
-  @Override
-  public PreservationEventAction[] getActions() {
-    return PreservationEventAction.values();
-  }
-
-  @Override
-  public PreservationEventAction actionForName(String name) {
-    return PreservationEventAction.valueOf(name);
-  }
-
   /**
    * Use this when the IndexedPreservationEvent is not a partial object
    */
@@ -88,8 +63,24 @@ public class PreservationEventActions extends AbstractActionable<IndexedPreserva
   }
 
   @Override
-  public boolean canAct(Action<IndexedPreservationEvent> action, IndexedPreservationEvent event) {
-    return hasPermissions(action) && POSSIBLE_ACTIONS_ON_SINGLE_EVENT.contains(action);
+  public PreservationEventAction[] getActions() {
+    return PreservationEventAction.values();
+  }
+
+  @Override
+  public PreservationEventAction actionForName(String name) {
+    return PreservationEventAction.valueOf(name);
+  }
+
+  @Override
+  public CanActResult userCanAct(Action<IndexedPreservationEvent> action, IndexedPreservationEvent event) {
+    return new CanActResult(hasPermissions(action), CanActResult.Reason.USER, messages.reasonUserLacksPermission());
+  }
+
+  @Override
+  public CanActResult contextCanAct(Action<IndexedPreservationEvent> action, IndexedPreservationEvent event) {
+    return new CanActResult(POSSIBLE_ACTIONS_ON_SINGLE_EVENT.contains(action), CanActResult.Reason.CONTEXT,
+      messages.reasonCantActOnMultipleObjects());
   }
 
   @Override
@@ -104,16 +95,9 @@ public class PreservationEventActions extends AbstractActionable<IndexedPreserva
 
   // ACTIONS
   private void download(IndexedPreservationEvent event, AsyncCallback<ActionImpact> callback) {
-    SafeUri downloadUri;
     // objectClass being null means that we are using a partial object and need to
     // try to get the aip, representation and file IDs from somewhere else
-    if (event.getObjectClass() == null) {
-      downloadUri = RestUtils.createPreservationEventDetailsUri(event.getId(), aipId, representationUUID, fileUUID,
-        false, RodaConstants.API_QUERY_VALUE_ACCEPT_FORMAT_BIN);
-    } else {
-      downloadUri = RestUtils.createPreservationEventDetailsUri(event.getId(), event.getAipID(),
-        event.getRepresentationUUID(), event.getFileUUID(), false, RodaConstants.API_QUERY_VALUE_ACCEPT_FORMAT_BIN);
-    }
+    SafeUri downloadUri = RestUtils.createPreservationEventDownloadUri(event.getId());
     callback.onSuccess(ActionImpact.NONE);
     Window.Location.assign(downloadUri.asString());
   }
@@ -129,5 +113,20 @@ public class PreservationEventActions extends AbstractActionable<IndexedPreserva
 
     preservationEventActionableBundle.addGroup(managementGroup);
     return preservationEventActionableBundle;
+  }
+
+  public enum PreservationEventAction implements Action<IndexedPreservationEvent> {
+    DOWNLOAD();
+
+    private List<String> methods;
+
+    PreservationEventAction(String... methods) {
+      this.methods = Arrays.asList(methods);
+    }
+
+    @Override
+    public List<String> getMethods() {
+      return this.methods;
+    }
   }
 }

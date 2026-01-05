@@ -16,9 +16,7 @@ import org.roda.wui.client.common.lists.RodaMemberList;
 import org.roda.wui.client.common.lists.utils.AsyncTableCellOptions;
 import org.roda.wui.client.common.lists.utils.ListBuilder;
 import org.roda.wui.client.common.search.SearchWrapper;
-import org.roda.wui.client.common.utils.JavascriptUtils;
 import org.roda.wui.client.management.access.CreateAccessKey;
-import org.roda.wui.client.management.access.EditAccessKey;
 import org.roda.wui.client.management.access.ShowAccessKey;
 import org.roda.wui.common.client.HistoryResolver;
 import org.roda.wui.common.client.tools.HistoryUtils;
@@ -102,12 +100,6 @@ public class MemberManagement extends Composite {
     memberManagementDescription.add(new HTMLWidgetWrapper("MemberManagementDescription.html"));
   }
 
-  @Override
-  protected void onLoad() {
-    super.onLoad();
-    JavascriptUtils.stickSidebar();
-  }
-
   private void refresh() {
     searchWrapper.refreshCurrentList();
   }
@@ -135,8 +127,6 @@ public class MemberManagement extends Composite {
         EditGroup.RESOLVER.resolve(HistoryUtils.tail(historyTokens), callback);
       } else if (historyTokens.get(0).equals(ShowAccessKey.RESOLVER.getHistoryToken())) {
         ShowAccessKey.RESOLVER.resolve(HistoryUtils.tail(historyTokens), callback);
-      } else if (historyTokens.get(0).equals(EditAccessKey.RESOLVER.getHistoryToken())) {
-        EditAccessKey.RESOLVER.resolve(HistoryUtils.tail(historyTokens), callback);
       } else if (historyTokens.get(0).equals(CreateAccessKey.RESOLVER.getHistoryToken())) {
         CreateAccessKey.RESOLVER.resolve(HistoryUtils.tail(historyTokens), callback);
       } else {

@@ -1,0 +1,726 @@
+.main .contentPanel {
+  min-height: 767px !important;
+}
+
+.double-bounce1,
+.double-bounce2 {
+  background-color: #127faa;
+}
+
+.padding-lg {
+  padding: 100px 30%;
+}
+
+.padding-md {
+  padding: 50px 18.75%;
+}
+
+.padding-sm {
+  padding: 17px 18.75%;
+}
+
+.column-split {
+    display:flex;
+}
+
+.first-column {
+    flex: 0.5;
+}
+
+.second-column {
+    flex: 0.5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.credentials-card {
+  width: 325px;
+}
+
+.grey-card {
+  background-color: #e9e9e9;
+  border-radius: 8px;
+  box-shadow: 0px 5px 10px rgba(0, 0, 0, 0.2);
+}
+
+.card-header {
+  padding: 12px 16px;
+  background-color: #e2e2e2;
+  border-radius: 8px 8px 0 0;
+}
+
+.card-header h3 {
+  margin: 0;
+  font-weight: bold;
+  font-size: 16px;
+  color: black;
+}
+
+.card-body {
+  padding: 18px 24px;
+  min-height: 180px;
+}
+
+.credentials-card-elements {
+  gap: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.small-text {
+  font-size: 12px;
+}
+
+.credentials-card-elements .white-card {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: none;
+}
+
+.credentials-card-elements .field-label {
+  font-size: 10px;
+  flex: 0.45;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.credentials-card-elements .field-label i {
+  font-size: 14px;
+}
+
+.field-faux-input {
+  background-color: #e9e9e9;
+  flex: 1;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-weight: bold;
+  color: black;
+}
+
+.credentials-card-elements .hero-button {
+  box-shadow: none;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.hero-button.button-with-icon {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 18px;
+}
+
+.hero-button {
+  background-color: #25a6d6;
+  padding: 8px 28px;
+  border: none;
+  border-radius: 8px;
+  color: white;
+  text-transform: uppercase;
+  font-weight: bold;
+  font-size: 18px;
+  box-shadow: 0px 5px 10px rgba(0, 0, 0, 0.5);
+}
+
+.hero-logo {
+  height: 70px
+}
+
+.white-card {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0px 5px 10px rgba(0, 0, 0, 0.2);
+}
+
+.credentials-card-elements .field {
+  margin: 0;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.hero-elements {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: 24px;
+}
+
+hr.hero-separator {
+  width: 100px;
+  height: 3px;
+  background: #25a6d6;
+  border: unset;
+  margin: 0;
+}
+
+hr.separator-sm {
+  width: 50px;
+  height: 3px;
+  background: #25a6d6;
+  margin-top: 8px;
+  margin-bottom: 8px;
+  display: inline-block;
+  border: unset;
+}
+
+h1.title {
+  margin: unset !important;
+}
+
+.title {
+  font-family: "Inter", "Ubuntu";
+  font-style: normal;
+  font-weight: 800;
+  font-size: 42px;
+  line-height: 46px;
+}
+
+.keyword {
+  text-transform: uppercase;
+  background-color: #25a6d6;
+  padding: 0 4px;
+  font-weight: bold;
+  color: black;
+}
+
+.hero-tags {
+  display: flex;
+  flex-flow: wrap;
+  gap: 8px;
+}
+
+.standard-tag {
+  display: flex;
+  background-color: #ddc;
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 12px;
+  gap: 8px;
+  align-items: center;
+  color: black;
+  text-wrap: nowrap;
+}
+
+.standard-inner-tag {
+  background-color: white;
+  font-weight: bold;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 10px;
+}
+
+.hero-details {
+  padding-bottom: 32px;
+}
+
+.hero-details p {
+  font-style: normal;
+  font-weight: 300;
+  font-size: 16px;
+  line-height: 150%;
+  text-align: justify;
+}
+
+.more-info-btn {
+  padding: 8px 28px;
+
+  box-shadow: 0px 5px 10px rgba(0, 0, 0, 0.5);
+  border-radius: 8px;
+}
+
+.btn-row {
+  display: flex;
+}
+
+a.btn-hero, a.btn-welcome {
+  text-decoration: none;
+  font-family: "Inter", "Ubuntu";
+  font-style: normal;
+  font-weight: bold;
+  font-size: 18px;
+  text-transform: uppercase;
+  color: #ffffff;
+  background-color: #25a6d6;
+}
+
+.request-trial-btn, .learn-more-btn {
+  padding: 8px 28px;
+
+  box-shadow: 0px 5px 10px rgba(0, 0, 0, 0.5);
+  border-radius: 8px;
+}
+
+a.btn-hero + a.btn-hero {
+  margin-left: 10px;
+}
+
+a.btn-hero:hover, a.btn-welcome:hover {
+  text-decoration: none;
+}
+
+a.btn-hero:visited, a.btn-welcome:visited {
+  text-decoration: none;
+}
+
+.highlight {
+    background-color: #eceaea;
+}
+
+.hero-elements h2 {
+  font-family: "Inter", "Ubuntu";
+  font-style: normal;
+  font-weight: 800;
+  font-size: 24px;
+  line-height: 28px;
+  text-transform: capitalize;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+.highlight p {
+  font-family: "Inter", "Ubuntu";
+  font-style: normal;
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 18px;
+  padding-bottom: 16px;
+}
+
+.highlight-alt {
+    background-color: white;
+}
+
+.get-quote {
+  color: #ffffff;
+}
+
+.get-quote .align-center {
+  display: flex;
+  align-items: center;
+}
+
+.get-quote .col_6 {
+  margin-right: unset;
+}
+
+.get-quote p {
+  display: inline;
+  font-family: "Inter", "Ubuntu";
+  font-style: normal;
+  font-weight: bold;
+  font-size: 24px;
+  line-height: 28px;
+  text-transform: uppercase;
+}
+
+.get-quote p.alt {
+  color: #363030;
+  font-family: "Inter", "Ubuntu";
+  font-style: normal;
+  font-weight: 700;
+  font-size: 24px;
+  line-height: 28px;
+  padding-left: 5px;
+}
+
+.get-quote p.values {
+  font-family: "Inter", "Ubuntu";
+  font-style: normal;
+  font-weight: bold;
+  font-size: 16px;
+  line-height: 22px;
+
+  text-align: center;
+  text-transform: uppercase;
+
+  color: #363030;
+}
+
+
+.get-quote p.values-alt {
+  color: #ffffff;
+}
+
+.highligth-details {
+  width: 75%;
+}
+
+.highlight-image {
+  height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 250px;
+}
+
+.text-columns {
+  display: flex;
+  gap: 32px;
+  text-align: justify;
+}
+
+.text-column {
+  display: flex;
+  gap: 16px;
+  flex-direction: column;
+  flex: 1;
+}
+
+.highlight-image img {
+  height: 100%;
+}
+
+.suite-cards {
+  display: flex;
+  gap: 32px;
+  padding: 24px;
+  align-items: start;
+}
+
+.suite-cards .white-card {
+  flex: 1;
+  color: #1d1f20;
+}
+
+.suite-cards .white-card .btn-hero {
+  box-shadow: none;
+  font-size: 14px;
+  padding: 6px 8px;
+}
+
+.suite-cards .card-header {
+  background-color: #f5f5f5;
+}
+
+.suite-cards .card-footer {
+  background-color: #f5f5f5;
+}
+
+.button-row-right {
+  display: flex;
+  justify-content: end;
+  gap: 8px;
+}
+
+.card-footer {
+  padding: 12px 16px;
+  border-radius: 0 0 8px 8px;
+}
+
+.tag-line {
+  padding-bottom: 20px;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.primary-text {
+  color: #25a6d6;
+}
+
+.suite-cards .card-body {
+  padding: 24px;
+}
+
+.input-with-icon-wrapper {
+  background: white;
+  box-shadow: 0px 5px 10px rgba(54, 48, 48, 0.25);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  border-radius: 8px;
+  flex: 1;
+  padding: 6px 16px;
+  font-size: 18px;
+}
+
+.input-with-icon-wrapper i {
+  color: black;
+}
+
+.form {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+}
+
+.form input[type="text"], .form input[type="email"] {
+  flex: 1;
+  margin-right: 5px;
+  background: #ffffff;
+  border-radius: 8px;
+  flex-direction: row;
+  align-items: center;
+  padding: 0px 5px;
+  border: unset;
+  font-size: 14px;
+}
+
+.form .form-button {
+  background: #363030;
+  box-shadow: 0px 5px 10px rgba(54, 48, 48, 0.25);
+  border-radius: 8px;
+  border: unset;
+  color: #ffffff;
+  margin-bottom: 0;
+  cursor: pointer;
+  padding: 8px 28px;
+  font-weight: bold;
+}
+
+.get-quote .middle-info-quote {
+  font-weight: bold;
+}
+
+.get-quote .custom-row {
+  display: flex;
+}
+
+.get-quote .custom-column {
+  padding: 10px;
+  text-wrap: nowrap;
+}
+
+.row-learn-more {
+  color: #ffffff;
+}
+
+.learn-more h1 {
+  margin-top: unset !important;
+  font-weight: bold;
+}
+
+.learn-more p {
+  font-family: "Inter", "Ubuntu";
+  font-style: normal;
+  font-weight: 300;
+  font-size: 16px;
+  line-height: 22px;
+}
+
+.learn-more h1 span {
+  color: #127faa;
+  font-weight: 500;
+}
+
+.learn-more .subtitle p {
+  display: inline;
+  text-transform: uppercase;
+  font-weight:bold;
+}
+
+.learn-more .subtitle p.alt {
+  color: #127faa;
+}
+
+.learn-more .details {
+  text-align: justify;
+  text-transform: unset;
+  padding-bottom: 32px;
+}
+
+.features h6 {
+  margin: 0;
+  font-weight: 500;
+  font-family: "Inter", "Ubuntu";
+  line-height: 18px;
+  font-size: 16px;
+}
+
+.authenticity .second-column,
+.vendor .second-column
+{
+  justify-content: center;
+}
+
+.tutorial-roda-community {
+
+}
+
+.build_time {
+  display: none;
+}
+
+.custom-row {
+  display: flex;
+  gap: 32px;
+  align-items: center;
+}
+
+.custom-column {
+  margin-bottom: 10px;
+}
+
+.custom-column {
+    flex: 0.25
+}
+
+.row-feature-details p {
+  font-family: "Inter", "Ubuntu";
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.row-feature-details {
+  display: flex;
+}
+
+.column-feature-details {
+  flex: 1;
+  padding: 10px;
+}
+
+.component-row {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.component-column {
+  padding: 5px;
+}
+
+.component-column:first-child {
+  width: 100px;
+  padding-right: 30px;
+}
+
+.component-column:last-child {
+  flex: 1;
+}
+
+.component-column img {
+  max-width: 100%;
+  height: auto;
+}
+
+.component-column h6 {
+  margin: 0;
+  font-weight: bold;
+  font-family: "Inter", "Ubuntu";
+  line-height: 18px;
+  font-size: 20px;
+}
+
+.component-column p {
+  font-family: "Inter", "Ubuntu";
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+
+}
+
+.footer-roda-enterprise p {
+  font-family: "Inter", "Ubuntu";
+  font-weight: 300;
+  font-size: 13px;
+  line-height: 18px;
+  text-align: justify;
+}
+
+.footer-roda-enterprise p + p {
+  margin-top: 25px;
+}
+
+.footer-roda-enterprise .footer-info h5 {
+  font-size: 1.6rem;
+  margin-top: unset !important;
+  margin-bottom: unset !important;
+  font-weight: 100;
+}
+
+@media (max-width: 768px) {
+  .column-feature-details {
+    flex-basis: 100%;
+  }
+
+  .image-column {
+    width: 100%;
+  }
+
+  .get-quote .custom-row {
+    flex-wrap: wrap;
+  }
+}
+
+.background-footer {
+    background-color: black;
+}
+
+.background-black {
+    background-color: #1d1f20;
+}
+
+.background-white {
+    background-color: white;
+}
+
+.background-grey {
+    background-color: #eaebec;
+}
+
+.background-dark-grey {
+    background-color: #303436;
+}
+
+.background-primary {
+    background-color: #25a6d6;
+}
+
+.background-very-dark-grey {
+  background-color: #2f3335;
+}
+
+.hero-bg {
+  background-image: url("themes?resource-id=images/hero-bg.svg");
+  background-repeat: no-repeat;
+  background-position: right;
+  background-position-x: 82vw;
+}
+.flex-align-center {
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
+}
+
+.circular-bg {
+  margin: 0;
+  width: 160%;
+  border-radius: 50% / 0 0 100px 100px;
+}
+
+.hero {
+    color: white;
+}
+
+.tutorial-roda-community {
+    color: #1d1f20;
+}
+
+.authenticity {
+    color: #1d1f20;
+}
+
+.vendor {
+    color: #1d1f20;
+}
+
+.features {
+    color: #1d1f20;
+}
+
+.learn-more {
+    color: white;
+}
+
+.get-quote {
+}
+
+.enterprise-editions {
+    color: white;
+}

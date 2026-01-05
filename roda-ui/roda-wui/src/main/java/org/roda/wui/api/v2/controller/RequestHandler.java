@@ -1,0 +1,135 @@
+/**
+ * The contents of this file are subject to the license and copyright
+ * detailed in the LICENSE file at the root of the source
+ * tree and available online at
+ *
+ * https://github.com/keeps/roda
+ */
+package org.roda.wui.api.v2.controller;
+
+import java.io.IOException;
+
+import io.micrometer.core.annotation.Timed;
+import org.roda.core.RodaCoreFactory;
+import org.roda.core.data.common.RodaConstants;
+import org.roda.core.data.exceptions.AuthorizationDeniedException;
+import org.roda.core.data.exceptions.RODAException;
+import org.roda.core.data.v2.log.LogEntryState;
+import org.roda.core.entity.transaction.TransactionLog;
+import org.roda.core.transaction.RODATransactionException;
+import org.roda.core.transaction.RODATransactionManager;
+import org.roda.core.transaction.TransactionalContext;
+import org.roda.wui.api.v2.exceptions.RESTException;
+import org.roda.wui.common.RequestControllerAssistant;
+import org.roda.wui.common.model.RequestContext;
+import org.roda.wui.common.utils.RequestUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import jakarta.servlet.http.HttpServletRequest;
+
+/**
+ * @author Gabriel Barros <gbarros@keep.pt>
+ */
+@Component
+@Timed
+public class RequestHandler {
+  private static final Logger LOGGER = LoggerFactory.getLogger(RequestHandler.class);
+
+  @Autowired
+  private RODATransactionManager transactionManager;
+
+  @Autowired
+  private HttpServletRequest request;
+
+  public <T> T processRequestWithTransaction(RequestProcessor<T> handler) {
+    return processRequest(handler, null, true, true, true);
+  }
+
+  public <T> T processRequest(RequestProcessor<T> handler) {
+    return processRequest(handler, null, false, true, true);
+  }
+
+  public <T> T processRequest(RequestProcessor<T> handler, Class<?> returnClass) {
+    return processRequest(handler, returnClass, false, true, true);
+  }
+
+  public <T> T processRequestWithoutCheckRoles(RequestProcessor<T> handler) {
+    return processRequest(handler, null, false, false, true);
+  }
+
+  public <T> T processRequestWithoutCheckRolesAndLog(RequestProcessor<T> handler) {
+    return processRequest(handler, null, false, false, false);
+  }
+
+  private <T> T processRequest(RequestProcessor<T> processor, Class<?> returnClass, boolean isTransactional,
+    boolean checkRoles, boolean logAction) {
+    RequestControllerAssistant controllerAssistant = new RequestControllerAssistant(processor);
+    RequestContext requestContext = RequestUtils.parseHTTPRequest(request);
+    LogEntryState state = LogEntryState.SUCCESS;
+
+    TransactionalContext transactionalContext = null;
+
+    try {
+      // check user permissions
+      if (checkRoles) {
+        controllerAssistant.checkRoles(requestContext.getUser(), returnClass);
+      }
+
+      if (isAValidTransactionalContext(isTransactional)) {
+        // Init transaction
+        transactionalContext = transactionManager.beginTransaction(TransactionLog.TransactionRequestType.API);
+        requestContext.setModelService(transactionalContext.transactionalModelService());
+        requestContext.setIndexService(transactionalContext.indexService());
+        // execute the request
+        T result = processor.process(requestContext, controllerAssistant);
+
+        controllerAssistant.addParameters(RodaConstants.CONTROLLER_TRANSACTION_ID_PARAM,
+          transactionalContext.transactionLog().getId());
+
+        // End transaction
+        transactionManager.endTransaction(transactionalContext.transactionLog().getId());
+        return result;
+      } else {
+        requestContext.setModelService(RodaCoreFactory.getModelService());
+        requestContext.setIndexService(RodaCoreFactory.getIndexService());
+        return processor.process(requestContext, controllerAssistant);
+      }
+    } catch (AuthorizationDeniedException e) {
+      state = LogEntryState.UNAUTHORIZED;
+      throw new RESTException(e);
+    } catch (RODAException | IOException e) {
+      state = LogEntryState.FAILURE;
+      throw new RESTException(e);
+    } finally {
+      if (logAction) {
+        controllerAssistant.registerAction(requestContext, controllerAssistant.getRelatedObjectId(), state,
+          controllerAssistant.getParameters());
+      }
+      try {
+        if (isAValidTransactionalContext(isTransactional) && transactionalContext != null
+          && state != LogEntryState.SUCCESS) {
+          transactionManager.rollbackTransaction(transactionalContext.transactionLog().getId());
+        }
+      } catch (RODATransactionException ex) {
+        LOGGER.error("Error rolling back transaction", ex);
+      }
+    }
+  }
+
+  private boolean isAValidTransactionalContext(boolean isTransactional) {
+    if(transactionManager != null && transactionManager.isInitialized()) {
+      // Check if the current node is not a read-only node
+      boolean writeIsAllowed = RodaCoreFactory.checkIfWriteIsAllowed(RodaCoreFactory.getNodeType());
+      return writeIsAllowed && isTransactional;
+    }
+    return false;
+  }
+
+  public interface RequestProcessor<T> {
+    T process(RequestContext requestContext, RequestControllerAssistant controllerAssistant)
+      throws RODAException, RESTException, IOException;
+  }
+}

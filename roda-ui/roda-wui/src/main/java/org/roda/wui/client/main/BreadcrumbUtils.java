@@ -12,6 +12,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.roda.core.data.common.RodaConstants;
+import org.roda.core.data.v2.ip.AIPState;
 import org.roda.core.data.v2.ip.DIPFile;
 import org.roda.core.data.v2.ip.IndexedAIP;
 import org.roda.core.data.v2.ip.IndexedDIP;
@@ -20,8 +21,8 @@ import org.roda.core.data.v2.ip.IndexedRepresentation;
 import org.roda.core.data.v2.ip.TransferredResource;
 import org.roda.wui.client.browse.BrowseTop;
 import org.roda.wui.client.browse.PreservationEvents;
-import org.roda.wui.client.browse.bundle.BrowseFileBundle;
-import org.roda.wui.client.browse.bundle.BrowseRepresentationBundle;
+import org.roda.wui.client.disposal.DisposalDestroyedRecords;
+import org.roda.wui.client.ingest.appraisal.IngestAppraisal;
 import org.roda.wui.client.ingest.transfer.IngestTransfer;
 import org.roda.wui.common.client.tools.DescriptionLevelUtils;
 import org.roda.wui.common.client.tools.HistoryUtils;
@@ -74,13 +75,35 @@ public class BreadcrumbUtils {
   }
 
   public static List<BreadcrumbItem> getAipBreadcrumbs(IndexedAIP aip) {
-    return Arrays.asList(getBreadcrumbItem(aip));
+    return List.of(getBreadcrumbItem(aip));
+  }
+
+  public static List<BreadcrumbItem> getDIPBreadcrumbs(IndexedAIP aip, IndexedDIP dip, DIPFile dipFile,
+    List<DIPFile> dipFileAncestors) {
+    List<BreadcrumbItem> ret = new ArrayList<>();
+    // Catalogue
+    ret.add(new BreadcrumbItem(SafeHtmlUtils.fromSafeConstant(messages.allCollectionsTitle()),
+      messages.allCollectionsTitle(), BrowseTop.RESOLVER.getHistoryPath()));
+    // AIP
+    ret.add(getBreadcrumbItem(aip));
+    // DIP
+    ret.add(getBreadcrumbItem(dip));
+    if (dipFile != null) {
+      // DIP File ancestors
+      if (dipFile.getAncestorsUUIDs() != null) {
+        for (DIPFile dipFileAncestor : dipFileAncestors) {
+          ret.add(getBreadcrumbItem(dipFileAncestor));
+        }
+      }
+      // DIP File
+      ret.add(getBreadcrumbItem(dipFile));
+    }
+    return ret;
   }
 
   public static List<BreadcrumbItem> getAipBreadcrumbs(List<IndexedAIP> aipAncestors, IndexedAIP aip, boolean events) {
     List<BreadcrumbItem> breadcrumb = new ArrayList<>();
-    breadcrumb
-      .add(new BreadcrumbItem(DescriptionLevelUtils.getTopIconSafeHtml(), "", BrowseTop.RESOLVER.getHistoryPath()));
+    breadcrumb.add(firstBreadcrumbItem(aip));
 
     if (aipAncestors != null) {
       for (IndexedAIP ancestor : aipAncestors) {
@@ -117,18 +140,31 @@ public class BreadcrumbUtils {
     return breadcrumb;
   }
 
-  public static List<BreadcrumbItem> getRepresentationBreadcrumbs(BrowseRepresentationBundle bundle) {
-    List<IndexedAIP> aipAncestors = bundle.getAipAncestors();
-    IndexedAIP aip = bundle.getAip();
-    IndexedRepresentation representation = bundle.getRepresentation();
-    return getRepresentationBreadcrumbs(aipAncestors, aip, representation);
+  private static BreadcrumbItem firstBreadcrumbItem(IndexedAIP aip) {
+    SafeHtml breadcrumbLabel = SafeHtmlUtils.fromSafeConstant(messages.allCollectionsTitle());
+    String breadcrumbTitle = messages.allCollectionsTitle();
+    List<String> breadcrumbPath = BrowseTop.RESOLVER.getHistoryPath();
+
+    if (AIPState.UNDER_APPRAISAL.equals(aip.getState())) {
+      breadcrumbLabel = SafeHtmlUtils.fromSafeConstant(messages.ingestAppraisalTitle());
+      breadcrumbTitle = messages.ingestAppraisalTitle();
+      breadcrumbPath = IngestAppraisal.RESOLVER.getHistoryPath();
+    }
+
+    if (AIPState.DESTROYED.equals(aip.getState())) {
+      breadcrumbLabel = SafeHtmlUtils.fromSafeConstant(messages.disposalDestroyedRecordsTitle());
+      breadcrumbTitle = messages.disposalDestroyedRecordsTitle();
+      breadcrumbPath = DisposalDestroyedRecords.RESOLVER.getHistoryPath();
+    }
+
+    return new BreadcrumbItem(breadcrumbLabel, breadcrumbTitle, breadcrumbPath);
   }
 
   public static List<BreadcrumbItem> getRepresentationBreadcrumbs(List<IndexedAIP> aipAncestors, IndexedAIP aip,
     IndexedRepresentation representation) {
     List<BreadcrumbItem> breadcrumb = new ArrayList<>();
-    breadcrumb
-      .add(new BreadcrumbItem(DescriptionLevelUtils.getTopIconSafeHtml(), "", BrowseTop.RESOLVER.getHistoryPath()));
+    breadcrumb.add(new BreadcrumbItem(SafeHtmlUtils.fromSafeConstant(messages.allCollectionsTitle()),
+      messages.allCollectionsTitle(), BrowseTop.RESOLVER.getHistoryPath()));
 
     if (aipAncestors != null) {
       for (IndexedAIP ancestor : aipAncestors) {
@@ -166,11 +202,31 @@ public class BreadcrumbUtils {
     return Arrays.asList(getBreadcrumbItem(aip), getBreadcrumbItem(representation));
   }
 
-  public static List<BreadcrumbItem> getFileBreadcrumbs(BrowseFileBundle bundle) {
-    IndexedAIP aip = bundle.getAip();
-    IndexedRepresentation representation = bundle.getRepresentation();
-    IndexedFile file = bundle.getFile();
-    return getFileBreadcrumbs(aip, representation, file);
+  public static List<BreadcrumbItem> getDIPBreadcrumbs(IndexedAIP aip, IndexedRepresentation representation,
+    IndexedDIP dip, DIPFile dipFile, List<DIPFile> dipFileAncestors) {
+    List<BreadcrumbItem> ret = new ArrayList<>();
+
+    // Catalogue
+    ret.add(new BreadcrumbItem(SafeHtmlUtils.fromSafeConstant(messages.allCollectionsTitle()),
+      messages.allCollectionsTitle(), BrowseTop.RESOLVER.getHistoryPath()));
+
+    // AIP and Representation
+    ret.add(getBreadcrumbItem(aip));
+    ret.add(getBreadcrumbItem(representation));
+
+    // DIP
+    ret.add(getBreadcrumbItem(dip));
+    if (dipFile != null) {
+      // DIP File ancestors
+      if (dipFile.getAncestorsUUIDs() != null) {
+        for (DIPFile dipFileAncestor : dipFileAncestors) {
+          ret.add(getBreadcrumbItem(dipFileAncestor));
+        }
+      }
+      // DIP File
+      ret.add(getBreadcrumbItem(dipFile));
+    }
+    return ret;
   }
 
   public static List<BreadcrumbItem> getFileBreadcrumbs(IndexedAIP aip, IndexedRepresentation representation,
@@ -214,25 +270,80 @@ public class BreadcrumbUtils {
     return fullBreadcrumb;
   }
 
+  public static List<BreadcrumbItem> getDIPBreadcrumbs(IndexedAIP aip, IndexedRepresentation representation,
+    IndexedFile file, IndexedDIP dip, DIPFile dipFile, List<DIPFile> dipFileAncestors) {
+    List<BreadcrumbItem> fullBreadcrumb = new ArrayList<>();
+    List<BreadcrumbItem> fileBreadcrumb = new ArrayList<>();
+
+    // Catalogue
+    fullBreadcrumb.add(new BreadcrumbItem(SafeHtmlUtils.fromSafeConstant(messages.allCollectionsTitle()),
+      messages.allCollectionsTitle(), BrowseTop.RESOLVER.getHistoryPath()));
+
+    // AIP
+    fullBreadcrumb.add(getBreadcrumbItem(aip));
+
+    // Representation
+    fullBreadcrumb.add(getBreadcrumbItem(representation));
+
+    if (file != null) {
+      // File directory path
+      List<String> filePath = file.getPath();
+      List<String> fileAncestorsPath = file.getAncestorsPath();
+
+      if (filePath != null && fileAncestorsPath != null && filePath.size() == fileAncestorsPath.size()) {
+        for (int i = 0; i < filePath.size(); i++) {
+          final String folderName = filePath.get(i);
+          final String folderUUID = fileAncestorsPath.get(i);
+
+          SafeHtml breadcrumbLabel = getBreadcrumbLabel(folderName, RodaConstants.VIEW_REPRESENTATION_FOLDER);
+          fileBreadcrumb.add(new BreadcrumbItem(breadcrumbLabel, folderName, new Command() {
+
+            @Override
+            public void execute() {
+              HistoryUtils.resolve(IndexedFile.class.getName(), folderUUID);
+            }
+          }));
+        }
+      }
+
+      // File item
+      fileBreadcrumb.add(getBreadcrumbItem(file));
+    }
+
+    fullBreadcrumb.addAll(fileBreadcrumb);
+
+    // DIP
+    fullBreadcrumb.add(getBreadcrumbItem(dip));
+    if (dipFile != null) {
+      // DIP File ancestors
+      if (dipFile.getAncestorsUUIDs() != null) {
+        for (DIPFile dipFileAncestor : dipFileAncestors) {
+          fullBreadcrumb.add(getBreadcrumbItem(dipFileAncestor));
+        }
+      }
+      // DIP File
+      fullBreadcrumb.add(getBreadcrumbItem(dipFile));
+    }
+    return fullBreadcrumb;
+  }
+
   public static List<BreadcrumbItem> getTransferredResourceBreadcrumbs(TransferredResource r) {
     List<BreadcrumbItem> ret = new ArrayList<>();
 
-    ret.add(
-      new BreadcrumbItem(DescriptionLevelUtils.getTopIconSafeHtml(), "", IngestTransfer.RESOLVER.getHistoryPath()));
+    ret.add(new BreadcrumbItem(SafeHtmlUtils.fromSafeConstant(messages.transferredResourcesTitle()),
+      messages.transferredResourcesTitle(), IngestTransfer.RESOLVER.getHistoryPath()));
     if (r != null) {
 
       // add parent
       if (r.getParentUUID() != null) {
-        List<String> path = new ArrayList<>();
-        path.addAll(IngestTransfer.RESOLVER.getHistoryPath());
+        List<String> path = new ArrayList<>(IngestTransfer.RESOLVER.getHistoryPath());
         path.add(r.getParentUUID());
         SafeHtml breadcrumbLabel = SafeHtmlUtils.fromString(r.getParentId());
         ret.add(new BreadcrumbItem(breadcrumbLabel, r.getParentId(), path));
       }
 
       // add self
-      List<String> path = new ArrayList<>();
-      path.addAll(IngestTransfer.RESOLVER.getHistoryPath());
+      List<String> path = new ArrayList<>(IngestTransfer.RESOLVER.getHistoryPath());
       path.add(r.getUUID());
       SafeHtml breadcrumbLabel = SafeHtmlUtils.fromString(r.getName());
       ret.add(new BreadcrumbItem(breadcrumbLabel, r.getName(), path));
@@ -244,6 +355,10 @@ public class BreadcrumbUtils {
   public static List<BreadcrumbItem> getDipBreadcrumbs(IndexedDIP dip, DIPFile dipFile,
     List<DIPFile> dipFileAncestors) {
     List<BreadcrumbItem> ret = new ArrayList<>();
+
+    // Catalogue
+    ret.add(new BreadcrumbItem(SafeHtmlUtils.fromSafeConstant(messages.allCollectionsTitle()),
+      messages.allCollectionsTitle(), BrowseTop.RESOLVER.getHistoryPath()));
 
     // DIP
     ret.add(getBreadcrumbItem(dip));

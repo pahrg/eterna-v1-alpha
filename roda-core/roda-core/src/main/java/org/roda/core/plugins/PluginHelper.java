@@ -53,7 +53,9 @@ import org.roda.core.data.v2.LiteOptionalWithCause;
 import org.roda.core.data.v2.LiteRODAObject;
 import org.roda.core.data.v2.Void;
 import org.roda.core.data.v2.common.OptionalWithCause;
+import org.roda.core.data.v2.disposal.confirmation.DisposalConfirmation;
 import org.roda.core.data.v2.index.IndexResult;
+import org.roda.core.data.v2.index.facet.Facets;
 import org.roda.core.data.v2.index.filter.Filter;
 import org.roda.core.data.v2.index.filter.SimpleFilterParameter;
 import org.roda.core.data.v2.index.select.SelectedItems;
@@ -67,12 +69,12 @@ import org.roda.core.data.v2.ip.IndexedAIP;
 import org.roda.core.data.v2.ip.Permissions;
 import org.roda.core.data.v2.ip.StoragePath;
 import org.roda.core.data.v2.ip.TransferredResource;
-import org.roda.core.data.v2.ip.disposal.DisposalConfirmation;
 import org.roda.core.data.v2.ip.metadata.IndexedPreservationAgent;
 import org.roda.core.data.v2.ip.metadata.IndexedPreservationEvent;
 import org.roda.core.data.v2.ip.metadata.LinkingIdentifier;
 import org.roda.core.data.v2.ip.metadata.PreservationMetadata;
 import org.roda.core.data.v2.ip.metadata.PreservationMetadata.PreservationMetadataType;
+import org.roda.core.data.v2.jobs.IndexedJob;
 import org.roda.core.data.v2.jobs.Job;
 import org.roda.core.data.v2.jobs.JobStats;
 import org.roda.core.data.v2.jobs.JobUserDetails;
@@ -85,12 +87,12 @@ import org.roda.core.data.v2.ri.RepresentationInformation;
 import org.roda.core.data.v2.risks.Risk;
 import org.roda.core.data.v2.risks.RiskIncidence;
 import org.roda.core.data.v2.user.RODAMember;
+import org.roda.core.data.v2.user.User;
 import org.roda.core.data.v2.validation.ValidationException;
 import org.roda.core.index.IndexService;
 import org.roda.core.index.utils.IterableIndexResult;
 import org.roda.core.model.LiteRODAObjectFactory;
 import org.roda.core.model.ModelService;
-import org.roda.core.model.utils.ModelUtils;
 import org.roda.core.plugins.base.maintenance.reindex.ReindexAIPPlugin;
 import org.roda.core.plugins.base.maintenance.reindex.ReindexActionLogPlugin;
 import org.roda.core.plugins.base.maintenance.reindex.ReindexDIPPlugin;
@@ -131,13 +133,13 @@ public final class PluginHelper {
   }
 
   public static <T extends IsRODAObject> Report processObjects(Plugin<T> plugin,
-    RODAObjectsProcessingLogic<T> objectsLogic, IndexService index, ModelService model, StorageService storage,
+    RODAObjectsProcessingLogic<T> objectsLogic, IndexService index, ModelService model,
     List<LiteOptionalWithCause> liteList) throws PluginException {
-    return processObjects(plugin, objectsLogic, index, model, storage, liteList, true);
+    return processObjects(plugin, objectsLogic, index, model, liteList, true);
   }
 
   public static <T extends IsRODAObject> Report processObjects(Plugin<T> plugin,
-    RODAObjectsProcessingLogic<T> objectsLogic, IndexService index, ModelService model, StorageService storage,
+    RODAObjectsProcessingLogic<T> objectsLogic, IndexService index, ModelService model,
     List<LiteOptionalWithCause> liteList, boolean autoLocking) throws PluginException {
     Report report = PluginHelper.initPluginReport(plugin);
     List<T> list;
@@ -152,7 +154,7 @@ public final class PluginHelper {
 
       if (!list.isEmpty()) {
         try {
-          objectsLogic.process(index, model, storage, report, job, jobPluginInfo, plugin, list);
+          objectsLogic.process(index, model, report, job, jobPluginInfo, plugin, list);
         } catch (Throwable e) {
           LOGGER.error("Unexpected exception during 'objectsLogic' execution", e);
           jobPluginInfo.setSourceObjectsProcessedWithFailure(
@@ -191,14 +193,13 @@ public final class PluginHelper {
 
   public static <T extends IsRODAObject> Report processObjects(Plugin<T> plugin, RODAProcessingLogic<T> beforeLogic,
     RODAObjectProcessingLogic<T> perObjectLogic, RODAProcessingLogic<T> afterLogic, IndexService index,
-    ModelService model, StorageService storage, List<LiteOptionalWithCause> liteList) throws PluginException {
-    return processObjects(plugin, beforeLogic, perObjectLogic, afterLogic, index, model, storage, liteList, true);
+    ModelService model, List<LiteOptionalWithCause> liteList) throws PluginException {
+    return processObjects(plugin, beforeLogic, perObjectLogic, afterLogic, index, model, liteList, true);
   }
 
   public static <T extends IsRODAObject> Report processObjects(Plugin<T> plugin, RODAProcessingLogic<T> beforeLogic,
     RODAObjectProcessingLogic<T> perObjectLogic, RODAProcessingLogic<T> afterLogic, IndexService index,
-    ModelService model, StorageService storage, List<LiteOptionalWithCause> liteList, boolean autoLocking)
-    throws PluginException {
+    ModelService model, List<LiteOptionalWithCause> liteList, boolean autoLocking) throws PluginException {
     Report report = PluginHelper.initPluginReport(plugin);
     Throwable exceptionOccurred = null;
 
@@ -212,7 +213,7 @@ public final class PluginHelper {
 
       if (beforeLogic != null) {
         try {
-          beforeLogic.process(index, model, storage, report, job, jobPluginInfo, plugin);
+          beforeLogic.process(index, model, report, job, jobPluginInfo, plugin);
         } catch (Throwable e) {
           LOGGER.error("Unexpected exception during 'beforeLogic' execution", e);
           exceptionOccurred = e;
@@ -225,7 +226,7 @@ public final class PluginHelper {
         // need to pass them to the orchestrator (via throw)
         try {
           for (T object : list) {
-            perObjectLogic.process(index, model, storage, report, job, jobPluginInfo, plugin, object);
+            perObjectLogic.process(index, model, report, job, jobPluginInfo, plugin, object);
           }
         } catch (Throwable e) {
           LOGGER.error("Unexpected exception during 'perObjectLogic' execution", e);
@@ -235,7 +236,7 @@ public final class PluginHelper {
 
       if (afterLogic != null && exceptionOccurred == null) {
         try {
-          afterLogic.process(index, model, storage, report, job, jobPluginInfo, plugin);
+          afterLogic.process(index, model, report, job, jobPluginInfo, plugin);
         } catch (Throwable e) {
           LOGGER.error("Unexpected exception during 'afterLogic' execution", e);
           exceptionOccurred = e;
@@ -268,30 +269,30 @@ public final class PluginHelper {
   }
 
   public static <T extends IsRODAObject> Report processObjects(Plugin<T> plugin, RODAProcessingLogic<T> beforeLogic,
-    RODAObjectProcessingLogic<T> perObjectLogic, IndexService index, ModelService model, StorageService storage,
+    RODAObjectProcessingLogic<T> perObjectLogic, IndexService index, ModelService model,
     List<LiteOptionalWithCause> liteList) throws PluginException {
-    return processObjects(plugin, beforeLogic, perObjectLogic, null, index, model, storage, liteList);
+    return processObjects(plugin, beforeLogic, perObjectLogic, null, index, model, liteList);
   }
 
   public static <T extends IsRODAObject> Report processObjects(Plugin<T> plugin,
     RODAObjectProcessingLogic<T> perObjectLogic, RODAProcessingLogic<T> afterLogic, IndexService index,
-    ModelService model, StorageService storage, List<LiteOptionalWithCause> liteList) throws PluginException {
-    return processObjects(plugin, null, perObjectLogic, afterLogic, index, model, storage, liteList);
+    ModelService model, List<LiteOptionalWithCause> liteList) throws PluginException {
+    return processObjects(plugin, null, perObjectLogic, afterLogic, index, model, liteList);
   }
 
   public static <T extends IsRODAObject> Report processObjects(Plugin<T> plugin,
-    RODAObjectProcessingLogic<T> perObjectLogic, IndexService index, ModelService model, StorageService storage,
+    RODAObjectProcessingLogic<T> perObjectLogic, IndexService index, ModelService model,
     List<LiteOptionalWithCause> liteList) throws PluginException {
-    return processObjects(plugin, null, perObjectLogic, null, index, model, storage, liteList);
+    return processObjects(plugin, null, perObjectLogic, null, index, model, liteList);
   }
 
   public static Report processVoids(Plugin<Void> plugin, RODAProcessingLogic<Void> logic, IndexService index,
-    ModelService model, StorageService storage) throws PluginException {
-    return processVoids(plugin, logic, index, model, storage, 0);
+    ModelService model) throws PluginException {
+    return processVoids(plugin, logic, index, model, 0);
   }
 
   public static Report processVoids(Plugin<Void> plugin, RODAProcessingLogic<Void> logic, IndexService index,
-    ModelService model, StorageService storage, int setSourceObjectsCount) throws PluginException {
+    ModelService model, int setSourceObjectsCount) throws PluginException {
     Report report = PluginHelper.initPluginReport(plugin);
     Throwable exceptionOccurred = null;
 
@@ -303,7 +304,7 @@ public final class PluginHelper {
       Job job = PluginHelper.getJob(plugin, model);
 
       try {
-        logic.process(index, model, storage, report, job, jobPluginInfo, plugin);
+        logic.process(index, model, report, job, jobPluginInfo, plugin);
       } catch (Throwable e) {
         LOGGER.error("Unexpected exception during 'logic' execution", e);
         jobPluginInfo.setSourceObjectsProcessedWithFailure(
@@ -559,6 +560,47 @@ public final class PluginHelper {
     }
   }
 
+  public static <T extends IsRODAObject> void updatePartialJobReport(Plugin<T> plugin, ModelService model,
+    Report reportItem, boolean replaceLastReportItemIfTheSame, IndexedJob indexJob) {
+    String jobId = getJobId(plugin);
+    for (String sourceObjectId : getSourceObjectIdsToInitPluginReportItem(plugin, reportItem.getOutcomeObjectId(),
+      reportItem.getSourceObjectId())) {
+      // lets ensure that job report id & source object id is correct
+      reportItem.setSourceObjectId(sourceObjectId);
+      reportItem.setId(IdUtils.getJobReportId(jobId, sourceObjectId, reportItem.getOutcomeObjectId()));
+      try {
+        Report jobReport;
+        try {
+          jobReport = model.retrieveJobReport(jobId, sourceObjectId, reportItem.getOutcomeObjectId());
+
+          if (!replaceLastReportItemIfTheSame) {
+            jobReport.addReport(reportItem);
+          } else {
+            List<Report> reportItems = jobReport.getReports();
+            Report report = reportItems.get(reportItems.size() - 1);
+            if (report.getPlugin().equalsIgnoreCase(reportItem.getPlugin())) {
+              reportItems.remove(reportItems.size() - 1);
+              jobReport.setStepsCompleted(jobReport.getStepsCompleted() - 1);
+              jobReport.addReport(reportItem);
+            }
+          }
+        } catch (NotFoundException e) {
+          jobReport = initPluginReportItem(plugin, reportItem.getOutcomeObjectId(), reportItem.getSourceObjectId())
+            .setSourceObjectClass(reportItem.getSourceObjectClass())
+            .setOutcomeObjectClass(reportItem.getOutcomeObjectClass());
+
+          jobReport.setId(reportItem.getId());
+          jobReport.setDateCreated(reportItem.getDateCreated());
+          jobReport.addReport(reportItem);
+        }
+
+        model.createOrUpdateJobReport(jobReport, indexJob);
+      } catch (GenericException | RequestNotValidException | AuthorizationDeniedException e) {
+        LOGGER.error("Error while updating Job Report", e);
+      }
+    }
+  }
+
   private static void updateJobReport(ModelService model, Report report) {
     try {
       Job job = model.retrieveJob(report.getJobId());
@@ -580,11 +622,11 @@ public final class PluginHelper {
    *
    * @throws RequestNotValidException
    */
-  public static <T extends IsRODAObject> Job getJob(Plugin<T> plugin, IndexService index)
+  public static <T extends IsRODAObject> IndexedJob getIndexedJob(Plugin<T> plugin, IndexService index)
     throws NotFoundException, GenericException, RequestNotValidException {
     String jobId = getJobId(plugin);
     if (jobId != null) {
-      return index.retrieve(Job.class, jobId, new ArrayList<>());
+      return index.retrieve(IndexedJob.class, jobId, new ArrayList<>());
     } else {
       throw new NotFoundException("Job not found");
     }
@@ -608,7 +650,7 @@ public final class PluginHelper {
   public static String getJobUsername(String jobId, IndexService index)
     throws NotFoundException, GenericException, RequestNotValidException, AuthorizationDeniedException {
     if (jobId != null) {
-      Job job = index.retrieve(Job.class, jobId, Arrays.asList(RodaConstants.JOB_USERNAME));
+      IndexedJob job = index.retrieve(IndexedJob.class, jobId, Arrays.asList(RodaConstants.JOB_USERNAME));
       return job.getUsername();
     } else {
       throw new NotFoundException("Job not found");
@@ -745,16 +787,22 @@ public final class PluginHelper {
 
   /*********************************/
   public static Optional<String> getComputedParent(ModelService model, IndexService index, List<String> ancestors,
-    Optional<String> computedSearchScope, boolean forceSearchScope, String jobId) {
+    Optional<String> computedSearchScope, boolean forceSearchScope, String jobId, String jobUsername) {
     if (ancestors.isEmpty()) {
       return computedSearchScope;
     }
-    return resolveParent(model, index, ancestors, computedSearchScope, forceSearchScope, jobId);
+    return resolveParent(model, index, ancestors, computedSearchScope, forceSearchScope, jobId, jobUsername);
   }
 
   private static Optional<String> resolveParent(ModelService model, IndexService index, List<String> ancestorsFromSIP,
-    Optional<String> computedSearchScope, boolean forceParent, String jobId) {
+    Optional<String> computedSearchScope, boolean forceParent, String jobId, String jobUsername) {
     Optional<String> parent = computedSearchScope;
+    User jobUser;
+    try {
+      jobUser = model.retrieveUser(jobUsername);
+    } catch (GenericException e) {
+      jobUser = null;
+    }
 
     if (forceParent) {
       parent = computedSearchScope;
@@ -766,9 +814,10 @@ public final class PluginHelper {
 
       try {
         for (String ancestor : ancestors) {
-          Optional<String> computedAncestorId = getAncestorById(ancestor, parent, index, RodaConstants.INGEST_SIP_IDS);
+          Optional<String> computedAncestorId = getAncestorById(model, ancestor, parent, index,
+            RodaConstants.INGEST_SIP_IDS, jobUser);
           if (!computedAncestorId.isPresent()) {
-            computedAncestorId = getAncestorById(ancestor, parent, index, RodaConstants.INDEX_UUID);
+            computedAncestorId = getAncestorById(model, ancestor, parent, index, RodaConstants.INDEX_UUID, jobUser);
           }
 
           if (computedAncestorId.isPresent()) {
@@ -794,14 +843,14 @@ public final class PluginHelper {
     Permissions permissions = new Permissions();
 
     boolean isGhost = true;
-    AIP ghostAIP = model.createAIP(parent.orElse(null), "", permissions, Arrays.asList(ancestor), jobId, true,
-      username, isGhost);
+    AIP ghostAIP = model.createAIP(parent.orElse(null), "", permissions, Arrays.asList(ancestor), jobId, true, username,
+      isGhost, null);
 
     return Optional.ofNullable(ghostAIP.getId());
   }
 
-  private static Optional<String> getAncestorById(String ancestor, Optional<String> computedSearchScope,
-    IndexService index, String aipField) {
+  private static Optional<String> getAncestorById(ModelService model, String ancestor,
+    Optional<String> computedSearchScope, IndexService index, String aipField, User jobUser) {
     if (ancestor.equalsIgnoreCase(computedSearchScope.orElse(null))) {
       return computedSearchScope;
     }
@@ -819,13 +868,19 @@ public final class PluginHelper {
     }
 
     try {
-      // TODO 2016-11-24 sleroux: add user permission
       IndexResult<IndexedAIP> result = index.find(IndexedAIP.class, ancestorFilter, Sorter.NONE, new Sublist(0, 1),
-        Arrays.asList(RodaConstants.INDEX_UUID));
+        Facets.NONE, jobUser, false, Arrays.asList(RodaConstants.INDEX_UUID));
 
       if (result.getTotalCount() >= 1) {
         IndexedAIP indexedAIP = result.getResults().get(0);
-        ancestorBySIPId = Optional.ofNullable(indexedAIP.getId());
+
+        // Check if exist on Model due to transactions
+        try {
+          model.retrieveAIP(indexedAIP.getId());
+          ancestorBySIPId = Optional.ofNullable(indexedAIP.getId());
+        } catch (NotFoundException | AuthorizationDeniedException e) {
+          ancestorBySIPId = Optional.empty();
+        }
       }
     } catch (GenericException | RequestNotValidException e) {
       // Do nothing
@@ -1122,12 +1177,15 @@ public final class PluginHelper {
     List<LinkingIdentifier> agentIds = new ArrayList<>();
     String agentId = IdUtils.getPluginAgentId(plugin.getClass().getName(), plugin.getVersion(),
       RODAInstanceUtils.getLocalInstanceIdentifier());
-    StoragePath agentPath = ModelUtils.getPreservationMetadataStoragePath(agentId, PreservationMetadataType.AGENT);
+    Optional<LiteRODAObject> agentLite = LiteRODAObjectFactory.get(PreservationMetadata.class, agentId);
+    if (agentLite.isEmpty()) {
+      throw new RequestNotValidException("Could not get LITE for agent with ID: " + agentId);
+    }
     LinkingIdentifier linkingIdentifierPlugin = new LinkingIdentifier();
     linkingIdentifierPlugin.setValue(agentId);
 
     try {
-      if (!RodaCoreFactory.getStorageService().exists(agentPath)) {
+      if (!model.existsInStorage(agentLite.get())) {
         PremisV3Utils.createPremisAgentBinary(plugin, model, true);
       }
       agentIds.add(linkingIdentifierPlugin);
@@ -1137,26 +1195,33 @@ public final class PluginHelper {
       LOGGER.error("Error creating PREMIS agent", e);
     }
 
-    Job job = cachedJob;
+    String jobUsername;
+    List<JobUserDetails> jobUserDetails;
     // INFO 20190509 hsilva: this is just to make easier to be retro-compatible
-    if (job == null) {
+    if (cachedJob == null) {
       try {
-        job = getJob(plugin, index);
+        IndexedJob indexedJob = getIndexedJob(plugin, index);
+        jobUserDetails = indexedJob.getJobUsersDetails();
+        jobUsername = indexedJob.getUsername();
       } catch (NotFoundException e) {
-        job = null;
+        jobUserDetails = null;
+        jobUsername = null;
       }
+    } else {
+      jobUserDetails = cachedJob.getJobUsersDetails();
+      jobUsername = cachedJob.getUsername();
     }
 
-    if (job != null) {
-      for (JobUserDetails jobUserDetails : job.getJobUsersDetails()) {
-        String userId = IdUtils.getUserAgentId(jobUserDetails.getUsername(),
+    if (jobUserDetails != null && jobUsername != null) {
+      for (JobUserDetails jobUserDetail : jobUserDetails) {
+        String userId = IdUtils.getUserAgentId(jobUserDetail.getUsername(),
           RODAInstanceUtils.getLocalInstanceIdentifier());
         LinkingIdentifier linkingIdentifierAgent1 = new LinkingIdentifier();
         linkingIdentifierAgent1.setValue(userId);
         List<String> rolesAgent1 = new ArrayList<>();
-        rolesAgent1.add(jobUserDetails.getRole());
+        rolesAgent1.add(jobUserDetail.getRole());
         linkingIdentifierAgent1.setRoles(rolesAgent1);
-        addAgent(jobUserDetails.getUsername(), model, linkingIdentifierAgent1, index, agentIds, job);
+        addAgent(jobUserDetail.getUsername(), model, linkingIdentifierAgent1, index, agentIds, jobUserDetails);
       }
     }
 
@@ -1182,7 +1247,7 @@ public final class PluginHelper {
       plugin.getPreservationEventType().toString(), plugin.getPreservationEventDescription(), sources, outcomes,
       outcome.name(), outcomeDetailNote, outcomeDetailExtension, agentIds);
     model.createPreservationMetadata(PreservationMetadataType.EVENT, id, aipId, representationId, filePath, fileId,
-      premisEvent, job.getUsername(), notify);
+      premisEvent, jobUsername, notify);
 
     PreservationMetadata pm = new PreservationMetadata();
     pm.setId(id);
@@ -1195,13 +1260,18 @@ public final class PluginHelper {
   }
 
   public static void addAgent(String agentName, ModelService model, LinkingIdentifier linkingIdentifierAgent,
-    IndexService index, List<LinkingIdentifier> agentIds, Job job) {
+    IndexService index, List<LinkingIdentifier> agentIds, List<JobUserDetails> jobUserDetails) {
 
     try {
-      StoragePath userAgentPath = ModelUtils.getPreservationMetadataStoragePath(linkingIdentifierAgent.getValue(),
-        PreservationMetadataType.AGENT);
-      if (!RodaCoreFactory.getStorageService().exists(userAgentPath)) {
-        PreservationMetadata pm = PremisV3Utils.createOrUpdatePremisUserAgentBinary(agentName, model, index, true, job);
+      Optional<LiteRODAObject> agentLite = LiteRODAObjectFactory.get(IndexedPreservationAgent.class,
+        linkingIdentifierAgent.getValue());
+      if (agentLite.isEmpty()) {
+        throw new RequestNotValidException(
+          "Could not get LITE for agent with ID: " + linkingIdentifierAgent.getValue());
+      }
+      if (!model.existsInStorage(agentLite.get())) {
+        PreservationMetadata pm = PremisV3Utils.createOrUpdatePremisUserAgentBinary(agentName, model, index, true,
+          jobUserDetails);
         if (pm != null) {
           agentIds.add(linkingIdentifierAgent);
         }
@@ -1262,13 +1332,13 @@ public final class PluginHelper {
               model.createRepositoryEvent(RodaConstants.PreservationEventType.DELETION,
                 "The process of deleting an object of the repository", PluginState.FAILURE,
                 "The transferred resource " + transferredResource.getName() + " has not been deleted.", "",
-                cachedJob.getUsername(), true);
+                cachedJob.getUsername(), true, null);
               LOGGER.debug("Failed to remove SIP {}", transferredResource.getFullPath(), e);
             }
             model.createRepositoryEvent(RodaConstants.PreservationEventType.DELETION,
               "The process of deleting an object of the repository", PluginState.SUCCESS,
               "The transferred resource " + transferredResource.getName() + " has been deleted.", "",
-              cachedJob.getUsername(), true);
+              cachedJob.getUsername(), true, null);
             LOGGER.debug("Done with removing SIP {}", transferredResource.getFullPath());
           }
         } catch (RequestNotValidException | NotFoundException | GenericException | AuthorizationDeniedException e) {
@@ -1278,7 +1348,7 @@ public final class PluginHelper {
     }
   }
 
-  public static <T extends IsRODAObject> void moveSIPs(Plugin<T> plugin, ModelService model, IndexService index,
+  public static <T extends IsRODAObject> void moveSIPs(Plugin<T> plugin, ModelService model,
     List<TransferredResource> transferredResources, IngestJobPluginInfo jobPluginInfo) {
     List<String> success = new ArrayList<>();
     List<String> unsuccessful = new ArrayList<>();
@@ -1343,7 +1413,7 @@ public final class PluginHelper {
 
     // update Job (with all new ids)
     successOldToNewTransferredResourceIds.putAll(unsuccessfulOldToNewTransferredResourceIds);
-    updateJobAfterMovingSIPsAsync(plugin, index, successOldToNewTransferredResourceIds);
+    updateJobAfterMovingSIPsAsync(plugin, model, successOldToNewTransferredResourceIds);
   }
 
   private static void updateReportsAndIngestInfoAfterMovingSIPs(ModelService model, IngestJobPluginInfo jobPluginInfo,
@@ -1370,16 +1440,16 @@ public final class PluginHelper {
   /**
    * Update Job source object ids (done asynchronously)
    */
-  private static <T extends IsRODAObject> void updateJobAfterMovingSIPsAsync(Plugin<T> plugin, IndexService index,
+  private static <T extends IsRODAObject> void updateJobAfterMovingSIPsAsync(Plugin<T> plugin, ModelService model,
     Map<String, String> oldToNewTransferredResourceIds) {
     try {
-      Job job = getJob(plugin, index);
+      Job job = getJob(plugin, model);
       SelectedItems<?> sourceObjects = job.getSourceObjects();
       if (sourceObjects instanceof SelectedItemsList) {
         RodaCoreFactory.getPluginOrchestrator().updateJobAsync(plugin, (JobPartialUpdate) Messages
           .newJobSourceObjectsUpdated(oldToNewTransferredResourceIds).withJobPriority(job.getPriority()));
       }
-    } catch (NotFoundException | GenericException | RequestNotValidException e) {
+    } catch (NotFoundException | GenericException | RequestNotValidException | AuthorizationDeniedException e) {
       LOGGER.error("Error retrieving Job", e);
     }
   }
@@ -1499,13 +1569,13 @@ public final class PluginHelper {
   public static void createAndExecuteJob(Job job) throws GenericException, JobAlreadyStartedException,
     RequestNotValidException, NotFoundException, AuthorizationDeniedException {
     RodaCoreFactory.getPluginOrchestrator().createAndExecuteJobs(job, true);
-    RodaCoreFactory.getIndexService().commit(Job.class);
+    RodaCoreFactory.getIndexService().commit(IndexedJob.class);
   }
 
   public static void createJob(Job job) throws GenericException, JobAlreadyStartedException, RequestNotValidException,
     NotFoundException, AuthorizationDeniedException {
     RodaCoreFactory.getModelService().createJob(job);
-    RodaCoreFactory.getIndexService().commit(Job.class);
+    RodaCoreFactory.getIndexService().commit(IndexedJob.class);
   }
 
   public static String getReindexPluginName(Class<?> reindexClass) throws NotFoundException {

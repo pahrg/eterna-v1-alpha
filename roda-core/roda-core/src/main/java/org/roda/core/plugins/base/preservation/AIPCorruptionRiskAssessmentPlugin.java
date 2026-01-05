@@ -113,19 +113,19 @@ public class AIPCorruptionRiskAssessmentPlugin extends AbstractPlugin<AIP> {
   }
 
   @Override
-  public Report execute(IndexService index, ModelService model, StorageService storage,
-    List<LiteOptionalWithCause> liteList) throws PluginException {
+  public Report execute(IndexService index, ModelService model, List<LiteOptionalWithCause> liteList)
+    throws PluginException {
     return PluginHelper.processObjects(this, new RODAObjectProcessingLogic<AIP>() {
       @Override
-      public void process(IndexService index, ModelService model, StorageService storage, Report report, Job cachedJob,
+      public void process(IndexService index, ModelService model, Report report, Job cachedJob,
         JobPluginInfo jobPluginInfo, Plugin<AIP> plugin, AIP object) {
-        processAIP(index, model, storage, report, jobPluginInfo, cachedJob, object);
+        processAIP(index, model, report, jobPluginInfo, cachedJob, object);
       }
-    }, index, model, storage, liteList);
+    }, index, model, liteList);
   }
 
-  private void processAIP(IndexService index, ModelService model, StorageService storage, Report report,
-    JobPluginInfo jobPluginInfo, Job job, AIP aip) {
+  private void processAIP(IndexService index, ModelService model, Report report, JobPluginInfo jobPluginInfo, Job job,
+    AIP aip) {
     boolean aipFailed = false;
     boolean aipSkipped = false;
     List<LinkingIdentifier> sources = new ArrayList<>();
@@ -141,8 +141,7 @@ public class AIPCorruptionRiskAssessmentPlugin extends AbstractPlugin<AIP> {
 
               if (!file.isDirectory()) {
                 if (FSUtils.isManifestOfExternalFiles(file.getId())) {
-                  StorageService tmpStorageService = ModelUtils.resolveTemporaryResourceShallow(job.getId(), storage,
-                    ModelUtils.getAIPStoragePath(aip.getId()));
+                  StorageService tmpStorageService = model.resolveTemporaryResourceShallow(job.getId(), aip);
                   for (OptionalWithCause<File> fileShallow : model.listExternalFilesUnder(file)) {
                     processFilesShallow(index, model, tmpStorageService, validationReport, sources, aipFailed, aip,
                       fileShallow.get());
@@ -155,8 +154,7 @@ public class AIPCorruptionRiskAssessmentPlugin extends AbstractPlugin<AIP> {
                     LOGGER.error("Error on removing temporary AIP " + aip.getId(), e);
                   }
                 } else {
-                  StoragePath storagePath = ModelUtils.getFileStoragePath(file);
-                  Binary currentFileBinary = storage.getBinary(storagePath);
+                  Binary currentFileBinary = model.getBinary(file);
                   List<Fixity> fixities = null;
 
                   try {
@@ -455,14 +453,13 @@ public class AIPCorruptionRiskAssessmentPlugin extends AbstractPlugin<AIP> {
   }
 
   @Override
-  public Report beforeAllExecute(IndexService index, ModelService model, StorageService storage)
-    throws PluginException {
+  public Report beforeAllExecute(IndexService index, ModelService model) throws PluginException {
     // do nothing
     return null;
   }
 
   @Override
-  public Report afterAllExecute(IndexService index, ModelService model, StorageService storage) throws PluginException {
+  public Report afterAllExecute(IndexService index, ModelService model) throws PluginException {
     // do nothing
     return null;
   }

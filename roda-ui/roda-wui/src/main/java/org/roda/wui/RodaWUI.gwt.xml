@@ -4,14 +4,16 @@
 	<inherits name='com.google.gwt.user.User' />
 	<inherits name="com.google.gwt.http.HTTP" />
 	<inherits name="com.google.gwt.logging.Logging" />
-	<inherits name="com.google.gwt.resources.Resources" />
+	<inherits name="org.fusesource.restygwt.RestyGWT"/>
+	<inherits name='com.ekotrope.gwt.CompletableFuture'/>
 	<source path="client" />
+	<source path="api" />
 
 	<!-- I18N -->
 	<extend-property name="locale" values="en" />
 	<!--
 	<extend-property name="locale" values="pt_PT" />
-	<extend-property name="locale" values="es_CL" />
+	<extend-property name="locale" values="es" />
 	<extend-property name="locale" values="hr" />
 	<extend-property name="locale" values="hu" />
 	-->
@@ -39,6 +41,7 @@
 	<inherits name="elemental2.core.Core" />
 	<inherits name="elemental2.dom.Dom" />
 	<inherits name="elemental2.promise.Promise" />
+	<set-property name="restygwt.encodeDecode.useGwtJackson" value="true" />
 
 	<!-- Inherit sub-projects -->
 	<!-- TODO: Remove the Common sub-module -->
@@ -51,7 +54,7 @@
 	<!-- Specify the app entry point class. -->
 	<entry-point class='org.roda.wui.client.main.Main' />
 	<!-- <stylesheet src="Main.css" /> Replaced by MyResources -->
-	<stylesheet src="../api/v1/theme?resource_id=theme.css" />
-	<stylesheet src="../api/v1/theme?resource_id=printing.css" />
-	<collapse-all-properties />
+	<stylesheet src="../api/v2/themes?resource-id=theme.css" />
+	<stylesheet src="../api/v2/themes?resource-id=printing.css" />
+	<collapse-all-properties/>
 </module>

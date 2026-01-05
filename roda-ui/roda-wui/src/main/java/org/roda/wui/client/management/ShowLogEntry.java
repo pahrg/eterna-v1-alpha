@@ -10,16 +10,20 @@
  */
 package org.roda.wui.client.management;
 
-import java.util.Arrays;
 import java.util.List;
 
 import org.roda.core.data.common.RodaConstants;
+import org.roda.core.data.v2.index.filter.Filter;
+import org.roda.core.data.v2.index.filter.SimpleFilterParameter;
 import org.roda.core.data.v2.log.LogEntry;
 import org.roda.core.data.v2.log.LogEntryParameter;
-import org.roda.wui.client.browse.BrowserService;
 import org.roda.wui.client.common.UserLogin;
+import org.roda.wui.client.common.lists.InternalLogEntryList;
+import org.roda.wui.client.common.lists.utils.AsyncTableCellOptions;
+import org.roda.wui.client.common.lists.utils.ListBuilder;
+import org.roda.wui.client.common.search.SearchWrapper;
 import org.roda.wui.client.common.utils.HtmlSnippetUtils;
-import org.roda.wui.client.common.utils.JavascriptUtils;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.HistoryResolver;
 import org.roda.wui.common.client.tools.HistoryUtils;
 import org.roda.wui.common.client.tools.Humanize;
@@ -27,6 +31,7 @@ import org.roda.wui.common.client.tools.ListUtils;
 import org.roda.wui.common.client.tools.StringUtils;
 
 import com.google.gwt.core.client.GWT;
+import com.google.gwt.i18n.client.LocaleInfo;
 import com.google.gwt.safehtml.shared.SafeHtmlUtils;
 import com.google.gwt.uibinder.client.UiBinder;
 import com.google.gwt.uibinder.client.UiField;
@@ -35,6 +40,7 @@ import com.google.gwt.user.client.ui.Composite;
 import com.google.gwt.user.client.ui.FlowPanel;
 import com.google.gwt.user.client.ui.HTML;
 import com.google.gwt.user.client.ui.Label;
+import com.google.gwt.user.client.ui.SimplePanel;
 import com.google.gwt.user.client.ui.Widget;
 
 import config.i18n.client.ClientMessages;
@@ -50,23 +56,16 @@ public class ShowLogEntry extends Composite {
     @Override
     public void resolve(List<String> historyTokens, final AsyncCallback<Widget> callback) {
       if (historyTokens.size() == 1) {
-        String logEntryId = historyTokens.get(0);
-
-        BrowserService.Util.getInstance().retrieve(LogEntry.class.getName(), logEntryId, fieldsToReturn,
-          new AsyncCallback<LogEntry>() {
-
-            @Override
-            public void onFailure(Throwable caught) {
-              callback.onFailure(caught);
-            }
-
-            @Override
-            public void onSuccess(LogEntry result) {
-              ShowLogEntry logEntryPanel = new ShowLogEntry(result);
+        Services services = new Services("Retrieve audit log", "get");
+        services
+          .rodaEntityRestService(s -> s.findByUuid(historyTokens.get(0), LocaleInfo.getCurrentLocale().getLocaleName()),
+            LogEntry.class)
+          .whenComplete((logEntry, throwable) -> {
+            if (throwable == null) {
+              ShowLogEntry logEntryPanel = new ShowLogEntry(logEntry);
               callback.onSuccess(logEntryPanel);
             }
           });
-
       } else {
         HistoryUtils.newHistory(UserLog.RESOLVER);
         callback.onSuccess(null);
@@ -92,55 +91,59 @@ public class ShowLogEntry extends Composite {
   interface MyUiBinder extends UiBinder<Widget, ShowLogEntry> {
   }
 
-  private static MyUiBinder uiBinder = GWT.create(MyUiBinder.class);
+  private static final MyUiBinder uiBinder = GWT.create(MyUiBinder.class);
   private static final ClientMessages messages = GWT.create(ClientMessages.class);
 
-  private static final List<String> fieldsToReturn = Arrays.asList(RodaConstants.INDEX_UUID, RodaConstants.LOG_ID,
-    RodaConstants.LOG_ACTION_COMPONENT, RodaConstants.LOG_ACTION_METHOD, RodaConstants.LOG_ADDRESS,
-    RodaConstants.LOG_DATETIME, RodaConstants.LOG_RELATED_OBJECT_ID, RodaConstants.LOG_USERNAME,
-    RodaConstants.LOG_PARAMETERS, RodaConstants.LOG_STATE);
-
   @UiField
-  Label logIdLabel, logIdValue;
-
+  Label logIdLabel;
   @UiField
-  Label logComponentLabel, logComponentValue;
-
+  Label logIdValue;
   @UiField
-  Label logMethodLabel, logMethodValue;
-
+  Label logReasonLabel;
   @UiField
-  Label logAddressLabel, logAddressValue;
-
+  Label logReasonValue;
   @UiField
-  Label logDatetimeLabel, logDatetimeValue;
-
+  Label logComponentLabel;
   @UiField
-  Label logDurationLabel, logDurationValue;
-
+  Label logComponentValue;
   @UiField
-  Label logRelatedObjectLabel, logRelatedObjectValue;
-
+  Label logMethodLabel;
   @UiField
-  Label logUsernameLabel, logUsernameValue;
-
+  Label logMethodValue;
+  @UiField
+  Label logAddressLabel;
+  @UiField
+  Label logAddressValue;
+  @UiField
+  Label logDatetimeLabel;
+  @UiField
+  Label logDatetimeValue;
+  @UiField
+  Label logDurationValue;
+  @UiField
+  Label logRelatedObjectLabel;
+  @UiField
+  Label logRelatedObjectValue;
+  @UiField
+  Label logUsernameLabel;
+  @UiField
+  Label logUsernameValue;
   @UiField
   Label logParametersLabel;
-
   @UiField
   FlowPanel logParametersValue;
-
   @UiField
   Label logStateLabel;
-
   @UiField
   HTML logStateValue;
-
   @UiField
   Label logInstanceIdLabel;
-
   @UiField
   Label logInstanceIdValue;
+  @UiField
+  SimplePanel expandedAuditLogs;
+  @UiField
+  SimplePanel expandedAuditLogsList;
 
   /**
    * Create a new panel to view a log entry
@@ -152,6 +155,10 @@ public class ShowLogEntry extends Composite {
     logIdValue.setText(logEntry.getId());
     logIdLabel.setVisible(StringUtils.isNotBlank(logEntry.getId()));
     logIdValue.setVisible(StringUtils.isNotBlank(logEntry.getId()));
+
+    logReasonValue.setText(logEntry.getAuditLogRequestHeaders().getReason());
+    logReasonLabel.setVisible(StringUtils.isNotBlank(logEntry.getAuditLogRequestHeaders().getReason()));
+    logReasonValue.setVisible(StringUtils.isNotBlank(logEntry.getAuditLogRequestHeaders().getReason()));
 
     logInstanceIdValue.setText(logEntry.getInstanceId());
     logInstanceIdLabel.setVisible(StringUtils.isNotBlank(logEntry.getInstanceId()));
@@ -202,11 +209,25 @@ public class ShowLogEntry extends Composite {
     logStateLabel.setVisible(logEntry.getState() != null);
     logStateValue.setVisible(logEntry.getState() != null);
 
+    expandedAuditLogsList.setVisible(false);
+
+    if (logEntry.getAuditLogRequestHeaders() != null) {
+      Label relatedAuditLogs = new Label();
+      relatedAuditLogs.addStyleName("h5");
+      relatedAuditLogs.setText(messages.relatedAuditLogs());
+      expandedAuditLogs.add(relatedAuditLogs);
+
+      Filter filter = new Filter(new SimpleFilterParameter(RodaConstants.LOG_REQUEST_HEADER_UUID,
+        logEntry.getAuditLogRequestHeaders().getUuid()));
+
+      ListBuilder<LogEntry> auditLogListBuilder = new ListBuilder<>(() -> new InternalLogEntryList(),
+        new AsyncTableCellOptions<>(LogEntry.class, "AuditLogs_triggeredLogs").withFilter(filter)
+          .withSummary(messages.listOfAIPs()).bindOpener());
+
+      SearchWrapper aipsSearchWrapper = new SearchWrapper(false).createListAndSearchPanel(auditLogListBuilder);
+      expandedAuditLogsList.setWidget(aipsSearchWrapper);
+      expandedAuditLogsList.setVisible(true);
+    }
   }
 
-  @Override
-  protected void onLoad() {
-    super.onLoad();
-    JavascriptUtils.stickSidebar();
-  }
 }

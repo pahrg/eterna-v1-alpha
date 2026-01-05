@@ -16,6 +16,7 @@ import java.util.List;
 
 import org.roda.core.data.common.RodaConstants;
 import org.roda.core.data.utils.RepresentationInformationUtils;
+import org.roda.core.data.v2.disposal.confirmation.DisposalConfirmation;
 import org.roda.core.data.v2.index.IsIndexed;
 import org.roda.core.data.v2.ip.DIPFile;
 import org.roda.core.data.v2.ip.IndexedAIP;
@@ -23,11 +24,10 @@ import org.roda.core.data.v2.ip.IndexedDIP;
 import org.roda.core.data.v2.ip.IndexedFile;
 import org.roda.core.data.v2.ip.IndexedRepresentation;
 import org.roda.core.data.v2.ip.TransferredResource;
-import org.roda.core.data.v2.ip.disposal.DisposalConfirmation;
 import org.roda.core.data.v2.ip.metadata.IndexedPreservationAgent;
 import org.roda.core.data.v2.ip.metadata.IndexedPreservationEvent;
+import org.roda.core.data.v2.jobs.IndexedJob;
 import org.roda.core.data.v2.jobs.IndexedReport;
-import org.roda.core.data.v2.jobs.Job;
 import org.roda.core.data.v2.log.LogEntry;
 import org.roda.core.data.v2.notifications.Notification;
 import org.roda.core.data.v2.ri.RepresentationInformation;
@@ -38,7 +38,6 @@ import org.roda.wui.client.browse.BrowseDIP;
 import org.roda.wui.client.browse.BrowseFile;
 import org.roda.wui.client.browse.BrowseRepresentation;
 import org.roda.wui.client.browse.BrowseTop;
-import org.roda.wui.client.browse.BrowserService;
 import org.roda.wui.client.browse.ShowPreservationEvent;
 import org.roda.wui.client.common.utils.AsyncCallbackUtils;
 import org.roda.wui.client.disposal.confirmations.ShowDisposalConfirmation;
@@ -56,10 +55,12 @@ import org.roda.wui.client.planning.ShowRisk;
 import org.roda.wui.client.planning.ShowRiskIncidence;
 import org.roda.wui.client.portal.BrowseAIPPortal;
 import org.roda.wui.client.search.Search;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.HistoryResolver;
 import org.roda.wui.common.client.widgets.Toast;
 
 import com.google.gwt.http.client.URL;
+import com.google.gwt.i18n.client.LocaleInfo;
 import com.google.gwt.user.client.Window;
 import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.google.gwt.user.client.ui.Widget;
@@ -76,13 +77,40 @@ public class HistoryUtils {
   public static final String HISTORY_PERMISSION_SEP = ".";
 
   private static boolean USING_PORTAL_UI = false;
+  public static final HistoryResolver UUID_RESOLVER = new HistoryResolver() {
 
-  public static void initEndpoint(boolean usingPortalUI) {
-    HistoryUtils.USING_PORTAL_UI = usingPortalUI;
-  }
+    @Override
+    public void resolve(List<String> historyTokens, AsyncCallback<Widget> callback) {
+      if (historyTokens.size() == 2) {
+        String objectClass = historyTokens.get(0);
+        String objectUUID = historyTokens.get(1);
+        HistoryUtils.resolve(objectClass, objectUUID, true);
+      }
+      callback.onSuccess(null);
+    }
+
+    @Override
+    public void isCurrentUserPermitted(AsyncCallback<Boolean> callback) {
+      callback.onSuccess(true);
+    }
+
+    @Override
+    public String getHistoryToken() {
+      return "uuid";
+    }
+
+    @Override
+    public List<String> getHistoryPath() {
+      return new ArrayList<>();
+    }
+  };
 
   private HistoryUtils() {
     // do nothing
+  }
+
+  public static void initEndpoint(boolean usingPortalUI) {
+    HistoryUtils.USING_PORTAL_UI = usingPortalUI;
   }
 
   public static <T> List<T> tail(List<T> list) {
@@ -322,18 +350,16 @@ public class HistoryUtils {
 
   public static <T extends IsIndexed> void resolve(final String objectClass, final String objectUUID,
     final boolean replace) {
-    BrowserService.Util.getInstance().retrieveFromModel(objectClass, objectUUID, new AsyncCallback<T>() {
-
-      @Override
-      public void onFailure(Throwable caught) {
-        AsyncCallbackUtils.defaultFailureTreatment(caught);
-      }
-
-      @Override
-      public void onSuccess(T object) {
-        resolve(object, replace);
-      }
-    });
+    Services services = new Services("Get indexed object", "get");
+    services
+      .rodaEntityRestService(s -> s.findByUuid(objectUUID, LocaleInfo.getCurrentLocale().getLocaleName()), objectClass)
+      .whenComplete((isIndexed, throwable) -> {
+        if (throwable != null) {
+          AsyncCallbackUtils.defaultFailureTreatment(throwable);
+        } else {
+          resolve(isIndexed, replace);
+        }
+      });
   }
 
   public static <T extends IsIndexed> void resolve(T object) {
@@ -377,12 +403,13 @@ public class HistoryUtils {
     } else if (object instanceof RiskIncidence) {
       RiskIncidence incidence = (RiskIncidence) object;
       path = HistoryUtils.getHistory(ShowRiskIncidence.RESOLVER.getHistoryPath(), incidence.getUUID());
-    } else if (object instanceof Job) {
-      Job job = (Job) object;
+    } else if (object instanceof IndexedJob) {
+      IndexedJob job = (IndexedJob) object;
       path = HistoryUtils.getHistory(ShowJob.RESOLVER.getHistoryPath(), job.getUUID());
     } else if (object instanceof IndexedReport) {
       IndexedReport report = (IndexedReport) object;
-      path = HistoryUtils.getHistory(ShowJobReport.RESOLVER.getHistoryPath(), report.getUUID());
+      List<String> jobPath = HistoryUtils.getHistory(ShowJob.RESOLVER.getHistoryPath(), report.getJobId());
+      path = HistoryUtils.getHistory(jobPath, ShowJobReport.RESOLVER.getHistoryToken(), report.getUUID());
     } else if (object instanceof RODAMember) {
       RODAMember member = (RODAMember) object;
       HistoryUtils.newHistory(member.isUser() ? ShowUser.RESOLVER : ShowGroup.RESOLVER, member.getId());
@@ -427,34 +454,6 @@ public class HistoryUtils {
       }
     }
   }
-
-  public static final HistoryResolver UUID_RESOLVER = new HistoryResolver() {
-
-    @Override
-    public void resolve(List<String> historyTokens, AsyncCallback<Widget> callback) {
-      if (historyTokens.size() == 2) {
-        String objectClass = historyTokens.get(0);
-        String objectUUID = historyTokens.get(1);
-        HistoryUtils.resolve(objectClass, objectUUID, true);
-      }
-      callback.onSuccess(null);
-    }
-
-    @Override
-    public void isCurrentUserPermitted(AsyncCallback<Boolean> callback) {
-      callback.onSuccess(true);
-    }
-
-    @Override
-    public String getHistoryToken() {
-      return "uuid";
-    }
-
-    @Override
-    public List<String> getHistoryPath() {
-      return new ArrayList<>();
-    }
-  };
 
   public static List<String> getHistoryUuidResolver(String objectClass, String objectUUID) {
     return Arrays.asList(UUID_RESOLVER.getHistoryToken(), objectClass, objectUUID);

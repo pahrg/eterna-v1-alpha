@@ -9,9 +9,21 @@ package org.roda.core.common.monitor;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.*;
+import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.FileVisitOption;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -21,12 +33,16 @@ import org.roda.core.RodaCoreFactory;
 import org.roda.core.common.iterables.CloseableIterable;
 import org.roda.core.data.common.RodaConstants;
 import org.roda.core.data.common.RodaConstants.NodeType;
-import org.roda.core.data.exceptions.*;
+import org.roda.core.data.exceptions.AlreadyExistsException;
+import org.roda.core.data.exceptions.AuthorizationDeniedException;
+import org.roda.core.data.exceptions.GenericException;
+import org.roda.core.data.exceptions.IsStillUpdatingException;
+import org.roda.core.data.exceptions.NotFoundException;
+import org.roda.core.data.exceptions.RequestNotValidException;
 import org.roda.core.data.v2.LiteRODAObject;
 import org.roda.core.data.v2.common.OptionalWithCause;
 import org.roda.core.data.v2.index.filter.Filter;
 import org.roda.core.data.v2.index.filter.SimpleFilterParameter;
-import org.roda.core.data.v2.ip.File;
 import org.roda.core.data.v2.ip.TransferredResource;
 import org.roda.core.index.IndexService;
 import org.roda.core.model.LiteRODAObjectFactory;
@@ -60,7 +76,7 @@ public class TransferredResourcesScanner {
   }
 
   public TransferredResource createFolder(String parentUUID, String folderName)
-    throws GenericException, NotFoundException, AuthorizationDeniedException {
+    throws GenericException, NotFoundException, AuthorizationDeniedException, AlreadyExistsException {
     Path parentPath;
 
     RodaCoreFactory.checkIfWriteIsAllowedAndIfFalseThrowException(nodeType);
@@ -74,7 +90,12 @@ public class TransferredResourcesScanner {
 
     try {
       String sanitizedFolderName = folderName.replaceAll("/", "");
-      Path createdPath = Files.createDirectories(parentPath.resolve(sanitizedFolderName));
+
+      if (Files.exists(parentPath.resolve(sanitizedFolderName))) {
+        throw new AlreadyExistsException("Directory already exists");
+      }
+
+      Path createdPath = Files.createDirectory(parentPath.resolve(sanitizedFolderName));
       BasicFileAttributes attrs = Files.readAttributes(createdPath, BasicFileAttributes.class);
       TransferredResource resource = createTransferredResource(createdPath, attrs, 0L, basePath, new Date());
       index.create(TransferredResource.class, resource);

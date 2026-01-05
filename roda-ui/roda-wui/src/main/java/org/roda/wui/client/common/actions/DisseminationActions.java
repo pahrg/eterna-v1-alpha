@@ -13,21 +13,20 @@ import java.util.List;
 import java.util.Set;
 
 import org.roda.core.data.common.RodaConstants;
+import org.roda.core.data.v2.generics.DeleteRequest;
 import org.roda.core.data.v2.index.select.SelectedItems;
 import org.roda.core.data.v2.ip.IndexedDIP;
 import org.roda.core.data.v2.ip.Permissions;
-import org.roda.core.data.v2.jobs.Job;
 import org.roda.wui.client.browse.BrowseTop;
-import org.roda.wui.client.browse.BrowserService;
 import org.roda.wui.client.browse.EditPermissions;
 import org.roda.wui.client.common.LastSelectedItemsSingleton;
-import org.roda.wui.client.common.actions.callbacks.ActionLoadingAsyncCallback;
 import org.roda.wui.client.common.actions.callbacks.ActionNoAsyncCallback;
 import org.roda.wui.client.common.actions.model.ActionableBundle;
 import org.roda.wui.client.common.actions.model.ActionableGroup;
 import org.roda.wui.client.common.dialogs.Dialogs;
 import org.roda.wui.client.ingest.process.ShowJob;
 import org.roda.wui.client.process.CreateSelectedJob;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.tools.HistoryUtils;
 import org.roda.wui.common.client.tools.RestUtils;
 import org.roda.wui.common.client.widgets.Toast;
@@ -35,7 +34,6 @@ import org.roda.wui.common.client.widgets.Toast;
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.regexp.shared.RegExp;
 import com.google.gwt.safehtml.shared.SafeUri;
-import com.google.gwt.user.client.History;
 import com.google.gwt.user.client.Window;
 import com.google.gwt.user.client.rpc.AsyncCallback;
 
@@ -58,21 +56,12 @@ public class DisseminationActions extends AbstractActionable<IndexedDIP> {
     this.permissions = permissions;
   }
 
-  public enum DisseminationAction implements Action<IndexedDIP> {
-    DOWNLOAD(), REMOVE(RodaConstants.PERMISSION_METHOD_DELETE_DIP),
-    NEW_PROCESS(RodaConstants.PERMISSION_METHOD_CREATE_JOB),
-    UPDATE_PERMISSIONS(RodaConstants.PERMISSION_METHOD_UPDATE_DIP_PERMISSIONS);
+  public static DisseminationActions get() {
+    return INSTANCE;
+  }
 
-    private List<String> methods;
-
-    DisseminationAction(String... methods) {
-      this.methods = Arrays.asList(methods);
-    }
-
-    @Override
-    public List<String> getMethods() {
-      return this.methods;
-    }
+  public static DisseminationActions get(Permissions permissions) {
+    return new DisseminationActions(permissions);
   }
 
   @Override
@@ -85,22 +74,34 @@ public class DisseminationActions extends AbstractActionable<IndexedDIP> {
     return DisseminationAction.valueOf(name);
   }
 
-  public static DisseminationActions get() {
-    return INSTANCE;
-  }
-
-  public static DisseminationActions get(Permissions permissions) {
-    return new DisseminationActions(permissions);
+  @Override
+  public CanActResult userCanAct(Action<IndexedDIP> action) {
+    return new CanActResult(hasPermissions(action, permissions), CanActResult.Reason.USER,
+      messages.reasonUserLacksPermission());
   }
 
   @Override
-  public boolean canAct(Action<IndexedDIP> action, IndexedDIP dip) {
-    return hasPermissions(action, dip.getPermissions()) && POSSIBLE_ACTIONS_ON_SINGLE_DISSEMINATION.contains(action);
+  public CanActResult userCanAct(Action<IndexedDIP> action, IndexedDIP dip) {
+    return new CanActResult(hasPermissions(action, dip.getPermissions()), CanActResult.Reason.USER,
+      messages.reasonUserLacksPermission());
   }
 
   @Override
-  public boolean canAct(Action<IndexedDIP> action, SelectedItems<IndexedDIP> selectedItems) {
-    return hasPermissions(action, permissions) && POSSIBLE_ACTIONS_ON_MULTIPLE_DISSEMINATIONS.contains(action);
+  public CanActResult contextCanAct(Action<IndexedDIP> action, IndexedDIP dip) {
+    return new CanActResult(POSSIBLE_ACTIONS_ON_SINGLE_DISSEMINATION.contains(action), CanActResult.Reason.CONTEXT,
+      messages.reasonCantActOnSingleObject());
+  }
+
+  @Override
+  public CanActResult userCanAct(Action<IndexedDIP> action, SelectedItems<IndexedDIP> selectedItems) {
+    return new CanActResult(hasPermissions(action, permissions), CanActResult.Reason.USER,
+      messages.reasonUserLacksPermission());
+  }
+
+  @Override
+  public CanActResult contextCanAct(Action<IndexedDIP> action, SelectedItems<IndexedDIP> selectedItems) {
+    return new CanActResult(POSSIBLE_ACTIONS_ON_MULTIPLE_DISSEMINATIONS.contains(action), CanActResult.Reason.CONTEXT,
+      messages.reasonCantActOnMultipleObjects());
   }
 
   @Override
@@ -143,47 +144,7 @@ public class DisseminationActions extends AbstractActionable<IndexedDIP> {
   }
 
   private void remove(final IndexedDIP dip, AsyncCallback<ActionImpact> callback) {
-    Dialogs.showConfirmDialog(messages.browseFileDipRepresentationConfirmTitle(),
-      messages.browseFileDipRepresentationConfirmMessage(), messages.dialogCancel(), messages.dialogYes(),
-      new ActionNoAsyncCallback<Boolean>(callback) {
-
-        @Override
-        public void onSuccess(Boolean confirmed) {
-          if (confirmed) {
-            Dialogs.showPromptDialog(messages.outcomeDetailTitle(), null, null, messages.outcomeDetailPlaceholder(),
-              RegExp.compile(".*"), messages.cancelButton(), messages.confirmButton(), false, false,
-              new ActionNoAsyncCallback<String>(callback) {
-
-                @Override
-                public void onSuccess(final String details) {
-                  BrowserService.Util.getInstance().deleteDIPs(objectToSelectedItems(dip, IndexedDIP.class), details,
-                    new ActionLoadingAsyncCallback<Job>(callback) {
-
-                      @Override
-                      public void onSuccessImpl(Job result) {
-                        Toast.showInfo(messages.runningInBackgroundTitle(), messages.runningInBackgroundDescription());
-
-                        Dialogs.showJobRedirectDialog(messages.removeJobCreatedMessage(), new AsyncCallback<Void>() {
-                          @Override
-                          public void onFailure(Throwable caught) {
-                            doActionCallbackDestroyed();
-                          }
-
-                          @Override
-                          public void onSuccess(final Void nothing) {
-                            doActionCallbackNone();
-                            HistoryUtils.newHistory(ShowJob.RESOLVER, result.getId());
-                          }
-                        });
-                      }
-                    });
-                }
-              });
-          } else {
-            doActionCallbackNone();
-          }
-        }
-      });
+    remove(objectToSelectedItems(dip, IndexedDIP.class), callback);
   }
 
   private void remove(final SelectedItems<IndexedDIP> selectedItems, final AsyncCallback<ActionImpact> callback) {
@@ -195,35 +156,41 @@ public class DisseminationActions extends AbstractActionable<IndexedDIP> {
         public void onSuccess(Boolean confirmed) {
           if (confirmed) {
             Dialogs.showPromptDialog(messages.outcomeDetailTitle(), null, null, messages.outcomeDetailPlaceholder(),
-              RegExp.compile(".*"), messages.cancelButton(), messages.confirmButton(), false, false,
+              RegExp.compile(".*"), messages.cancelButton(), messages.confirmButton(), false, true,
               new ActionNoAsyncCallback<String>(callback) {
 
                 @Override
                 public void onSuccess(final String details) {
-                  BrowserService.Util.getInstance().deleteDIPs(selectedItems, details,
-                    new ActionLoadingAsyncCallback<Job>(callback) {
+                  Services services = new Services("Delete DIPs", "delete");
+                  DeleteRequest deleteRequest = new DeleteRequest();
+                  deleteRequest.setSelectedItemsToDelete(selectedItems);
+                  deleteRequest.setDetails(details);
 
-                      @Override
-                      public void onSuccessImpl(Job result) {
-                        Toast.showInfo(messages.runningInBackgroundTitle(), messages.runningInBackgroundDescription());
+                  services.dipResource(s -> s.deleteIndexedDIPs(deleteRequest)).whenComplete((job, throwable) -> {
+                    if (throwable != null) {
+                      doActionCallbackNone();
+                      Toast.showError("Unable to perform the actions", "");
+                    } else {
+                      Toast.showInfo(messages.runningInBackgroundTitle(), messages.runningInBackgroundDescription());
 
-                        Dialogs.showJobRedirectDialog(messages.removeJobCreatedMessage(), new AsyncCallback<Void>() {
-                          @Override
-                          public void onFailure(Throwable caught) {
-                            doActionCallbackDestroyed();
-                            History.fireCurrentHistoryState();
-                          }
+                      Dialogs.showJobRedirectDialog(messages.removeJobCreatedMessage(), new AsyncCallback<Void>() {
+                        @Override
+                        public void onFailure(Throwable caught) {
+                          doActionCallbackDestroyed();
+                        }
 
-                          @Override
-                          public void onSuccess(final Void nothing) {
-                            doActionCallbackNone();
-                            HistoryUtils.newHistory(ShowJob.RESOLVER, result.getId());
-                          }
-                        });
-                      }
-                    });
+                        @Override
+                        public void onSuccess(final Void nothing) {
+                          doActionCallbackNone();
+                          HistoryUtils.newHistory(ShowJob.RESOLVER, job.getId());
+                        }
+                      });
+                    }
+                  });
                 }
               });
+          } else {
+            doActionCallbackNone();
           }
         }
       });
@@ -263,7 +230,7 @@ public class DisseminationActions extends AbstractActionable<IndexedDIP> {
 
     // MANAGEMENT
     ActionableGroup<IndexedDIP> managementGroup = new ActionableGroup<>(
-      messages.viewRepresentationFileDisseminationTitle());
+      messages.viewRepresentationFileDisseminationTitle(), "btn-edit");
     managementGroup.addButton(messages.downloadButton(), DisseminationAction.DOWNLOAD, ActionImpact.NONE,
       "btn-download");
     managementGroup.addButton(messages.removeButton(), DisseminationAction.REMOVE, ActionImpact.DESTROYED, "btn-ban");
@@ -277,5 +244,22 @@ public class DisseminationActions extends AbstractActionable<IndexedDIP> {
 
     dipActionableBundle.addGroup(managementGroup).addGroup(preservationGroup);
     return dipActionableBundle;
+  }
+
+  public enum DisseminationAction implements Action<IndexedDIP> {
+    DOWNLOAD(), REMOVE(RodaConstants.PERMISSION_METHOD_DELETE_DIP),
+    NEW_PROCESS(RodaConstants.PERMISSION_METHOD_CREATE_JOB),
+    UPDATE_PERMISSIONS(RodaConstants.PERMISSION_METHOD_UPDATE_DIP_PERMISSIONS);
+
+    private List<String> methods;
+
+    DisseminationAction(String... methods) {
+      this.methods = Arrays.asList(methods);
+    }
+
+    @Override
+    public List<String> getMethods() {
+      return this.methods;
+    }
   }
 }

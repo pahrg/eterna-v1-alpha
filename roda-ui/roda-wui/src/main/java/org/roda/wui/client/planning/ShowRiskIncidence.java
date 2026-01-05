@@ -10,12 +10,10 @@
  */
 package org.roda.wui.client.planning;
 
-import java.util.Arrays;
 import java.util.List;
 
 import org.roda.core.data.common.RodaConstants;
 import org.roda.core.data.v2.risks.RiskIncidence;
-import org.roda.wui.client.browse.BrowserService;
 import org.roda.wui.client.common.NoAsyncCallback;
 import org.roda.wui.client.common.UserLogin;
 import org.roda.wui.client.common.actions.Actionable;
@@ -23,9 +21,9 @@ import org.roda.wui.client.common.actions.RiskIncidenceActions;
 import org.roda.wui.client.common.actions.model.ActionableObject;
 import org.roda.wui.client.common.actions.widgets.ActionableWidgetBuilder;
 import org.roda.wui.client.common.utils.HtmlSnippetUtils;
-import org.roda.wui.client.common.utils.JavascriptUtils;
 import org.roda.wui.client.common.utils.SidebarUtils;
 import org.roda.wui.client.management.MemberManagement;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.HistoryResolver;
 import org.roda.wui.common.client.tools.HistoryUtils;
 import org.roda.wui.common.client.tools.ListUtils;
@@ -33,6 +31,7 @@ import org.roda.wui.common.client.tools.StringUtils;
 
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.i18n.client.DateTimeFormat;
+import com.google.gwt.i18n.client.LocaleInfo;
 import com.google.gwt.uibinder.client.UiBinder;
 import com.google.gwt.uibinder.client.UiField;
 import com.google.gwt.user.client.rpc.AsyncCallback;
@@ -83,13 +82,6 @@ public class ShowRiskIncidence extends Composite {
   private static MyUiBinder uiBinder = GWT.create(MyUiBinder.class);
   private static final ClientMessages messages = GWT.create(ClientMessages.class);
 
-  private static final List<String> fieldsToReturn = Arrays.asList(RodaConstants.INDEX_UUID,
-    RodaConstants.RISK_INCIDENCE_ID, RodaConstants.RISK_INCIDENCE_RISK_ID, RodaConstants.RISK_INCIDENCE_DESCRIPTION,
-    RodaConstants.RISK_INCIDENCE_STATUS, RodaConstants.RISK_INCIDENCE_SEVERITY,
-    RodaConstants.RISK_INCIDENCE_DETECTED_BY, RodaConstants.RISK_INCIDENCE_DETECTED_ON,
-    RodaConstants.RISK_INCIDENCE_MITIGATED_ON, RodaConstants.RISK_INCIDENCE_MITIGATED_BY,
-    RodaConstants.RISK_INCIDENCE_MITIGATED_DESCRIPTION);
-
   private RiskIncidence incidence;
 
   @UiField
@@ -111,7 +103,10 @@ public class ShowRiskIncidence extends Composite {
   Anchor riskLink;
 
   @UiField
-  Label descriptionKey, descriptionValue;
+  Label descriptionKey;
+
+  @UiField
+  Label descriptionValue;
 
   @UiField
   Label status;
@@ -126,13 +121,22 @@ public class ShowRiskIncidence extends Composite {
   Label detectedBy;
 
   @UiField
-  Label mitigatedOnKey, mitigatedOnValue;
+  Label mitigatedOnKey;
 
   @UiField
-  Label mitigatedByKey, mitigatedByValue;
+  Label mitigatedOnValue;
 
   @UiField
-  Label mitigatedDescriptionKey, mitigatedDescriptionValue;
+  Label mitigatedByKey;
+
+  @UiField
+  Label mitigatedByValue;
+
+  @UiField
+  Label mitigatedDescriptionKey;
+
+  @UiField
+  Label mitigatedDescriptionValue;
 
   @UiField
   SimplePanel actionsSidebar;
@@ -225,29 +229,23 @@ public class ShowRiskIncidence extends Composite {
     return instance;
   }
 
-  @Override
-  protected void onLoad() {
-    super.onLoad();
-    JavascriptUtils.stickSidebar();
-  }
-
   void resolve(List<String> historyTokens, final AsyncCallback<Widget> callback) {
     if (historyTokens.size() == 1) {
+
+      Services services = new Services("Retrieve risk incidences", "get");
+
       String riskIncidenceId = historyTokens.get(0);
-      BrowserService.Util.getInstance().retrieve(RiskIncidence.class.getName(), riskIncidenceId, fieldsToReturn,
-        new AsyncCallback<RiskIncidence>() {
 
-          @Override
-          public void onFailure(Throwable caught) {
-            callback.onFailure(caught);
-          }
-
-          @Override
-          public void onSuccess(RiskIncidence result) {
-            ShowRiskIncidence incidencePanel = new ShowRiskIncidence(result);
+      services.rodaEntityRestService(s -> s.findByUuid(riskIncidenceId, LocaleInfo.getCurrentLocale().getLocaleName()),
+        RiskIncidence.class).whenComplete((value, error) -> {
+          if (error != null) {
+            callback.onFailure(error);
+          } else if (value != null) {
+            ShowRiskIncidence incidencePanel = new ShowRiskIncidence(value);
             callback.onSuccess(incidencePanel);
           }
         });
+
     } else {
       HistoryUtils.newHistory(RiskIncidenceRegister.RESOLVER);
       callback.onSuccess(null);

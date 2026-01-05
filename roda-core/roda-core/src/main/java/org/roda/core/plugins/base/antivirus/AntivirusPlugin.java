@@ -25,7 +25,6 @@ import org.roda.core.data.exceptions.RequestNotValidException;
 import org.roda.core.data.v2.LiteOptionalWithCause;
 import org.roda.core.data.v2.ip.AIP;
 import org.roda.core.data.v2.ip.AIPState;
-import org.roda.core.data.v2.ip.StoragePath;
 import org.roda.core.data.v2.jobs.Job;
 import org.roda.core.data.v2.jobs.PluginState;
 import org.roda.core.data.v2.jobs.PluginType;
@@ -37,9 +36,9 @@ import org.roda.core.model.utils.ModelUtils;
 import org.roda.core.plugins.AbstractPlugin;
 import org.roda.core.plugins.Plugin;
 import org.roda.core.plugins.PluginException;
+import org.roda.core.plugins.PluginHelper;
 import org.roda.core.plugins.RODAObjectProcessingLogic;
 import org.roda.core.plugins.orchestrate.JobPluginInfo;
-import org.roda.core.plugins.PluginHelper;
 import org.roda.core.storage.DirectResourceAccess;
 import org.roda.core.storage.StorageService;
 import org.slf4j.Logger;
@@ -60,8 +59,8 @@ public class AntivirusPlugin extends AbstractPlugin<AIP> {
       LOGGER.debug("Loading antivirus class {}", antiVirusClassName);
       setAntiVirus((AntiVirus) Class.forName(antiVirusClassName).getDeclaredConstructor().newInstance());
       LOGGER.debug("Using antivirus {}", getAntiVirus().getClass().getName());
-    } catch (ClassNotFoundException | InstantiationException | IllegalAccessException |
-             InvocationTargetException | NoSuchMethodException e) {
+    } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | InvocationTargetException
+      | NoSuchMethodException e) {
       LOGGER.warn("Error loading antivirus", e);
     }
 
@@ -107,29 +106,28 @@ public class AntivirusPlugin extends AbstractPlugin<AIP> {
   }
 
   @Override
-  public Report execute(IndexService index, ModelService model, StorageService storage,
-    List<LiteOptionalWithCause> liteList) throws PluginException {
+  public Report execute(IndexService index, ModelService model, List<LiteOptionalWithCause> liteList)
+    throws PluginException {
     return PluginHelper.processObjects(this, new RODAObjectProcessingLogic<AIP>() {
       @Override
-      public void process(IndexService index, ModelService model, StorageService storage, Report report, Job cachedJob,
+      public void process(IndexService index, ModelService model, Report report, Job cachedJob,
         JobPluginInfo jobPluginInfo, Plugin<AIP> plugin, AIP object) {
-        preProcessAIP(index, model, storage, report, jobPluginInfo, cachedJob, object);
+        preProcessAIP(index, model, report, jobPluginInfo, cachedJob, object);
       }
-    }, index, model, storage, liteList);
+    }, index, model, liteList);
   }
 
-  private void preProcessAIP(IndexService index, ModelService model, StorageService storage, Report report,
-    JobPluginInfo jobPluginInfo, Job job, AIP aip) {
+  private void preProcessAIP(IndexService index, ModelService model, Report report, JobPluginInfo jobPluginInfo,
+    Job job, AIP aip) {
     PluginState reportState = PluginState.SUCCESS;
     Report reportItem = PluginHelper.initPluginReportItem(this, aip.getId(), AIP.class, AIPState.INGEST_PROCESSING);
 
     if (aip.getHasShallowFiles() != null && aip.getHasShallowFiles()) {
-      StorageService tmpStorageService = null;
+      StorageService tmpStorageService;
       try {
-        tmpStorageService = ModelUtils.resolveTemporaryResourceShallow(job.getId(), storage,
-          ModelUtils.getAIPStoragePath(aip.getId()));
+        tmpStorageService = model.resolveTemporaryResourceShallow(job.getId(), aip);
         processAIP(index, model, tmpStorageService, report, jobPluginInfo, job, aip, reportItem, reportState);
-      } catch (RequestNotValidException | GenericException e) {
+      } catch (GenericException | RequestNotValidException e) {
         LOGGER.error("Error processing AIP " + aip.getId(), e);
         reportState = PluginState.FAILURE;
         reportItem.setPluginState(reportState).setPluginDetails(e.getMessage());
@@ -143,11 +141,11 @@ public class AntivirusPlugin extends AbstractPlugin<AIP> {
         }
       }
     } else {
-      processAIP(index, model, storage, report, jobPluginInfo, job, aip, reportItem, reportState);
+      processAIP(index, model, null, report, jobPluginInfo, job, aip, reportItem, reportState);
     }
   }
 
-  private void processAIP(IndexService index, ModelService model, StorageService storage, Report report,
+  private void processAIP(IndexService index, ModelService model, StorageService tmpStorage, Report report,
     JobPluginInfo jobPluginInfo, Job job, AIP aip, Report reportItem, PluginState reportState) {
     PluginHelper.updatePartialJobReport(this, model, reportItem, false, job);
 
@@ -157,9 +155,12 @@ public class AntivirusPlugin extends AbstractPlugin<AIP> {
 
     try {
       LOGGER.debug("Checking if AIP {} is clean of virus", aip.getId());
-      StoragePath aipPath = ModelUtils.getAIPStoragePath(aip.getId());
 
-      directAccess = storage.getDirectAccess(aipPath);
+      if (tmpStorage != null) {
+        directAccess = model.getDirectAccess(aip, tmpStorage);
+      } else {
+        directAccess = model.getDirectAccess(aip);
+      }
       virusCheckResult = getAntiVirus().checkForVirus(directAccess.getPath());
       reportState = virusCheckResult.isClean() ? PluginState.SUCCESS : PluginState.FAILURE;
       reportItem.setPluginState(reportState).setPluginDetails(virusCheckResult.getReport());
@@ -258,14 +259,13 @@ public class AntivirusPlugin extends AbstractPlugin<AIP> {
   }
 
   @Override
-  public Report beforeAllExecute(IndexService index, ModelService model, StorageService storage)
-    throws PluginException {
+  public Report beforeAllExecute(IndexService index, ModelService model) throws PluginException {
     // do nothing
     return null;
   }
 
   @Override
-  public Report afterAllExecute(IndexService index, ModelService model, StorageService storage) throws PluginException {
+  public Report afterAllExecute(IndexService index, ModelService model) throws PluginException {
     // do nothing
     return null;
   }

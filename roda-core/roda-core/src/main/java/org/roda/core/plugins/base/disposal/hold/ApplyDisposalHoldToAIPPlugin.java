@@ -27,10 +27,10 @@ import org.roda.core.data.exceptions.InvalidParameterException;
 import org.roda.core.data.exceptions.NotFoundException;
 import org.roda.core.data.exceptions.RequestNotValidException;
 import org.roda.core.data.v2.LiteOptionalWithCause;
+import org.roda.core.data.v2.disposal.hold.DisposalHold;
+import org.roda.core.data.v2.disposal.metadata.DisposalHoldAIPMetadata;
 import org.roda.core.data.v2.ip.AIP;
 import org.roda.core.data.v2.ip.IndexedAIP;
-import org.roda.core.data.v2.ip.disposal.DisposalHold;
-import org.roda.core.data.v2.ip.disposal.aipMetadata.DisposalHoldAIPMetadata;
 import org.roda.core.data.v2.jobs.Job;
 import org.roda.core.data.v2.jobs.PluginParameter;
 import org.roda.core.data.v2.jobs.PluginState;
@@ -43,10 +43,9 @@ import org.roda.core.model.ModelService;
 import org.roda.core.plugins.AbstractPlugin;
 import org.roda.core.plugins.Plugin;
 import org.roda.core.plugins.PluginException;
+import org.roda.core.plugins.PluginHelper;
 import org.roda.core.plugins.RODAObjectsProcessingLogic;
 import org.roda.core.plugins.orchestrate.JobPluginInfo;
-import org.roda.core.plugins.PluginHelper;
-import org.roda.core.storage.StorageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,22 +54,33 @@ import org.slf4j.LoggerFactory;
  */
 public class ApplyDisposalHoldToAIPPlugin extends AbstractPlugin<AIP> {
   private static final Logger LOGGER = LoggerFactory.getLogger(ApplyDisposalHoldToAIPPlugin.class);
-
-  private String disposalHoldId;
-  private boolean override;
-
   private static final Map<String, PluginParameter> pluginParameters = new HashMap<>();
 
   static {
     pluginParameters.put(RodaConstants.PLUGIN_PARAMS_DISPOSAL_HOLD_ID,
-      new PluginParameter(RodaConstants.PLUGIN_PARAMS_DISPOSAL_HOLD_ID, "Disposal hold id",
-        PluginParameter.PluginParameterType.STRING, "", true, false, "Disposal hold identifier"));
+      PluginParameter
+        .getBuilder(RodaConstants.PLUGIN_PARAMS_DISPOSAL_HOLD_ID, "Disposal hold id",
+          PluginParameter.PluginParameterType.STRING)
+        .isMandatory(true).isReadOnly(false).withDescription("Disposal hold identifier").build());
 
     pluginParameters.put(RodaConstants.PLUGIN_PARAMS_DISPOSAL_HOLD_OVERRIDE,
-      new PluginParameter(RodaConstants.PLUGIN_PARAMS_DISPOSAL_HOLD_OVERRIDE, "Override disposal holds",
-        PluginParameter.PluginParameterType.BOOLEAN, "false", true, false,
-        "Lift all disposal holds associated and apply the selected disposal hold"));
+      PluginParameter
+        .getBuilder(RodaConstants.PLUGIN_PARAMS_DISPOSAL_HOLD_OVERRIDE, "Override disposal holds",
+          PluginParameter.PluginParameterType.BOOLEAN)
+        .withDefaultValue("false").isMandatory(true).isReadOnly(false)
+        .withDescription("Lift all disposal holds associated and apply the selected disposal hold").build());
 
+  }
+
+  private String disposalHoldId;
+  private boolean override;
+
+  public static String getStaticName() {
+    return "Apply disposal hold";
+  }
+
+  public static String getStaticDescription() {
+    return "";
   }
 
   @Override
@@ -98,17 +108,9 @@ public class ApplyDisposalHoldToAIPPlugin extends AbstractPlugin<AIP> {
     return "1.0";
   }
 
-  public static String getStaticName() {
-    return "Apply disposal hold";
-  }
-
   @Override
   public String getName() {
     return getStaticName();
-  }
-
-  public static String getStaticDescription() {
-    return "";
   }
 
   @Override
@@ -142,22 +144,21 @@ public class ApplyDisposalHoldToAIPPlugin extends AbstractPlugin<AIP> {
   }
 
   @Override
-  public Report beforeAllExecute(IndexService index, ModelService model, StorageService storage)
-    throws PluginException {
+  public Report beforeAllExecute(IndexService index, ModelService model) throws PluginException {
     // do nothing
     return null;
   }
 
   @Override
-  public Report execute(IndexService index, ModelService model, StorageService storage,
-    List<LiteOptionalWithCause> liteList) throws PluginException {
+  public Report execute(IndexService index, ModelService model, List<LiteOptionalWithCause> liteList)
+    throws PluginException {
     return PluginHelper.processObjects(this, new RODAObjectsProcessingLogic<AIP>() {
       @Override
-      public void process(IndexService index, ModelService model, StorageService storage, Report report, Job cachedJob,
+      public void process(IndexService index, ModelService model, Report report, Job cachedJob,
         JobPluginInfo jobPluginInfo, Plugin<AIP> plugin, List<AIP> objects) {
         processAIP(index, model, objects, report, jobPluginInfo, cachedJob);
       }
-    }, index, model, storage, liteList);
+    }, index, model, liteList);
   }
 
   private void processAIP(IndexService index, ModelService model, List<AIP> aips, Report report,
@@ -266,7 +267,7 @@ public class ApplyDisposalHoldToAIPPlugin extends AbstractPlugin<AIP> {
 
       if (disposalHold.getFirstTimeUsed() == null) {
         disposalHold.setFirstTimeUsed(new Date());
-        model.updateDisposalHold(disposalHold, cachedJob.getUsername());
+        model.updateDisposalHoldFirstUseDate(disposalHold, cachedJob.getUsername());
       }
 
       reportItem.setPluginState(state).addPluginDetails("Disposal hold '" + disposalHold.getTitle() + "' ("
@@ -312,7 +313,7 @@ public class ApplyDisposalHoldToAIPPlugin extends AbstractPlugin<AIP> {
                   + " are disassociated from AIP " + transitiveAIP.getId();
                 model.createEvent(transitiveAIP.getId(), null, null, null, POLICY_ASSIGNMENT,
                   LiftDisposalHoldPlugin.getStaticName(), null, null, state, outcomeLiftText, "",
-                  cachedJob.getUsername(), true);
+                  cachedJob.getUsername(), true, null);
               }
             }
           }
@@ -347,7 +348,7 @@ public class ApplyDisposalHoldToAIPPlugin extends AbstractPlugin<AIP> {
   }
 
   @Override
-  public Report afterAllExecute(IndexService index, ModelService model, StorageService storage) throws PluginException {
+  public Report afterAllExecute(IndexService index, ModelService model) throws PluginException {
     // do nothing
     return null;
   }

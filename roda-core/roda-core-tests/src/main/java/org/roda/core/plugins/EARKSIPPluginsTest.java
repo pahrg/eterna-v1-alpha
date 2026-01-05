@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 
+import com.google.common.collect.Lists;
 import org.roda.core.CorporaConstants;
 import org.roda.core.RodaCoreFactory;
 import org.roda.core.TestsHelper;
@@ -57,6 +58,7 @@ import org.roda.core.plugins.base.ingest.EARKSIP2ToAIPPlugin;
 import org.roda.core.plugins.base.ingest.EARKSIPToAIPPlugin;
 import org.roda.core.plugins.base.maintenance.FixAncestorsPlugin;
 import org.roda.core.plugins.base.maintenance.reindex.ReindexAIPPlugin;
+import org.roda.core.security.LdapUtilityTestHelper;
 import org.roda.core.storage.fs.FSUtils;
 import org.roda.core.util.IdUtils;
 import org.slf4j.Logger;
@@ -69,8 +71,6 @@ import org.testng.annotations.Test;
 
 import com.google.common.collect.Iterables;
 
-import jersey.repackaged.com.google.common.collect.Lists;
-
 @Test(groups = {RodaConstants.TEST_GROUP_ALL, RodaConstants.TEST_GROUP_DEV, RodaConstants.TEST_GROUP_TRAVIS})
 public class EARKSIPPluginsTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(EARKSIPPluginsTest.class);
@@ -81,6 +81,7 @@ public class EARKSIPPluginsTest {
 
   private ModelService model;
   private IndexService index;
+  private LdapUtilityTestHelper ldapUtilityTestHelper;
 
   private Path corporaPath;
 
@@ -121,7 +122,7 @@ public class EARKSIPPluginsTest {
     throws RequestNotValidException, NotFoundException, GenericException, AlreadyExistsException,
     AuthorizationDeniedException {
     String aipType = RodaConstants.AIP_TYPE_MIXED;
-    AIP root = model.createAIP(null, aipType, new Permissions(), RodaConstants.ADMIN);
+    AIP root = model.createAIP(null, aipType, new Permissions(), RodaConstants.ADMIN, null);
 
     Map<String, String> parameters = new HashMap<>();
     parameters.put(RodaConstants.PLUGIN_PARAMS_PARENT_ID, root.getId());
@@ -150,7 +151,7 @@ public class EARKSIPPluginsTest {
     throws RequestNotValidException, NotFoundException, GenericException, AlreadyExistsException,
     AuthorizationDeniedException, IOException, IsStillUpdatingException {
     String aipType = RodaConstants.AIP_TYPE_MIXED;
-    AIP root = model.createAIP(null, aipType, new Permissions(), RodaConstants.ADMIN);
+    AIP root = model.createAIP(null, aipType, new Permissions(), RodaConstants.ADMIN, null);
 
     Map<String, String> parameters = new HashMap<>();
     parameters.put(RodaConstants.PLUGIN_PARAMS_PARENT_ID, root.getId());
@@ -191,6 +192,7 @@ public class EARKSIPPluginsTest {
   @BeforeClass
   public void setUp() throws IOException, URISyntaxException {
     basePath = TestsHelper.createBaseTempDir(getClass(), true);
+    ldapUtilityTestHelper = new LdapUtilityTestHelper();
 
     boolean deploySolr = true;
     boolean deployLdap = true;
@@ -199,7 +201,7 @@ public class EARKSIPPluginsTest {
     boolean deployPluginManager = true;
     boolean deployDefaultResources = false;
     RodaCoreFactory.instantiateTest(deploySolr, deployLdap, deployFolderMonitor, deployOrchestrator,
-      deployPluginManager, deployDefaultResources, false);
+      deployPluginManager, deployDefaultResources, false, ldapUtilityTestHelper.getLdapUtility());
     model = RodaCoreFactory.getModelService();
     index = RodaCoreFactory.getIndexService();
 
@@ -212,6 +214,7 @@ public class EARKSIPPluginsTest {
   @AfterClass
   public void tearDown() throws IOException, NotFoundException, GenericException {
     IndexTestUtils.resetIndex();
+    ldapUtilityTestHelper.shutdown();
     RodaCoreFactory.shutdown();
     FSUtils.deletePath(basePath);
   }
@@ -327,7 +330,7 @@ public class EARKSIPPluginsTest {
   private void ingestCorporaAncestors() throws RequestNotValidException, NotFoundException, GenericException,
     AlreadyExistsException, AuthorizationDeniedException, IOException, IsStillUpdatingException {
     String aipType = RodaConstants.AIP_TYPE_MIXED;
-    AIP root = model.createAIP(null, aipType, new Permissions(), RodaConstants.ADMIN);
+    AIP root = model.createAIP(null, aipType, new Permissions(), RodaConstants.ADMIN, null);
 
     Map<String, String> parameters = new HashMap<>();
     parameters.put(RodaConstants.PLUGIN_PARAMS_PARENT_ID, root.getId());

@@ -8,22 +8,21 @@
 package org.roda.wui.client.planning;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import org.roda.core.data.common.RodaConstants;
 import org.roda.core.data.exceptions.NotFoundException;
-import org.roda.core.data.v2.index.select.SelectedItemsList;
-import org.roda.core.data.v2.jobs.Job;
+import org.roda.core.data.v2.generics.select.SelectedItemsListRequest;
 import org.roda.core.data.v2.risks.IndexedRisk;
 import org.roda.core.data.v2.risks.Risk;
-import org.roda.wui.client.browse.BrowserService;
 import org.roda.wui.client.common.UserLogin;
 import org.roda.wui.client.common.dialogs.Dialogs;
 import org.roda.wui.client.common.utils.AsyncCallbackUtils;
-import org.roda.wui.client.common.utils.JavascriptUtils;
 import org.roda.wui.client.ingest.process.ShowJob;
 import org.roda.wui.client.management.MemberManagement;
 import org.roda.wui.client.process.InternalProcess;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.HistoryResolver;
 import org.roda.wui.common.client.tools.HistoryUtils;
 import org.roda.wui.common.client.tools.ListUtils;
@@ -31,6 +30,7 @@ import org.roda.wui.common.client.widgets.Toast;
 
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.event.dom.client.ClickEvent;
+import com.google.gwt.i18n.client.LocaleInfo;
 import com.google.gwt.uibinder.client.UiBinder;
 import com.google.gwt.uibinder.client.UiField;
 import com.google.gwt.uibinder.client.UiHandler;
@@ -49,21 +49,19 @@ public class EditRisk extends Composite {
     @Override
     public void resolve(List<String> historyTokens, final AsyncCallback<Widget> callback) {
       if (historyTokens.size() == 1) {
+        Services service = new Services("Retrieve indexed risk", "get");
         String riskId = historyTokens.get(0);
-        BrowserService.Util.getInstance().retrieve(Risk.class.getName(), riskId, fieldsToReturn,
-          new AsyncCallback<IndexedRisk>() {
 
-            @Override
-            public void onFailure(Throwable caught) {
-              callback.onFailure(caught);
-            }
-
-            @Override
-            public void onSuccess(IndexedRisk risk) {
-              EditRisk editRisk = new EditRisk(risk);
+        service.rodaEntityRestService(s -> s.findByUuid(riskId, LocaleInfo.getCurrentLocale().getLocaleName()),
+          IndexedRisk.class).whenComplete((value, error) -> {
+            if (error != null) {
+              callback.onFailure(error);
+            } else if (value != null) {
+              EditRisk editRisk = new EditRisk(value);
               callback.onSuccess(editRisk);
             }
           });
+
       } else {
         HistoryUtils.newHistory(RiskRegister.RESOLVER);
         callback.onSuccess(null);
@@ -131,30 +129,20 @@ public class EditRisk extends Composite {
     initWidget(uiBinder.createAndBindUi(this));
   }
 
-  @Override
-  protected void onLoad() {
-    super.onLoad();
-    JavascriptUtils.stickSidebar();
-  }
-
   @UiHandler("buttonApply")
   void buttonApplyHandler(ClickEvent e) {
     if (riskDataPanel.isChanged() && riskDataPanel.isValid()) {
+      Services services = new Services("Edit indexed risk", "update");
       final String riskId = risk.getId();
       risk = riskDataPanel.getRisk();
       risk.setId(riskId);
-      BrowserService.Util.getInstance().updateRisk(risk, incidences, new AsyncCallback<Void>() {
 
-        @Override
-        public void onFailure(Throwable caught) {
-          errorMessage(caught);
-        }
-
-        @Override
-        public void onSuccess(Void result) {
+      services.riskResource(s -> s.updateRisk(risk)).whenComplete((value, error) -> {
+        if (error != null) {
+          errorMessage(error);
+        } else {
           HistoryUtils.newHistory(ShowRisk.RESOLVER, riskId);
         }
-
       });
     } else {
       HistoryUtils.newHistory(ShowRisk.RESOLVER, risk.getId());
@@ -163,15 +151,12 @@ public class EditRisk extends Composite {
 
   @UiHandler("buttonRemove")
   void buttonRemoveHandler(ClickEvent e) {
-    BrowserService.Util.getInstance().deleteRisk(
-      new SelectedItemsList<>(Arrays.asList(risk.getUUID()), IndexedRisk.class.getName()), new AsyncCallback<Job>() {
-        @Override
-        public void onFailure(Throwable caught) {
+    Services service = new Services("Remove risk", "remove");
+    service.riskResource(s -> s.deleteRisk(new SelectedItemsListRequest(Collections.singletonList(risk.getUUID()))))
+      .whenComplete((value, error) -> {
+        if (error != null) {
           HistoryUtils.newHistory(InternalProcess.RESOLVER);
-        }
-
-        @Override
-        public void onSuccess(Job result) {
+        } else if (value != null) {
           Dialogs.showJobRedirectDialog(messages.removeJobCreatedMessage(), new AsyncCallback<Void>() {
 
             @Override
@@ -188,7 +173,7 @@ public class EditRisk extends Composite {
 
             @Override
             public void onSuccess(final Void nothing) {
-              HistoryUtils.newHistory(ShowJob.RESOLVER, result.getId());
+              HistoryUtils.newHistory(ShowJob.RESOLVER, value.getId());
             }
           });
         }

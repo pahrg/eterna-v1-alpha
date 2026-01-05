@@ -15,11 +15,10 @@ import org.roda.core.data.exceptions.NotFoundException;
 import org.roda.core.data.v2.risks.IncidenceStatus;
 import org.roda.core.data.v2.risks.RiskIncidence;
 import org.roda.core.data.v2.risks.SeverityLevel;
-import org.roda.wui.client.browse.BrowserService;
 import org.roda.wui.client.common.UserLogin;
 import org.roda.wui.client.common.utils.HtmlSnippetUtils;
-import org.roda.wui.client.common.utils.JavascriptUtils;
 import org.roda.wui.client.management.MemberManagement;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.HistoryResolver;
 import org.roda.wui.common.client.tools.HistoryUtils;
 import org.roda.wui.common.client.tools.ListUtils;
@@ -28,6 +27,7 @@ import org.roda.wui.common.client.widgets.Toast;
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.event.dom.client.ClickEvent;
 import com.google.gwt.i18n.client.DateTimeFormat;
+import com.google.gwt.i18n.client.LocaleInfo;
 import com.google.gwt.uibinder.client.UiBinder;
 import com.google.gwt.uibinder.client.UiField;
 import com.google.gwt.uibinder.client.UiHandler;
@@ -38,7 +38,6 @@ import com.google.gwt.user.client.ui.Composite;
 import com.google.gwt.user.client.ui.Label;
 import com.google.gwt.user.client.ui.ListBox;
 import com.google.gwt.user.client.ui.TextArea;
-import com.google.gwt.user.client.ui.TextBox;
 import com.google.gwt.user.client.ui.Widget;
 import com.google.gwt.user.datepicker.client.DateBox;
 import com.google.gwt.user.datepicker.client.DateBox.DefaultFormat;
@@ -52,21 +51,18 @@ public class EditRiskIncidence extends Composite {
     @Override
     public void resolve(List<String> historyTokens, final AsyncCallback<Widget> callback) {
       if (historyTokens.size() == 1) {
+        Services service = new Services("Retrieve incidence risk", "get");
         String riskIncidenceId = historyTokens.get(0);
-        BrowserService.Util.getInstance().retrieve(RiskIncidence.class.getName(), riskIncidenceId, fieldsToReturn,
-          new AsyncCallback<RiskIncidence>() {
-
-            @Override
-            public void onFailure(Throwable caught) {
-              callback.onFailure(caught);
-            }
-
-            @Override
-            public void onSuccess(RiskIncidence incidence) {
-              EditRiskIncidence editIncidence = new EditRiskIncidence(incidence);
+        service.rodaEntityRestService(s -> s.findByUuid(riskIncidenceId, LocaleInfo.getCurrentLocale().getLocaleName()),
+          RiskIncidence.class).whenComplete((value, error) -> {
+            if (error != null) {
+              callback.onFailure(error);
+            } else if (value != null) {
+              EditRiskIncidence editIncidence = new EditRiskIncidence(value);
               callback.onSuccess(editIncidence);
             }
           });
+
       } else {
         HistoryUtils.newHistory(RepresentationInformationNetwork.RESOLVER);
         callback.onSuccess(null);
@@ -132,12 +128,6 @@ public class EditRiskIncidence extends Composite {
   ListBox status, severity;
 
   @UiField
-  DateBox mitigatedOn;
-
-  @UiField
-  TextBox mitigatedBy;
-
-  @UiField
   TextArea mitigatedDescription;
 
   /**
@@ -165,13 +155,8 @@ public class EditRiskIncidence extends Composite {
     detectedBy.setText(incidence.getDetectedBy());
 
     DefaultFormat dateFormat = new DateBox.DefaultFormat(DateTimeFormat.getFormat("yyyy-MM-dd"));
-    mitigatedOn.setFormat(dateFormat);
-    mitigatedOn.getDatePicker().setYearArrowsVisible(true);
-    mitigatedOn.setFireNullValues(true);
-    mitigatedOn.setValue(incidence.getMitigatedOn());
 
     description.setText(incidence.getDescription());
-    mitigatedBy.setText(incidence.getMitigatedBy());
     mitigatedDescription.setText(incidence.getMitigatedDescription());
 
     int selectedIndex = 0;
@@ -197,43 +182,30 @@ public class EditRiskIncidence extends Composite {
     severity.setSelectedIndex(selectedIndex - 1);
   }
 
-  @Override
-  protected void onLoad() {
-    super.onLoad();
-    JavascriptUtils.stickSidebar();
-  }
-
   public void getRiskIncidence() {
     incidence.setDescription(description.getText());
     incidence.setStatus(IncidenceStatus.valueOf(status.getSelectedValue()));
     incidence.setSeverity(SeverityLevel.valueOf(severity.getSelectedValue()));
-    incidence.setMitigatedOn(mitigatedOn.getValue());
-    incidence.setMitigatedBy(mitigatedBy.getText());
     incidence.setMitigatedDescription(mitigatedDescription.getText());
   }
 
   public void clear() {
     description.setText("");
-    mitigatedOn.setValue(null);
-    mitigatedBy.setText("");
     mitigatedDescription.setText("");
   }
 
   @UiHandler("buttonApply")
   void buttonApplyHandler(ClickEvent e) {
     getRiskIncidence();
-    BrowserService.Util.getInstance().updateRiskIncidence(incidence, new AsyncCallback<Void>() {
 
-      @Override
-      public void onFailure(Throwable caught) {
-        errorMessage(caught);
-      }
+    Services service = new Services("Edit risk incidence", "update");
 
-      @Override
-      public void onSuccess(Void result) {
+    service.riskIncidenceResource(s -> s.updateRiskIncidence(incidence)).whenComplete((value, error) -> {
+      if (error != null) {
+        errorMessage(error);
+      } else {
         HistoryUtils.newHistory(ShowRiskIncidence.RESOLVER, incidence.getId());
       }
-
     });
   }
 

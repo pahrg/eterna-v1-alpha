@@ -13,7 +13,7 @@ import java.util.Set;
 
 import org.roda.core.data.v2.user.RODAMember;
 import org.roda.core.data.v2.user.User;
-import org.roda.wui.client.browse.MetadataValue;
+import org.roda.core.data.v2.generics.MetadataValue;
 import org.roda.wui.client.browse.bundle.UserExtraBundle;
 import org.roda.wui.client.common.NoAsyncCallback;
 import org.roda.wui.client.common.UserLogin;
@@ -23,8 +23,9 @@ import org.roda.wui.client.common.actions.model.ActionableObject;
 import org.roda.wui.client.common.actions.widgets.ActionableWidgetBuilder;
 import org.roda.wui.client.common.utils.FormUtilities;
 import org.roda.wui.client.common.utils.HtmlSnippetUtils;
-import org.roda.wui.client.common.utils.JavascriptUtils;
 import org.roda.wui.client.common.utils.SidebarUtils;
+import org.roda.wui.client.management.access.AccessKeyTablePanel;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.HistoryResolver;
 import org.roda.wui.common.client.tools.ConfigurationManager;
 import org.roda.wui.common.client.tools.HistoryUtils;
@@ -54,17 +55,13 @@ public class ShowUser extends Composite {
     public void resolve(List<String> historyTokens, final AsyncCallback<Widget> callback) {
       if (historyTokens.size() == 1) {
         String username = historyTokens.get(0);
-        UserManagementService.Util.getInstance().retrieveUser(username, new AsyncCallback<User>() {
-
-          @Override
-          public void onFailure(Throwable caught) {
-            callback.onFailure(caught);
-          }
-
-          @Override
-          public void onSuccess(User user) {
+        Services services = new Services("Get User", "get");
+        services.membersResource(s -> s.getUser(username)).whenComplete((user, error) -> {
+          if (user != null) {
             ShowUser showUser = new ShowUser(user);
             callback.onSuccess(showUser);
+          } else if (error != null) {
+            callback.onFailure(error);
           }
         });
       } else {
@@ -88,34 +85,29 @@ public class ShowUser extends Composite {
       return "show_user";
     }
   };
-
-  interface MyUiBinder extends UiBinder<Widget, ShowUser> {
-  }
-
-  private static MyUiBinder uiBinder = GWT.create(MyUiBinder.class);
-
   private static final ClientMessages messages = GWT.create(ClientMessages.class);
-
-  private ActionableWidgetBuilder<RODAMember> actionableWidgetBuilder;
+  private static MyUiBinder uiBinder = GWT.create(MyUiBinder.class);
   private final User user;
-
-  private UserExtraBundle userExtraBundle = null;
-
   @UiField
-  Label userNameValue, fullnameValue, emailValue;
-
+  Label userNameValue;
+  @UiField
+  Label fullnameValue;
+  @UiField
+  Label emailValue;
   @UiField
   HTML stateValue;
-
   @UiField
-  FlowPanel extraValue, permissionList, groupList;
-
+  FlowPanel extraValue;
+  @UiField
+  FlowPanel permissionList;
+  @UiField
+  FlowPanel groupList;
+  @UiField
+  FlowPanel accessKeyTablePanel;
   @UiField
   SimplePanel actionsSidebar;
-
   @UiField
   FlowPanel contentFlowPanel;
-
   @UiField
   FlowPanel sidebarFlowPanel;
 
@@ -134,6 +126,10 @@ public class ShowUser extends Composite {
     // Extra fields
     loadExtraFields();
 
+    if (!user.getExtra().isEmpty()) {
+      HtmlSnippetUtils.createExtraShow(extraValue, user.getExtra(), false);
+    }
+
     // Groups
     if (user.getGroups().isEmpty()) {
       groupList.add(new Label(messages.showUserEmptyGroupList()));
@@ -146,10 +142,12 @@ public class ShowUser extends Composite {
     // Permissions
     buildPermissionList();
 
+    accessKeyTablePanel.add(new AccessKeyTablePanel(user.getId()));
+
     // Sidebar
     RODAMemberActions rodaMemberActions = RODAMemberActions.get();
-    actionableWidgetBuilder = new ActionableWidgetBuilder<>(rodaMemberActions).withBackButton()
-      .withActionCallback(new NoAsyncCallback<Actionable.ActionImpact>() {
+    ActionableWidgetBuilder<RODAMember> actionableWidgetBuilder = new ActionableWidgetBuilder<>(rodaMemberActions)
+      .withBackButton().withActionCallback(new NoAsyncCallback<Actionable.ActionImpact>() {
         @Override
         public void onSuccess(Actionable.ActionImpact result) {
           if (result.equals(Actionable.ActionImpact.DESTROYED)) {
@@ -243,9 +241,6 @@ public class ShowUser extends Composite {
     return panel;
   }
 
-  @Override
-  protected void onLoad() {
-    super.onLoad();
-    JavascriptUtils.stickSidebar();
+  interface MyUiBinder extends UiBinder<Widget, ShowUser> {
   }
 }

@@ -9,10 +9,14 @@ package org.roda.wui.servlets;
 
 import java.io.Serial;
 
+import jakarta.servlet.annotation.WebServlet;
 import org.apache.commons.configuration.ConfigurationException;
 import org.roda.core.RodaCoreFactory;
+import org.roda.core.model.utils.LdapUtility;
+import org.roda.wui.security.SecurityObserverImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
@@ -22,9 +26,14 @@ public class RodaWuiServlet extends HttpServlet {
   @Serial
   private static final long serialVersionUID = 1523530268219980563L;
 
+  @Autowired
+  LdapUtility ldapUtility;
+
   @Override
   public void init() throws ServletException {
     LOGGER.info("Starting up RODA, please wait...");
+
+    RodaCoreFactory.setLdapUtility(ldapUtility);
     RodaCoreFactory.instantiate();
     if (!RodaCoreFactory.instantiatedWithoutErrors()) {
       LOGGER.error(
@@ -47,6 +56,7 @@ public class RodaWuiServlet extends HttpServlet {
       LOGGER.error("RODA WUI configurations could not be injected!", e);
     }
 
+    RodaCoreFactory.getPluginManager().registerSecurityObserver(new SecurityObserverImpl());
     RodaCoreFactory.addLogger("logback_wui.xml");
 
     LOGGER.info("RODA started with success!");

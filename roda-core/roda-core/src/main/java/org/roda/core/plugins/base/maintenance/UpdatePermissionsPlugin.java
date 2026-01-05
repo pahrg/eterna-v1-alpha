@@ -43,10 +43,9 @@ import org.roda.core.model.ModelService;
 import org.roda.core.plugins.AbstractPlugin;
 import org.roda.core.plugins.Plugin;
 import org.roda.core.plugins.PluginException;
+import org.roda.core.plugins.PluginHelper;
 import org.roda.core.plugins.RODAObjectProcessingLogic;
 import org.roda.core.plugins.orchestrate.JobPluginInfo;
-import org.roda.core.plugins.PluginHelper;
-import org.roda.core.storage.StorageService;
 
 public class UpdatePermissionsPlugin<T extends IsRODAObject> extends AbstractPlugin<T> {
   private Permissions permissions;
@@ -56,20 +55,22 @@ public class UpdatePermissionsPlugin<T extends IsRODAObject> extends AbstractPlu
 
   private static Map<String, PluginParameter> pluginParameters = new HashMap<>();
   static {
-    pluginParameters.put(RodaConstants.PLUGIN_PARAMS_PERMISSIONS_JSON,
-      new PluginParameter(RodaConstants.PLUGIN_PARAMS_PERMISSIONS_JSON, "Permission object in JSON",
-        PluginParameterType.STRING, "", false, false, "Permission object in JSON."));
+    pluginParameters.put(RodaConstants.PLUGIN_PARAMS_PERMISSIONS_JSON, PluginParameter
+      .getBuilder(RodaConstants.PLUGIN_PARAMS_PERMISSIONS_JSON, "Permission object in JSON", PluginParameterType.STRING)
+      .isMandatory(false).withDescription("Permission object in JSON.").build());
 
-    pluginParameters.put(RodaConstants.PLUGIN_PARAMS_DETAILS, new PluginParameter(RodaConstants.PLUGIN_PARAMS_DETAILS,
-      "Event details", PluginParameterType.STRING, "", false, false, "Details that will be used when creating event"));
+    pluginParameters.put(RodaConstants.PLUGIN_PARAMS_DETAILS,
+      PluginParameter.getBuilder(RodaConstants.PLUGIN_PARAMS_DETAILS, "Event details", PluginParameterType.STRING)
+        .isMandatory(false).withDescription("Details that will be used when creating event").build());
 
     pluginParameters.put(RodaConstants.PLUGIN_PARAMS_EVENT_DESCRIPTION,
-      new PluginParameter(RodaConstants.PLUGIN_PARAMS_EVENT_DESCRIPTION, "Event description",
-        PluginParameterType.STRING, "", false, false, "Description that will be used when creating event"));
+      PluginParameter
+        .getBuilder(RodaConstants.PLUGIN_PARAMS_EVENT_DESCRIPTION, "Event description", PluginParameterType.STRING)
+        .isMandatory(false).withDescription("Description that will be used when creating event").build());
 
     pluginParameters.put(RodaConstants.PLUGIN_PARAMS_RECURSIVE,
-      new PluginParameter(RodaConstants.PLUGIN_PARAMS_RECURSIVE, "Recursive mode", PluginParameterType.BOOLEAN, "true",
-        true, false, "Execute in recursive mode."));
+      PluginParameter.getBuilder(RodaConstants.PLUGIN_PARAMS_RECURSIVE, "Recursive mode", PluginParameterType.BOOLEAN)
+        .withDefaultValue("true").withDescription("Execute in recursive mode.").build());
   }
 
   @Override
@@ -131,20 +132,20 @@ public class UpdatePermissionsPlugin<T extends IsRODAObject> extends AbstractPlu
   }
 
   @Override
-  public Report execute(IndexService index, ModelService model, StorageService storage,
-    List<LiteOptionalWithCause> liteList) throws PluginException {
+  public Report execute(IndexService index, ModelService model, List<LiteOptionalWithCause> liteList)
+    throws PluginException {
 
     return PluginHelper.processObjects(this, new RODAObjectProcessingLogic<T>() {
       @Override
-      public void process(IndexService index, ModelService model, StorageService storage, Report report, Job cachedJob,
+      public void process(IndexService index, ModelService model, Report report, Job cachedJob,
         JobPluginInfo jobPluginInfo, Plugin<T> plugin, T object) {
-        if (object instanceof AIP) {
-          processAIP(model, index, report, jobPluginInfo, cachedJob, (AIP) object);
-        } else if (object instanceof DIP) {
-          processDIP(model, report, jobPluginInfo, cachedJob, (DIP) object);
+        if (object instanceof AIP aip) {
+          processAIP(model, index, report, jobPluginInfo, cachedJob, aip);
+        } else if (object instanceof DIP dip) {
+          processDIP(model, report, jobPluginInfo, cachedJob, dip);
         }
       }
-    }, index, model, storage, liteList);
+    }, index, model, liteList);
   }
 
   private void processAIP(ModelService model, IndexService index, Report report, JobPluginInfo jobPluginInfo, Job job,
@@ -182,7 +183,7 @@ public class UpdatePermissionsPlugin<T extends IsRODAObject> extends AbstractPlu
       List<LinkingIdentifier> sources = Arrays
         .asList(PluginHelper.getLinkingIdentifier(aip.getId(), RodaConstants.PRESERVATION_LINKING_OBJECT_OUTCOME));
       model.createEvent(aip.getId(), null, null, null, PreservationEventType.UPDATE, eventDescription, sources, null,
-        state, outcome, details, job.getUsername(), true);
+        state, outcome, details, job.getUsername(), true, null);
     }
   }
 
@@ -206,13 +207,12 @@ public class UpdatePermissionsPlugin<T extends IsRODAObject> extends AbstractPlu
   }
 
   @Override
-  public Report beforeAllExecute(IndexService index, ModelService model, StorageService storage)
-    throws PluginException {
+  public Report beforeAllExecute(IndexService index, ModelService model) throws PluginException {
     return new Report();
   }
 
   @Override
-  public Report afterAllExecute(IndexService index, ModelService model, StorageService storage) throws PluginException {
+  public Report afterAllExecute(IndexService index, ModelService model) throws PluginException {
     return new Report();
   }
 

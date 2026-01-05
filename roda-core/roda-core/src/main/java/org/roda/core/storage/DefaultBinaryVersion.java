@@ -62,17 +62,17 @@ public class DefaultBinaryVersion implements BinaryVersion {
   }
 
   @Override
-  public String toString() {
-    return "DefaultBinaryVersion [binary=" + binary + ", id=" + id + ", createdDate=" + createdDate + ", properties="
-      + properties + "]";
-  }
-
-  @Override
   public Map<String, String> getProperties() {
     return properties;
   }
 
   public void setProperties(Map<String, String> properties) {
     this.properties = properties;
+  }
+
+  @Override
+  public String toString() {
+    return "DefaultBinaryVersion [binary=" + binary + ", id=" + id + ", createdDate=" + createdDate + ", properties="
+      + properties + "]";
   }
 }

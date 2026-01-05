@@ -10,12 +10,13 @@ package org.roda.core.storage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.Path;
 import java.util.Date;
 
 import org.apache.commons.io.IOUtils;
-import org.roda.core.common.ConsumesSkipableOutputStream;
+import org.roda.core.data.v2.ConsumesOutputStream;
 
-public class BinaryConsumesOutputStream implements ConsumesSkipableOutputStream {
+public class BinaryConsumesOutputStream implements ConsumesOutputStream {
 
   private static final String DEFAULT_MIME_TYPE = "application/octet-stream";
   private final Binary binary;
@@ -38,13 +39,6 @@ public class BinaryConsumesOutputStream implements ConsumesSkipableOutputStream 
   }
 
   @Override
-  public void consumeOutputStream(OutputStream out, int from, int len) throws IOException {
-    try (InputStream in = binary.getContent().createInputStream()) {
-      IOUtils.copyLarge(in, out, from, len);
-    }
-  }
-
-  @Override
   public Date getLastModified() {
     return null;
   }
@@ -63,5 +57,4 @@ public class BinaryConsumesOutputStream implements ConsumesSkipableOutputStream 
   public String getMediaType() {
     return mediaType;
   }
-
 }

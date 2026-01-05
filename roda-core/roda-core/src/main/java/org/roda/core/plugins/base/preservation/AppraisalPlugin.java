@@ -31,6 +31,7 @@ import org.roda.core.data.v2.ip.IndexedAIP;
 import org.roda.core.data.v2.ip.metadata.IndexedPreservationEvent;
 import org.roda.core.data.v2.ip.metadata.LinkingIdentifier;
 import org.roda.core.data.v2.ip.metadata.PreservationMetadata;
+import org.roda.core.data.v2.jobs.IndexedJob;
 import org.roda.core.data.v2.jobs.IndexedReport;
 import org.roda.core.data.v2.jobs.Job;
 import org.roda.core.data.v2.jobs.PluginParameter;
@@ -49,7 +50,6 @@ import org.roda.core.plugins.RODAObjectsProcessingLogic;
 import org.roda.core.plugins.base.ingest.AutoAcceptSIPPlugin;
 import org.roda.core.plugins.orchestrate.JobPluginInfo;
 import org.roda.core.storage.ContentPayload;
-import org.roda.core.storage.StorageService;
 import org.roda.core.storage.utils.RODAInstanceUtils;
 import org.roda.core.util.IdUtils;
 
@@ -60,12 +60,14 @@ public class AppraisalPlugin extends AbstractPlugin<AIP> {
   private static Map<String, PluginParameter> pluginParameters = new HashMap<>();
   static {
     pluginParameters.put(RodaConstants.PLUGIN_PARAMS_ACCEPT,
-      new PluginParameter(RodaConstants.PLUGIN_PARAMS_ACCEPT, "Appraisal accept or reject", PluginParameterType.BOOLEAN,
-        "true", false, false, "Allows to accept or reject intellectual entities."));
+      PluginParameter
+        .getBuilder(RodaConstants.PLUGIN_PARAMS_ACCEPT, "Appraisal accept or reject", PluginParameterType.BOOLEAN)
+        .withDefaultValue("true").isMandatory(false)
+        .withDescription("Allows to accept or reject intellectual entities.").build());
 
     pluginParameters.put(RodaConstants.PLUGIN_PARAMS_REJECT_REASON,
-      new PluginParameter(RodaConstants.PLUGIN_PARAMS_REJECT_REASON, "Reject reason", PluginParameterType.STRING, "",
-        false, false, "Appraisal reject reason"));
+      PluginParameter.getBuilder(RodaConstants.PLUGIN_PARAMS_REJECT_REASON, "Reject reason", PluginParameterType.STRING)
+        .isMandatory(false).withDescription("Appraisal reject reason").build());
   }
 
   @Override
@@ -114,15 +116,15 @@ public class AppraisalPlugin extends AbstractPlugin<AIP> {
   }
 
   @Override
-  public Report execute(IndexService index, ModelService model, StorageService storage,
+  public Report execute(IndexService index, ModelService model,
     List<LiteOptionalWithCause> liteList) throws PluginException {
     return PluginHelper.processObjects(this, new RODAObjectsProcessingLogic<AIP>() {
       @Override
-      public void process(IndexService index, ModelService model, StorageService storage, Report report, Job cachedJob,
+      public void process(IndexService index, ModelService model, Report report, Job cachedJob,
         JobPluginInfo jobPluginInfo, Plugin<AIP> plugin, List<AIP> objects) {
         processAIP(model, index, report, jobPluginInfo, cachedJob, objects);
       }
-    }, index, model, storage, liteList);
+    }, index, model, liteList);
   }
 
   private void processAIP(ModelService model, IndexService index, Report report, JobPluginInfo jobPluginInfo, Job job,
@@ -135,7 +137,7 @@ public class AppraisalPlugin extends AbstractPlugin<AIP> {
       String userAgentId;
       try {
         PreservationMetadata pm = PremisV3Utils.createOrUpdatePremisUserAgentBinary(job.getUsername(), model, index,
-          true, job);
+          true, job.getJobUsersDetails());
         linkingIdentifierAgent.setValue(pm.getId());
       } catch (AlreadyExistsException e) {
         linkingIdentifierAgent
@@ -225,7 +227,7 @@ public class AppraisalPlugin extends AbstractPlugin<AIP> {
 
           model.createRepositoryEvent(PreservationEventType.APPRAISAL,
             "The process of updating an non active object of the repository", state, outcomeText.toString(), null,
-            job.getUsername(), true);
+            job.getUsername(), true, null);
           reportItem.setPluginState(state).setPluginDetails(outcomeText.toString());
           report.addReport(reportItem);
           PluginHelper.updatePartialJobReport(this, model, reportItem, true, job);
@@ -254,7 +256,7 @@ public class AppraisalPlugin extends AbstractPlugin<AIP> {
         model.createOrUpdateJob(ingestJob);
       }
 
-      index.commit(IndexedAIP.class, Job.class, IndexedReport.class, IndexedPreservationEvent.class);
+      index.commit(IndexedAIP.class, IndexedJob.class, IndexedReport.class, IndexedPreservationEvent.class);
 
     } catch (GenericException | RequestNotValidException | NotFoundException | AuthorizationDeniedException e) {
       report.setPluginState(PluginState.FAILURE).setPluginDetails("Failed to update job counters");
@@ -262,13 +264,13 @@ public class AppraisalPlugin extends AbstractPlugin<AIP> {
   }
 
   @Override
-  public Report beforeAllExecute(IndexService index, ModelService model, StorageService storage)
+  public Report beforeAllExecute(IndexService index, ModelService model)
     throws PluginException {
     return new Report();
   }
 
   @Override
-  public Report afterAllExecute(IndexService index, ModelService model, StorageService storage) throws PluginException {
+  public Report afterAllExecute(IndexService index, ModelService model) throws PluginException {
     return new Report();
   }
 

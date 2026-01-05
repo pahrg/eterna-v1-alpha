@@ -66,6 +66,7 @@ import org.roda.core.data.v2.log.LogEntryState;
 import org.roda.core.data.v2.user.Group;
 import org.roda.core.data.v2.user.User;
 import org.roda.core.model.utils.ModelUtils;
+import org.roda.core.security.LdapUtilityTestHelper;
 import org.roda.core.storage.Binary;
 import org.roda.core.storage.DefaultStoragePath;
 import org.roda.core.storage.StorageService;
@@ -80,12 +81,12 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 
 import gov.loc.premis.v3.AgentComplexType;
 import gov.loc.premis.v3.EventComplexType;
 import gov.loc.premis.v3.ObjectCharacteristicsComplexType;
 import gov.loc.premis.v3.ObjectIdentifierComplexType;
-import jersey.repackaged.com.google.common.collect.Lists;
 
 /**
  * Unit tests for ModelService
@@ -108,6 +109,7 @@ public class ModelServiceTest {
   private static ModelService model;
   private static StorageService corporaService;
   private static int fileCounter = 0;
+  private static LdapUtilityTestHelper ldapUtilityTestHelper;
 
   @BeforeClass
   public static void setUp() throws IOException, URISyntaxException, GenericException {
@@ -122,6 +124,7 @@ public class ModelServiceTest {
   @BeforeClass
   public void init() throws IOException, GenericException {
     basePath = TestsHelper.createBaseTempDir(getClass(), true);
+    ldapUtilityTestHelper = new LdapUtilityTestHelper();
 
     boolean deploySolr = false;
     boolean deployLdap = true;
@@ -130,7 +133,7 @@ public class ModelServiceTest {
     boolean deployPluginManager = false;
     boolean deployDefaultResources = false;
     RodaCoreFactory.instantiateTest(deploySolr, deployLdap, deployFolderMonitor, deployOrchestrator,
-      deployPluginManager, deployDefaultResources, false);
+      deployPluginManager, deployDefaultResources, false, ldapUtilityTestHelper.getLdapUtility());
 
     logPath = RodaCoreFactory.getLogPath();
     storage = RodaCoreFactory.getStorageService();
@@ -140,6 +143,7 @@ public class ModelServiceTest {
   // @AfterMethod
   @AfterClass
   public void cleanup() throws NotFoundException, GenericException, IOException {
+    ldapUtilityTestHelper.shutdown();
     RodaCoreFactory.shutdown();
     // FSUtils.deletePath(basePath);
   }
@@ -179,9 +183,7 @@ public class ModelServiceTest {
     assertEquals(CorporaConstants.DESCRIPTIVE_METADATA_TYPE, descMetadata.getType());
     assertEquals(CorporaConstants.DESCRIPTIVE_METADATA_VERSION, descMetadata.getVersion());
 
-    StoragePath descriptiveMetadataPath = ModelUtils.getDescriptiveMetadataStoragePath(descMetadata.getAipId(),
-      descMetadata.getId());
-    final Binary descMetadataBinary = storage.getBinary(descriptiveMetadataPath);
+    final Binary descMetadataBinary = model.getBinary(descMetadata);
     assertTrue(descMetadataBinary.getSizeInBytes() > 0);
     assertEquals(descMetadataBinary.getSizeInBytes().intValue(),
       IOUtils.toByteArray(descMetadataBinary.getContent().createInputStream()).length);
@@ -222,7 +224,7 @@ public class ModelServiceTest {
     assertEquals(CorporaConstants.REPRESENTATION_1_ID, file_1_1.getRepresentationId());
     assertEquals(CorporaConstants.REPRESENTATION_1_FILE_1_ID, file_1_1.getId());
 
-    final Binary binary_1_1 = storage.getBinary(ModelUtils.getFileStoragePath(file_1_1));
+    final Binary binary_1_1 = model.getBinary(file_1_1);
     assertTrue(binary_1_1.getSizeInBytes() > 0);
     assertEquals(binary_1_1.getSizeInBytes().intValue(),
       IOUtils.toByteArray(binary_1_1.getContent().createInputStream()).length);
@@ -233,7 +235,7 @@ public class ModelServiceTest {
     assertEquals(CorporaConstants.REPRESENTATION_1_ID, file_1_2.getRepresentationId());
     assertEquals(CorporaConstants.REPRESENTATION_1_FILE_2_ID, file_1_2.getId());
 
-    final Binary binary_1_2 = storage.getBinary(ModelUtils.getFileStoragePath(file_1_2));
+    final Binary binary_1_2 = model.getBinary(file_1_2);
     assertTrue(binary_1_2.getSizeInBytes() > 0);
     assertEquals(binary_1_2.getSizeInBytes().intValue(),
       IOUtils.toByteArray(binary_1_2.getContent().createInputStream()).length);
@@ -244,7 +246,7 @@ public class ModelServiceTest {
     assertEquals(CorporaConstants.REPRESENTATION_2_ID, file_2_1.getRepresentationId());
     assertEquals(CorporaConstants.REPRESENTATION_2_FILE_1_ID, file_2_1.getId());
 
-    final Binary binary_2_1 = storage.getBinary(ModelUtils.getFileStoragePath(file_2_1));
+    final Binary binary_2_1 = model.getBinary(file_2_1);
     assertTrue(binary_2_1.getSizeInBytes() > 0);
     assertEquals(binary_2_1.getSizeInBytes().intValue(),
       IOUtils.toByteArray(binary_2_1.getContent().createInputStream()).length);
@@ -255,7 +257,7 @@ public class ModelServiceTest {
     assertEquals(CorporaConstants.REPRESENTATION_2_ID, file_2_2.getRepresentationId());
     assertEquals(CorporaConstants.REPRESENTATION_2_FILE_2_ID, file_2_2.getId());
 
-    final Binary binary_2_2 = storage.getBinary(ModelUtils.getFileStoragePath(file_2_2));
+    final Binary binary_2_2 = model.getBinary(file_2_2);
     assertTrue(binary_2_2.getSizeInBytes() > 0);
     assertEquals(binary_2_2.getSizeInBytes().intValue(),
       IOUtils.toByteArray(binary_2_2.getContent().createInputStream()).length);
@@ -329,9 +331,7 @@ public class ModelServiceTest {
     assertEquals(CorporaConstants.DESCRIPTIVE_METADATA_TYPE_EAD, descMetadata.getType());
     assertEquals(CorporaConstants.DESCRIPTIVE_METADATA_TYPE_EAD_VERSION3, descMetadata.getVersion());
 
-    StoragePath descriptiveMetadataPath = ModelUtils.getDescriptiveMetadataStoragePath(descMetadata.getAipId(),
-      descMetadata.getId());
-    final Binary descMetadataBinary = storage.getBinary(descriptiveMetadataPath);
+    final Binary descMetadataBinary = model.getBinary(descMetadata);
     assertTrue(descMetadataBinary.getSizeInBytes() > 0);
     assertEquals(descMetadataBinary.getSizeInBytes().intValue(),
       IOUtils.toByteArray(descMetadataBinary.getContent().createInputStream()).length);
@@ -375,9 +375,7 @@ public class ModelServiceTest {
     assertEquals(CorporaConstants.DESCRIPTIVE_METADATA_TYPE_EAD, descMetadata.getType());
     assertEquals(CorporaConstants.DESCRIPTIVE_METADATA_TYPE_EAD_VERSIONUNKNOWN, descMetadata.getVersion());
 
-    StoragePath descriptiveMetadataPath = ModelUtils.getDescriptiveMetadataStoragePath(descMetadata.getAipId(),
-      descMetadata.getId());
-    final Binary descMetadataBinary = storage.getBinary(descriptiveMetadataPath);
+    final Binary descMetadataBinary = model.getBinary(descMetadata);
     assertTrue(descMetadataBinary.getSizeInBytes() > 0);
     assertEquals(descMetadataBinary.getSizeInBytes().intValue(),
       IOUtils.toByteArray(descMetadataBinary.getContent().createInputStream()).length);
@@ -593,8 +591,7 @@ public class ModelServiceTest {
     assertEquals(newDescriptiveMetadata, retrievedDescriptiveMetadata);
 
     // check content
-    Binary newDescriptiveMetadataBinary = storage
-      .getBinary(ModelUtils.getDescriptiveMetadataStoragePath(newDescriptiveMetadata));
+    Binary newDescriptiveMetadataBinary = model.getBinary(newDescriptiveMetadata);
     assertTrue(IOUtils.contentEquals(binary.getContent().createInputStream(),
       newDescriptiveMetadataBinary.getContent().createInputStream()));
 
@@ -627,13 +624,12 @@ public class ModelServiceTest {
     assertEquals(updatedDescriptiveMetadata, retrievedDescriptiveMetadata);
 
     // check content
-    StoragePath storagePath = ModelUtils.getDescriptiveMetadataStoragePath(updatedDescriptiveMetadata);
-    Binary updatedDescriptiveMetadataBinary = storage.getBinary(storagePath);
+    Binary updatedDescriptiveMetadataBinary = model.getBinary(updatedDescriptiveMetadata);
     assertTrue(IOUtils.contentEquals(binary.getContent().createInputStream(),
       updatedDescriptiveMetadataBinary.getContent().createInputStream()));
 
     // check if binary version was created
-    assertEquals(1, Iterables.size(storage.listBinaryVersions(storagePath)));
+    assertEquals(1, Iterables.size(model.listBinaryVersions(updatedDescriptiveMetadata)));
 
     // check if binary version message collisions are well treated
     model.updateDescriptiveMetadata(aipId, CorporaConstants.DESCRIPTIVE_METADATA_ID, binary.getContent(),
@@ -646,7 +642,7 @@ public class ModelServiceTest {
       CorporaConstants.OTHER_DESCRIPTIVE_METADATA_TYPE, CorporaConstants.OTHER_DESCRIPTIVE_METADATA_VERSION, properties,
       RodaConstants.ADMIN);
 
-    assertEquals(4, Iterables.size(storage.listBinaryVersions(storagePath)));
+    assertEquals(4, Iterables.size(model.listBinaryVersions(updatedDescriptiveMetadata)));
 
     // cleanup
     model.deleteAIP(aipId);
@@ -804,7 +800,7 @@ public class ModelServiceTest {
     assertEquals(createdFile, retrievedFile);
 
     // check content
-    Binary createdFileBinary = storage.getBinary(ModelUtils.getFileStoragePath(createdFile));
+    Binary createdFileBinary = model.getBinary(createdFile);
     assertTrue(IOUtils.contentEquals(binary.getContent().createInputStream(),
       createdFileBinary.getContent().createInputStream()));
 
@@ -835,7 +831,7 @@ public class ModelServiceTest {
     assertEquals(createdFile, retrievedFile);
 
     // check content
-    Binary createdFileBinary = storage.getBinary(ModelUtils.getFileStoragePath(createdFile));
+    Binary createdFileBinary = model.getBinary(createdFile);
     assertTrue(IOUtils.contentEquals(binary.getContent().createInputStream(),
       createdFileBinary.getContent().createInputStream()));
 

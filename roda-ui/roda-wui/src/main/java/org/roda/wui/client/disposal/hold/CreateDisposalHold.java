@@ -9,12 +9,11 @@ package org.roda.wui.client.disposal.hold;
 
 import java.util.List;
 
-import org.roda.core.data.v2.ip.disposal.DisposalHold;
-import org.roda.wui.client.browse.BrowserService;
-import org.roda.wui.client.common.NoAsyncCallback;
+import org.roda.core.data.v2.disposal.hold.DisposalHold;
 import org.roda.wui.client.common.UserLogin;
-import org.roda.wui.client.common.utils.JavascriptUtils;
+import org.roda.wui.client.common.utils.AsyncCallbackUtils;
 import org.roda.wui.client.disposal.policy.DisposalPolicy;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.HistoryResolver;
 import org.roda.wui.common.client.tools.HistoryUtils;
 import org.roda.wui.common.client.tools.ListUtils;
@@ -58,24 +57,15 @@ public class CreateDisposalHold extends Composite {
       return "create_disposal_hold";
     }
   };
-
-  interface MyUiBinder extends UiBinder<Widget, CreateDisposalHold> {
-  }
-
-  private static CreateDisposalHold.MyUiBinder uiBinder = GWT.create(CreateDisposalHold.MyUiBinder.class);
-
-  private DisposalHold disposalHold;
-
   private static final ClientMessages messages = GWT.create(ClientMessages.class);
-
+  private static CreateDisposalHold.MyUiBinder uiBinder = GWT.create(CreateDisposalHold.MyUiBinder.class);
   @UiField
   Button buttonApply;
-
   @UiField
   Button buttonCancel;
-
   @UiField(provided = true)
   DisposalHoldDataPanel disposalHoldDataPanel;
+  private DisposalHold disposalHold;
 
   public CreateDisposalHold(DisposalHold disposalHold) {
     this.disposalHold = disposalHold;
@@ -84,22 +74,19 @@ public class CreateDisposalHold extends Composite {
     initWidget(uiBinder.createAndBindUi(this));
   }
 
-  @Override
-  protected void onLoad() {
-    super.onLoad();
-    JavascriptUtils.stickSidebar();
-  }
-
   @UiHandler("buttonApply")
   void buttonApplyHandler(ClickEvent e) {
     if (disposalHoldDataPanel.isValid()) {
       disposalHold = disposalHoldDataPanel.getDisposalHold();
-      BrowserService.Util.getInstance().createDisposalHold(disposalHold, new NoAsyncCallback<DisposalHold>() {
-        @Override
-        public void onSuccess(DisposalHold disposalHold) {
-          HistoryUtils.newHistory(DisposalPolicy.RESOLVER);
-        }
-      });
+      Services services = new Services("Create disposal hold", "create");
+      services.disposalHoldResource(s -> s.createDisposalHold(disposalHold))
+        .whenComplete((disposalHold1, throwable) -> {
+          if (throwable != null) {
+            AsyncCallbackUtils.defaultFailureTreatment(throwable);
+          } else {
+            HistoryUtils.newHistory(DisposalPolicy.RESOLVER);
+          }
+        });
     }
 
   }
@@ -111,6 +98,9 @@ public class CreateDisposalHold extends Composite {
 
   private void cancel() {
     HistoryUtils.newHistory(DisposalPolicy.RESOLVER);
+  }
+
+  interface MyUiBinder extends UiBinder<Widget, CreateDisposalHold> {
   }
 
 }

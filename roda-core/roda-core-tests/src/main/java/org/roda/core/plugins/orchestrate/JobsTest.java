@@ -62,6 +62,7 @@ import org.roda.core.plugins.base.PluginThatStopsItself;
 import org.roda.core.plugins.base.PluginThatTestsLocking;
 import org.roda.core.plugins.base.antivirus.AntivirusPlugin;
 import org.roda.core.plugins.base.maintenance.reindex.ReindexAIPPlugin;
+import org.roda.core.security.LdapUtilityTestHelper;
 import org.roda.core.storage.StringContentPayload;
 import org.roda.core.storage.fs.FSUtils;
 import org.roda.core.util.IdUtils;
@@ -79,11 +80,13 @@ public class JobsTest {
 
   private static ModelService model;
   private static IndexService index;
+  private static LdapUtilityTestHelper ldapUtilityTestHelper;
   private static Path basePath;
 
   @BeforeClass
   public void setUp() throws Exception {
     basePath = TestsHelper.createBaseTempDir(getClass(), true);
+    ldapUtilityTestHelper = new LdapUtilityTestHelper();
 
     boolean deploySolr = true;
     boolean deployLdap = true;
@@ -92,7 +95,7 @@ public class JobsTest {
     boolean deployPluginManager = true;
     boolean deployDefaultResources = false;
     RodaCoreFactory.instantiateTest(deploySolr, deployLdap, deployFolderMonitor, deployOrchestrator,
-      deployPluginManager, deployDefaultResources, false);
+      deployPluginManager, deployDefaultResources, false, ldapUtilityTestHelper.getLdapUtility());
 
     model = RodaCoreFactory.getModelService();
     index = RodaCoreFactory.getIndexService();
@@ -103,6 +106,7 @@ public class JobsTest {
   @AfterClass
   public void tearDown() throws Exception {
     IndexTestUtils.resetIndex();
+    ldapUtilityTestHelper.shutdown();
     RodaCoreFactory.shutdown();
     FSUtils.deletePath(basePath);
   }
@@ -182,8 +186,8 @@ public class JobsTest {
     JobsHelper.setBlockSize(1);
 
     ModelService modelService = RodaCoreFactory.getModelService();
-    String aip1 = modelService.createAIP(null, "misc", new Permissions(), RodaConstants.ADMIN).getId();
-    String aip2 = modelService.createAIP(null, "misc", new Permissions(), RodaConstants.ADMIN).getId();
+    String aip1 = modelService.createAIP(null, "misc", new Permissions(), RodaConstants.ADMIN, null).getId();
+    String aip2 = modelService.createAIP(null, "misc", new Permissions(), RodaConstants.ADMIN, null).getId();
 
     Map<String, String> parameters = new HashMap<>();
     Job job;
@@ -238,7 +242,7 @@ public class JobsTest {
     try {
       for (int i = 0; i < 30; i++) {
         aips.add(modelService
-          .createAIP(null, RodaConstants.REPRESENTATION_TYPE_MIXED, new Permissions(), RodaConstants.ADMIN).getId());
+          .createAIP(null, RodaConstants.REPRESENTATION_TYPE_MIXED, new Permissions(), RodaConstants.ADMIN, null).getId());
       }
     } catch (AlreadyExistsException e) {
       // do nothing
@@ -288,7 +292,7 @@ public class JobsTest {
     ModelService modelService = RodaCoreFactory.getModelService();
     IndexService indexService = RodaCoreFactory.getIndexService();
     AIP aip = modelService.createAIP(null, RodaConstants.REPRESENTATION_TYPE_MIXED, new Permissions(),
-      RodaConstants.ADMIN);
+      RodaConstants.ADMIN, null);
 
     Map<String, String> parameters = new HashMap<>();
     parameters.put(PluginThatTestsLocking.PLUGIN_PARAM_AUTO_LOCKING, "true");
@@ -324,7 +328,7 @@ public class JobsTest {
     ModelService modelService = RodaCoreFactory.getModelService();
     IndexService indexService = RodaCoreFactory.getIndexService();
     AIP aip = modelService.createAIP(null, RodaConstants.REPRESENTATION_TYPE_MIXED, new Permissions(),
-      RodaConstants.ADMIN);
+      RodaConstants.ADMIN, null);
 
     Map<String, String> parameters = new HashMap<>();
     parameters.put(PluginThatTestsLocking.PLUGIN_PARAM_AUTO_LOCKING, "false");
@@ -366,8 +370,8 @@ public class JobsTest {
   }
 
   @Test
-  public void testRunPluginWithFilter() throws AuthorizationDeniedException, RequestNotValidException, NotFoundException,
-    GenericException, AlreadyExistsException {
+  public void testRunPluginWithFilter() throws AuthorizationDeniedException, RequestNotValidException,
+    NotFoundException, GenericException, AlreadyExistsException {
     for (int i = 0; i < 20; i++) {
       createSampleAIP(false);
     }
@@ -436,7 +440,7 @@ public class JobsTest {
   private AIP createSampleAIP(boolean createRepresentation, boolean createFiles, int numberOfFiles)
     throws AuthorizationDeniedException, RequestNotValidException, AlreadyExistsException, NotFoundException,
     GenericException {
-    AIP aip = model.createAIP(null, "", new Permissions(), RodaConstants.ADMIN);
+    AIP aip = model.createAIP(null, "", new Permissions(), RodaConstants.ADMIN, null);
     if (createRepresentation) {
       Representation representation = model.createRepresentation(aip.getId(), IdUtils.createUUID(), true, "", true,
         RodaConstants.ADMIN);

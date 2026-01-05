@@ -26,10 +26,10 @@ import org.apache.pekko.dispatch.OnComplete;
 import org.apache.pekko.pattern.Patterns;
 import org.apache.pekko.util.Timeout;
 import org.roda.core.RodaCoreFactory;
-import org.roda.core.common.pekko.PekkoUtils;
+import org.roda.core.common.iterables.CloseableIterable;
 import org.roda.core.common.pekko.DeadLetterActor;
 import org.roda.core.common.pekko.Messages;
-import org.roda.core.common.iterables.CloseableIterable;
+import org.roda.core.common.pekko.PekkoUtils;
 import org.roda.core.common.pekko.messages.jobs.JobPartialUpdate;
 import org.roda.core.common.pekko.messages.jobs.JobStateUpdated;
 import org.roda.core.common.pekko.messages.jobs.JobsManagerNotLockableAtTheTime;
@@ -54,6 +54,7 @@ import org.roda.core.data.v2.index.IsIndexed;
 import org.roda.core.data.v2.index.filter.Filter;
 import org.roda.core.data.v2.index.select.SelectedItems;
 import org.roda.core.data.v2.index.select.SelectedItemsList;
+import org.roda.core.data.v2.jobs.IndexedJob;
 import org.roda.core.data.v2.jobs.Job;
 import org.roda.core.data.v2.jobs.Job.JOB_STATE;
 import org.roda.core.data.v2.jobs.JobParallelism;
@@ -118,7 +119,8 @@ public class PekkoEmbeddedPluginOrchestrator implements PluginOrchestrator {
     // 20170105 hsilva: subscribe all dead letter so they are logged
     jobsSystem.eventStream().subscribe(jobsSystem.actorOf(Props.create(DeadLetterActor.class)), AllDeadLetters.class);
 
-    jobsManager = jobsSystem.actorOf(Props.create(PekkoJobsManager.class, maxNumberOfJobsInParallel, maxNumberOfLimitedJobsInParallel), "jobsManager");
+    jobsManager = jobsSystem.actorOf(
+      Props.create(PekkoJobsManager.class, maxNumberOfJobsInParallel, maxNumberOfLimitedJobsInParallel), "jobsManager");
 
   }
 
@@ -512,11 +514,11 @@ public class PekkoEmbeddedPluginOrchestrator implements PluginOrchestrator {
   @Override
   public void cleanUnfinishedJobsAsync() {
     List<String> unfinishedJobsIdsList = new ArrayList<>();
-    try (IterableIndexResult<Job> result = JobsHelper.findUnfinishedJobs(index)) {
+    try (IterableIndexResult<IndexedJob> result = JobsHelper.findUnfinishedJobs(index)) {
       // set all jobs state to TO_BE_CLEANED
-      for (Job job : result) {
-        unfinishedJobsIdsList.add(job.getId());
-        Job jobToUpdate = model.retrieveJob(job.getId());
+      for (IndexedJob indexedJob : result) {
+        unfinishedJobsIdsList.add(indexedJob.getId());
+        Job jobToUpdate = model.retrieveJob(indexedJob.getId());
         jobToUpdate.setState(JOB_STATE.TO_BE_CLEANED);
         model.createOrUpdateJob(jobToUpdate);
       }

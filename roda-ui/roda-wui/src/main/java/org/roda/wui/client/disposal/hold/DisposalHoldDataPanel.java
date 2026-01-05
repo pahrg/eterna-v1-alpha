@@ -10,11 +10,13 @@ package org.roda.wui.client.disposal.hold;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.google.gwt.event.dom.client.KeyUpHandler;
-import org.roda.core.data.v2.ip.disposal.DisposalHold;
+import com.google.gwt.event.dom.client.ChangeEvent;
+import com.google.gwt.event.dom.client.KeyUpEvent;
+import org.roda.core.data.v2.disposal.hold.DisposalHold;
 
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.event.dom.client.ChangeHandler;
+import com.google.gwt.event.dom.client.KeyUpHandler;
 import com.google.gwt.event.logical.shared.HasValueChangeHandlers;
 import com.google.gwt.event.logical.shared.ValueChangeEvent;
 import com.google.gwt.event.logical.shared.ValueChangeHandler;
@@ -30,41 +32,31 @@ import com.google.gwt.user.client.ui.TextBox;
 import com.google.gwt.user.client.ui.Widget;
 
 import config.i18n.client.ClientMessages;
+import org.roda.wui.client.disposal.schedule.DisposalScheduleDataPanel;
 
 /**
  * @author Tiago Fraga <tfraga@keep.pt>
  */
 public class DisposalHoldDataPanel extends Composite implements HasValueChangeHandlers<DisposalHold> {
 
-  interface MyUiBinder extends UiBinder<Widget, DisposalHoldDataPanel> {
-  }
-
-  private static DisposalHoldDataPanel.MyUiBinder uiBinder = GWT.create(DisposalHoldDataPanel.MyUiBinder.class);
-
   private static final ClientMessages messages = GWT.create(ClientMessages.class);
-
+  private static DisposalHoldDataPanel.MyUiBinder uiBinder = GWT.create(DisposalHoldDataPanel.MyUiBinder.class);
   @UiField
   TextBox title;
-
   @UiField
   Label titleError;
-
   @UiField
   TextBox description;
-
   @UiField
   TextBox mandate;
-
   @UiField
   TextArea notes;
-
+  @UiField
+  HTML errors;
   private boolean editMode;
 
   private boolean changed = false;
   private boolean checked = false;
-
-  @UiField
-  HTML errors;
 
   public DisposalHoldDataPanel(DisposalHold disposalHold, boolean editMode) {
     initWidget(uiBinder.createAndBindUi(this));
@@ -72,23 +64,32 @@ public class DisposalHoldDataPanel extends Composite implements HasValueChangeHa
     this.editMode = editMode;
     errors.setVisible(false);
 
-    ChangeHandler changeHandler = event -> DisposalHoldDataPanel.this.onChange();
+    ChangeHandler changeHandler = new ChangeHandler() {
+      @Override
+      public void onChange(ChangeEvent event) {
+        DisposalHoldDataPanel.this.onChange();
+      }
+    };
 
-    KeyUpHandler keyUpHandler = event -> DisposalHoldDataPanel.this.onChange();
+    KeyUpHandler keyUpHandler = new KeyUpHandler() {
+      @Override
+      public void onKeyUp(KeyUpEvent keyUpEvent) {
+        DisposalHoldDataPanel.this.onChange();
+      }
+    };
 
     title.addChangeHandler(changeHandler);
     title.addKeyUpHandler(keyUpHandler);
+    description.addChangeHandler(changeHandler);
+    description.addKeyUpHandler(keyUpHandler);
+    mandate.addChangeHandler(changeHandler);
+    mandate.addKeyUpHandler(keyUpHandler);
+    notes.addChangeHandler(changeHandler);
+    notes.addKeyUpHandler(keyUpHandler);
 
     if (editMode) {
       setDisposalHold(disposalHold);
     }
-  }
-
-  public void setDisposalHold(DisposalHold disposalHold) {
-    this.title.setText(disposalHold.getTitle());
-    this.description.setText(disposalHold.getDescription());
-    this.mandate.setText(disposalHold.getMandate());
-    this.notes.setText(disposalHold.getScopeNotes());
   }
 
   public DisposalHold getDisposalHold() {
@@ -98,6 +99,13 @@ public class DisposalHoldDataPanel extends Composite implements HasValueChangeHa
     disposalHold.setMandate(mandate.getText());
     disposalHold.setScopeNotes(notes.getText());
     return disposalHold;
+  }
+
+  public void setDisposalHold(DisposalHold disposalHold) {
+    this.title.setText(disposalHold.getTitle());
+    this.description.setText(disposalHold.getDescription());
+    this.mandate.setText(disposalHold.getMandate());
+    this.notes.setText(disposalHold.getScopeNotes());
   }
 
   /**
@@ -165,6 +173,9 @@ public class DisposalHoldDataPanel extends Composite implements HasValueChangeHa
 
   public DisposalHold getValue() {
     return getDisposalHold();
+  }
+
+  interface MyUiBinder extends UiBinder<Widget, DisposalHoldDataPanel> {
   }
 
 }

@@ -10,7 +10,6 @@ package org.roda.core.common;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -24,8 +23,7 @@ import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPut;
-import org.apache.http.entity.StringEntity;
+import org.apache.http.client.methods.HttpPatch;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
@@ -38,20 +36,23 @@ import org.roda.core.data.exceptions.GenericException;
 import org.roda.core.data.exceptions.NotFoundException;
 import org.roda.core.data.exceptions.RequestNotValidException;
 import org.roda.core.data.utils.JsonUtils;
+import org.roda.core.data.v2.ConsumesOutputStream;
+import org.roda.core.data.v2.IsRODAObject;
+import org.roda.core.data.v2.StreamResponse;
 import org.roda.core.data.v2.accessToken.AccessToken;
 import org.roda.core.data.v2.index.IsIndexed;
 import org.roda.core.data.v2.index.filter.Filter;
 import org.roda.core.data.v2.index.filter.SimpleFilterParameter;
-import org.roda.core.data.v2.ip.StoragePath;
+import org.roda.core.data.v2.jobs.IndexedJob;
 import org.roda.core.data.v2.jobs.Job;
 import org.roda.core.data.v2.ri.RepresentationInformation;
 import org.roda.core.data.v2.risks.IndexedRisk;
+import org.roda.core.data.v2.risks.Risk;
 import org.roda.core.data.v2.synchronization.SynchronizingStatus;
 import org.roda.core.data.v2.synchronization.central.DistributedInstance;
 import org.roda.core.data.v2.synchronization.local.LocalInstance;
 import org.roda.core.index.utils.IterableIndexResult;
-import org.roda.core.model.utils.ModelUtils;
-import org.roda.core.storage.StorageService;
+import org.roda.core.model.ModelService;
 import org.roda.core.storage.fs.FSUtils;
 import org.roda.core.util.ZipUtility;
 import org.slf4j.Logger;
@@ -65,6 +66,10 @@ import com.fasterxml.jackson.core.JsonParser;
  */
 public class SyncUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(SyncUtils.class);
+
+  private SyncUtils() {
+    // private constructor
+  }
 
   /**
    * Central Bundle methods
@@ -83,12 +88,12 @@ public class SyncUtils {
     final Filter filter = new Filter();
     filter.add(new SimpleFilterParameter(RodaConstants.INDEX_INSTANCE_ID, instanceIdentifier));
     filter.add(new SimpleFilterParameter(RodaConstants.JOB_STATE, "CREATED"));
-    final IterableIndexResult<Job> jobs = RodaCoreFactory.getIndexService().findAll(Job.class, filter, true,
-      new ArrayList<>());
+    final IterableIndexResult<IndexedJob> jobs = RodaCoreFactory.getIndexService().findAll(IndexedJob.class, filter,
+      true, new ArrayList<>());
 
     final Path destinationPath = workingDir.resolve(RodaConstants.CORE_STORAGE_FOLDER)
       .resolve(RodaConstants.STORAGE_CONTAINER_JOB);
-    return createCentralPackage(ModelUtils.getJobContainerPath(), jobs, RodaConstants.JOB_FILE_EXTENSION,
+    return createCentralPackage(Job.class, jobs, RodaConstants.JOB_FILE_EXTENSION,
       destinationPath);
   }
 
@@ -101,7 +106,7 @@ public class SyncUtils {
     final Path destinationPath = workingDir.resolve(RodaConstants.CORE_STORAGE_FOLDER)
       .resolve(RodaConstants.STORAGE_CONTAINER_RISK);
 
-    return createCentralPackage(ModelUtils.getRiskContainerPath(), risks, RodaConstants.RISK_FILE_EXTENSION,
+    return createCentralPackage(Risk.class, risks, RodaConstants.RISK_FILE_EXTENSION,
       destinationPath);
   }
 
@@ -114,19 +119,18 @@ public class SyncUtils {
     final Path destinationPath = workingDir.resolve(RodaConstants.CORE_STORAGE_FOLDER)
       .resolve(RodaConstants.STORAGE_CONTAINER_REPRESENTATION_INFORMATION);
 
-    return createCentralPackage(ModelUtils.getRepresentationInformationContainerPath(), representationInformation,
+    return createCentralPackage(RepresentationInformation.class, representationInformation,
       RodaConstants.REPRESENTATION_INFORMATION_FILE_EXTENSION, destinationPath);
   }
 
-  private static boolean createCentralPackage(StoragePath containerPath,
+  private static <T extends IsRODAObject> boolean createCentralPackage(Class<T> containerClass,
     IterableIndexResult<? extends IsIndexed> indexedObject, String fileExtension, Path destinationPath)
-    throws AlreadyExistsException, GenericException, AuthorizationDeniedException {
+    throws AlreadyExistsException, GenericException, AuthorizationDeniedException, RequestNotValidException {
     if (indexedObject.getTotalCount() > 0) {
-      final StorageService storage = RodaCoreFactory.getStorageService();
+      final ModelService model = RodaCoreFactory.getModelService();
 
       for (IsIndexed object : indexedObject) {
-        final String filename = object.getId() + fileExtension;
-        storage.copy(storage, containerPath, destinationPath.resolve(filename), filename);
+        model.exportToPath(object, destinationPath, false);
       }
       return true;
     }
@@ -139,7 +143,7 @@ public class SyncUtils {
   public static Path getBundleWorkingDirectory(String instanceId) throws IOException {
     Path tempDirectory = Files.createTempDirectory(RodaCoreFactory.getWorkingDirectory(),
       RodaConstants.CORE_SYNCHRONIZATION_FOLDER + instanceId);
-    LOGGER.debug("Creating " + tempDirectory);
+    LOGGER.debug("Creating temporary directory {}", tempDirectory);
     return tempDirectory;
   }
 
@@ -181,7 +185,7 @@ public class SyncUtils {
     throws NotFoundException, GenericException, IOException {
     Path outcomePath = RodaCoreFactory.getSynchronizationDirectoryPath()
       .resolve(RodaConstants.CORE_SYNCHRONIZATION_OUTCOME_FOLDER).resolve(filename);
-    LOGGER.debug("Compress files to " + outcomePath);
+    LOGGER.debug("Compress files to {}", outcomePath);
 
     if (FSUtils.exists(outcomePath)) {
       FSUtils.deletePath(outcomePath);
@@ -191,7 +195,7 @@ public class SyncUtils {
   }
 
   public static void extract(Path workingDir, Path incomingPath) throws IOException {
-    LOGGER.debug("Extracting files to " + workingDir);
+    LOGGER.debug("Extracting files to {}", workingDir);
     ZipUtility.extractFilesFromZIP(incomingPath.toFile(), workingDir.toFile(), true);
   }
 
@@ -242,8 +246,8 @@ public class SyncUtils {
   public static DistributedInstance requestInstanceStatus(LocalInstance localInstance) throws GenericException {
     try {
       AccessToken accessToken = TokenManager.getInstance().getAccessToken(localInstance);
-      String resource = RodaConstants.API_SEP + RodaConstants.API_REST_V1_DISTRIBUTED_INSTANCE + "status"
-        + RodaConstants.API_SEP + localInstance.getId();
+      String resource = RodaConstants.API_SEP + RodaConstants.API_REST_V2_DISTRIBUTED_INSTANCE + RodaConstants.API_SEP
+        + localInstance.getId();
 
       CloseableHttpClient httpClient = HttpClientBuilder.create().build();
       HttpGet httpGet = new HttpGet(localInstance.getCentralInstanceURL() + resource);
@@ -268,7 +272,7 @@ public class SyncUtils {
   public static Path requestRemoteActions(LocalInstance localInstance) throws GenericException {
     try {
       AccessToken accessToken = TokenManager.getInstance().getAccessToken(localInstance);
-      String resource = RodaConstants.API_SEP + RodaConstants.API_REST_V1_DISTRIBUTED_INSTANCE + "remote_actions"
+      String resource = RodaConstants.API_SEP + RodaConstants.API_REST_V2_DISTRIBUTED_INSTANCE + "remote/actions"
         + RodaConstants.API_SEP + localInstance.getId();
 
       CloseableHttpClient httpClient = HttpClientBuilder.create().build();
@@ -317,10 +321,9 @@ public class SyncUtils {
     LocalInstance localInstance) {
     try {
       AccessToken accessToken = TokenManager.getInstance().getAccessToken(localInstance);
-      String resource = RodaConstants.API_SEP + RodaConstants.API_REST_V1_DISTRIBUTED_INSTANCE + "remove"
-        + RodaConstants.API_SEP + "bundle" + RodaConstants.API_QUERY_START + RodaConstants.SYNCHRONIZATION_BUNDLE_NAME
-        + RodaConstants.API_QUERY_ASSIGN_SYMBOL + bundleName + RodaConstants.API_QUERY_SEP
-        + RodaConstants.SYNCHRONIZATION_BUNDLE_DIRECTORY + RodaConstants.API_QUERY_ASSIGN_SYMBOL + bundleDirectory;
+      String resource = RodaConstants.API_SEP + RodaConstants.API_REST_V2_DISTRIBUTED_INSTANCE + "remove"
+        + RodaConstants.API_SEP + "bundle" + RodaConstants.API_SEP + bundleName + RodaConstants.API_SEP
+        + bundleDirectory;
 
       CloseableHttpClient httpClient = HttpClientBuilder.create().build();
       HttpGet httpGet = new HttpGet(localInstance.getCentralInstanceURL() + resource);
@@ -330,8 +333,8 @@ public class SyncUtils {
 
       HttpResponse response = httpClient.execute(httpGet);
 
-      if (response.getStatusLine().getStatusCode() == RodaConstants.HTTP_RESPONSE_CODE_SUCCESS) {
-        EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
+      if (response.getStatusLine().getStatusCode() != RodaConstants.HTTP_RESPONSE_CODE_NO_CONTENT) {
+        throw new GenericException("Error deleting sync bundle.");
       }
     } catch (AuthenticationDeniedException | GenericException | IOException e) {
       // do nothing
@@ -360,24 +363,26 @@ public class SyncUtils {
    *           if some i/o error occurs.
    */
   public static JsonParser createJsonParser(Path path) throws IOException {
-    final JsonFactory jfactory = new JsonFactory();
-    return jfactory.createParser(path.toFile());
+    final JsonFactory factory = new JsonFactory();
+    return factory.createParser(path.toFile());
   }
 
-  public static void updateDistributedInstance(LocalInstance localInstance, DistributedInstance distributedInstance)
-    throws GenericException {
+  public static void updateDistributedInstanceSyncStatus(LocalInstance localInstance,
+    DistributedInstance distributedInstance) throws GenericException {
     try {
       AccessToken accessToken = TokenManager.getInstance().getAccessToken(localInstance);
-      String resource = RodaConstants.API_SEP + RodaConstants.API_REST_V1_DISTRIBUTED_INSTANCE + "update";
+      String resource = RodaConstants.API_SEP + "api/v2/distributed-instances/" + distributedInstance.getId()
+        + "/status?activate=false";
 
       CloseableHttpClient httpClient = HttpClientBuilder.create().build();
-      HttpPut httpPut = new HttpPut(localInstance.getCentralInstanceURL() + resource);
-      httpPut.setEntity(new StringEntity(JsonUtils.getJsonFromObject(distributedInstance)));
-      httpPut.addHeader("Authorization", "Bearer " + accessToken.getToken());
-      httpPut.addHeader("content-type", "application/json");
-      httpPut.addHeader("Accept", "application/json");
+      HttpPatch httpPatch = new HttpPatch(localInstance.getCentralInstanceURL() + resource);
+      // httpPatch.setEntity(new
+      // StringEntity(JsonUtils.getJsonFromObject(distributedInstance)));
+      httpPatch.addHeader("Authorization", "Bearer " + accessToken.getToken());
+      httpPatch.addHeader("content-type", "application/json");
+      httpPatch.addHeader("Accept", "application/json");
 
-      HttpResponse response = httpClient.execute(httpPut);
+      HttpResponse response = httpClient.execute(httpPatch);
 
       if (response.getStatusLine().getStatusCode() != RodaConstants.HTTP_RESPONSE_CODE_SUCCESS) {
         throw new GenericException(
@@ -391,7 +396,7 @@ public class SyncUtils {
   public static Long getUpdatesFromDistributedInstance(LocalInstance localInstance) throws GenericException {
     try {
       AccessToken accessToken = TokenManager.getInstance().getAccessToken(localInstance);
-      String resource = RodaConstants.API_SEP + RodaConstants.API_REST_V1_DISTRIBUTED_INSTANCE
+      String resource = RodaConstants.API_SEP + RodaConstants.API_REST_V2_DISTRIBUTED_INSTANCE
         + RodaConstants.API_PATH_PARAM_DISTRIBUTED_INSTANCE_GET_UPDATES + RodaConstants.API_SEP + localInstance.getId();
 
       CloseableHttpClient httpClient = HttpClientBuilder.create().build();
@@ -416,5 +421,4 @@ public class SyncUtils {
       throw new GenericException("Unable to retrieve instance status: " + e.getMessage());
     }
   }
-
 }

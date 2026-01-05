@@ -12,82 +12,59 @@ package org.roda.wui.client.browse;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 import org.roda.core.data.common.RodaConstants;
-import org.roda.core.data.v2.common.Pair;
+import org.roda.core.data.exceptions.AuthorizationDeniedException;
+import org.roda.core.data.exceptions.NotFoundException;
+import org.roda.core.data.v2.generics.LongResponse;
+import org.roda.core.data.v2.index.CountRequest;
+import org.roda.core.data.v2.index.FindRequest;
 import org.roda.core.data.v2.index.filter.Filter;
 import org.roda.core.data.v2.index.filter.SimpleFilterParameter;
+import org.roda.core.data.v2.ip.AIP;
 import org.roda.core.data.v2.ip.AIPState;
 import org.roda.core.data.v2.ip.IndexedAIP;
 import org.roda.core.data.v2.ip.IndexedDIP;
-import org.roda.core.data.v2.ip.IndexedRepresentation;
-import org.roda.wui.client.browse.bundle.BrowseAIPBundle;
-import org.roda.wui.client.browse.bundle.DescriptiveMetadataViewBundle;
+import org.roda.core.data.v2.ip.metadata.DescriptiveMetadataInfos;
+import org.roda.wui.client.browse.tabs.BrowseAIPTabs;
+import org.roda.wui.client.common.BrowseAIPActionsToolbar;
 import org.roda.wui.client.common.LastSelectedItemsSingleton;
 import org.roda.wui.client.common.NavigationToolbar;
 import org.roda.wui.client.common.NoAsyncCallback;
 import org.roda.wui.client.common.TitlePanel;
 import org.roda.wui.client.common.actions.Actionable;
-import org.roda.wui.client.common.actions.AipActions;
-import org.roda.wui.client.common.actions.DisseminationActions;
-import org.roda.wui.client.common.actions.RepresentationActions;
-import org.roda.wui.client.common.actions.model.ActionableObject;
-import org.roda.wui.client.common.actions.widgets.ActionableWidgetBuilder;
-import org.roda.wui.client.common.lists.DIPList;
+import org.roda.wui.client.common.actions.AipSearchWrapperActions;
+import org.roda.wui.client.common.cards.AIPDisseminationCardList;
+import org.roda.wui.client.common.cards.AIPRepresentationCardList;
+import org.roda.wui.client.common.labels.Header;
 import org.roda.wui.client.common.lists.utils.AsyncTableCellOptions;
 import org.roda.wui.client.common.lists.utils.ConfigurableAsyncTableCell;
 import org.roda.wui.client.common.lists.utils.ListBuilder;
+import org.roda.wui.client.common.model.BrowseAIPResponse;
 import org.roda.wui.client.common.search.SearchWrapper;
-import org.roda.wui.client.common.slider.Sliders;
 import org.roda.wui.client.common.utils.AsyncCallbackUtils;
-import org.roda.wui.client.common.utils.DisposalPolicyUtils;
-import org.roda.wui.client.common.utils.HtmlSnippetUtils;
 import org.roda.wui.client.common.utils.PermissionClientUtils;
-import org.roda.wui.client.disposal.association.DisposalPolicyAssociationPanel;
-import org.roda.wui.client.management.UserLog;
-import org.roda.wui.client.planning.RiskIncidenceRegister;
-import org.roda.wui.common.client.tools.ConfigurationManager;
+import org.roda.wui.client.services.AIPRestService;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.tools.DescriptionLevelUtils;
 import org.roda.wui.common.client.tools.HistoryUtils;
-import org.roda.wui.common.client.tools.Humanize;
-import org.roda.wui.common.client.tools.RestErrorOverlayType;
-import org.roda.wui.common.client.tools.RestUtils;
 import org.roda.wui.common.client.tools.StringUtils;
 import org.roda.wui.common.client.widgets.Toast;
-import org.roda.wui.common.client.widgets.wcag.WCAGUtilities;
 
 import com.google.gwt.core.client.GWT;
-import com.google.gwt.core.client.JsonUtils;
 import com.google.gwt.dom.client.Element;
-import com.google.gwt.event.dom.client.ClickEvent;
-import com.google.gwt.http.client.Request;
-import com.google.gwt.http.client.RequestBuilder;
-import com.google.gwt.http.client.RequestCallback;
-import com.google.gwt.http.client.RequestException;
-import com.google.gwt.http.client.Response;
 import com.google.gwt.i18n.client.LocaleInfo;
-import com.google.gwt.safehtml.shared.SafeHtml;
-import com.google.gwt.safehtml.shared.SafeHtmlBuilder;
-import com.google.gwt.safehtml.shared.SafeHtmlUtils;
-import com.google.gwt.safehtml.shared.SafeUri;
 import com.google.gwt.uibinder.client.UiBinder;
 import com.google.gwt.uibinder.client.UiField;
-import com.google.gwt.uibinder.client.UiHandler;
 import com.google.gwt.user.client.rpc.AsyncCallback;
-import com.google.gwt.user.client.ui.Anchor;
-import com.google.gwt.user.client.ui.Button;
 import com.google.gwt.user.client.ui.Composite;
 import com.google.gwt.user.client.ui.FlowPanel;
 import com.google.gwt.user.client.ui.FocusPanel;
-import com.google.gwt.user.client.ui.HTML;
-import com.google.gwt.user.client.ui.HTMLPanel;
-import com.google.gwt.user.client.ui.Label;
 import com.google.gwt.user.client.ui.SimplePanel;
-import com.google.gwt.user.client.ui.TabPanel;
 import com.google.gwt.user.client.ui.Widget;
 
 import config.i18n.client.ClientMessages;
@@ -98,123 +75,65 @@ import config.i18n.client.ClientMessages;
  */
 public class BrowseAIP extends Composite {
 
-  private static SimplePanel container;
-
-  public static void getAndRefresh(String id, AsyncCallback<Widget> callback) {
-    container = new SimplePanel();
-    refresh(id, new AsyncCallback<BrowseAIPBundle>() {
-      @Override
-      public void onFailure(Throwable caught) {
-        callback.onFailure(caught);
-      }
-
-      @Override
-      public void onSuccess(BrowseAIPBundle result) {
-        callback.onSuccess(container);
-      }
-    });
-  }
-
-  private static void refresh(String id, AsyncCallback<BrowseAIPBundle> callback) {
-    BrowserService.Util.getInstance().retrieveBrowseAIPBundle(id, LocaleInfo.getCurrentLocale().getLocaleName(),
-      fieldsToReturn, new AsyncCallback<BrowseAIPBundle>() {
-
-        @Override
-        public void onFailure(Throwable caught) {
-          callback.onFailure(caught);
-        }
-
-        @Override
-        public void onSuccess(BrowseAIPBundle bundle) {
-          container.setWidget(new BrowseAIP(bundle));
-          callback.onSuccess(bundle);
-        }
-      });
-  }
-
   private static final List<String> fieldsToReturn = new ArrayList<>(RodaConstants.AIP_PERMISSIONS_FIELDS_TO_RETURN);
+  private static final ClientMessages messages = GWT.create(ClientMessages.class);
+  private static SimplePanel container;
+  private static final MyUiBinder uiBinder = GWT.create(MyUiBinder.class);
+
   static {
     fieldsToReturn.addAll(
       Arrays.asList(RodaConstants.INDEX_UUID, RodaConstants.AIP_STATE, RodaConstants.AIP_TITLE, RodaConstants.AIP_LEVEL,
         RodaConstants.INGEST_SIP_IDS, RodaConstants.INGEST_JOB_ID, RodaConstants.INGEST_UPDATE_JOB_IDS));
   }
 
-  interface MyUiBinder extends UiBinder<Widget, BrowseAIP> {
-  }
-
-  private static MyUiBinder uiBinder = GWT.create(MyUiBinder.class);
-  private static final ClientMessages messages = GWT.create(ClientMessages.class);
-
-  private String aipId;
-  private IndexedAIP aip;
-
   // Focus
   @UiField
   FocusPanel keyboardFocus;
-
-  // HEADER
-
   @UiField
   NavigationToolbar<IndexedAIP> navigationToolbar;
-
-  // STATUS
-
   @UiField
-  HTML aipState;
+  BrowseAIPActionsToolbar objectToolbar;
 
   // IDENTIFICATION
   @UiField
   TitlePanel title;
-
-  // DESCRIPTIVE METADATA
-
   @UiField
-  TabPanel descriptiveMetadata;
-
-  @UiField
-  Button newDescriptiveMetadata;
-
-  private SimplePanel descriptiveMetadataButtons;
-  private Map<Integer, HTMLPanel> descriptiveMetadataSavedButtons;
-
-  // REPRESENTATIONS
-  @UiField
-  SimplePanel addRepresentation;
-
-  @UiField
-  SimplePanel representationsCard;
-
-  // DISSEMINATIONS
-  @UiField
-  SimplePanel disseminationsCard;
+  BrowseAIPTabs browseTab;
 
   // AIP CHILDREN
   @UiField
+  FlowPanel lowerContent;
+  @UiField
+  Header aipChildrenTitle;
+  @UiField
   SimplePanel aipChildrenCard;
 
+  // SIDEBAR
   @UiField
-  SimplePanel addChildAip;
-
+  FlowPanel sidePanel;
   @UiField
-  FlowPanel risksEventsLogs;
-
+  FlowPanel representationCards;
   @UiField
-  FlowPanel disposalPolicy;
+  FlowPanel disseminationCards;
 
-  @UiField
-  FlowPanel center;
+  private String aipId;
+  private IndexedAIP aip;
+  private Map<Actionable.ActionImpact, Runnable> handlers = new HashMap<>();
+  private AsyncCallback<Actionable.ActionImpact> handler = new NoAsyncCallback<Actionable.ActionImpact>() {
+    @Override
+    public void onSuccess(Actionable.ActionImpact result) {
+      if (handlers.containsKey(result)) {
+        handlers.get(result).run();
+      }
+    }
+  };
 
-  @UiField
-  Label dateCreatedAndModified;
-
-  private BrowseAIP(BrowseAIPBundle bundle) {
-    aip = bundle.getAip();
+  private BrowseAIP(BrowseAIPResponse response) {
+    aip = response.getIndexedAIP();
     aipId = aip.getId();
     boolean justActive = AIPState.ACTIVE.equals(aip.getState());
 
-    RepresentationActions representationActions = RepresentationActions.get(aip.getId(), aip.getPermissions());
-    DisseminationActions disseminationActions = DisseminationActions.get();
-    AipActions aipActions = AipActions.get(aip.getId(), aip.getState(), aip.getPermissions());
+    AipSearchWrapperActions aipActions = AipSearchWrapperActions.get(aip.getId(), aip.getState(), aip.getPermissions());
 
     // INIT
     initWidget(uiBinder.createAndBindUi(this));
@@ -228,89 +147,52 @@ public class BrowseAIP extends Composite {
       }
     };
 
-    // REPRESENTATIONS
-    if (PermissionClientUtils.hasPermissions(RodaConstants.PERMISSION_METHOD_FIND_REPRESENTATION)) {
-      ListBuilder<IndexedRepresentation> representationsListBuilder;
-      if (aip.getState().equals(AIPState.DESTROYED) || aip.isOnHold() || aip.getDisposalConfirmationId() != null) {
-        representationsListBuilder = new ListBuilder<>(() -> new ConfigurableAsyncTableCell<>(),
-          new AsyncTableCellOptions<>(IndexedRepresentation.class, "BrowseAIP_representations")
-            .withFilter(new Filter(new SimpleFilterParameter(RodaConstants.REPRESENTATION_AIP_ID, aip.getId())))
-            .withJustActive(justActive).withSummary(messages.listOfRepresentations()).bindOpener());
-      } else {
-        representationsListBuilder = new ListBuilder<>(() -> new ConfigurableAsyncTableCell<>(),
-          new AsyncTableCellOptions<>(IndexedRepresentation.class, "BrowseAIP_representations")
-            .withFilter(new Filter(new SimpleFilterParameter(RodaConstants.REPRESENTATION_AIP_ID, aip.getId())))
-            .withJustActive(justActive).withSummary(messages.listOfRepresentations()).bindOpener()
-            .withActionable(representationActions).withActionableCallback(listActionableCallback));
-      }
-
-      SearchWrapper representationsSearchWrapper = new SearchWrapper(false)
-        .createListAndSearchPanel(representationsListBuilder);
-      representationsCard.setWidget(representationsSearchWrapper);
-      representationsCard.setVisible(bundle.getRepresentationCount() > 0);
-    } else {
-      representationsCard.setVisible(false);
+    if (justActive) {
+      initHandlers();
     }
 
-    // DISSEMINATIONS
-
-    if (PermissionClientUtils.hasPermissions(RodaConstants.PERMISSION_METHOD_FIND_DIP)) {
-      ListBuilder<IndexedDIP> disseminationsListBuilder = new ListBuilder<>(() -> new DIPList(),
-        new AsyncTableCellOptions<>(IndexedDIP.class, "BrowseAIP_disseminations")
-          .withFilter(new Filter(new SimpleFilterParameter(RodaConstants.DIP_AIP_UUIDS, aip.getId())))
-          .withJustActive(justActive).withSummary(messages.listOfDisseminations()).bindOpener()
-          .withActionable(disseminationActions).withActionableCallback(listActionableCallback));
-
-      SearchWrapper disseminationsSearchWrapper = new SearchWrapper(false)
-        .createListAndSearchPanel(disseminationsListBuilder);
-      disseminationsCard.setWidget(disseminationsSearchWrapper);
-      disseminationsCard.setVisible(bundle.getDipCount() > 0);
-    } else {
-      disseminationsCard.setVisible(false);
-    }
+    // TABS
+    browseTab.init(response, handler);
 
     // AIP CHILDREN
+    aipChildrenTitle.setHeaderText(messages.sublevels());
+    aipChildrenTitle.setIcon("ma ma-account-tree");
+    aipChildrenTitle.setLevel(5);
     if (PermissionClientUtils.hasPermissions(RodaConstants.PERMISSION_METHOD_FIND_AIP)) {
       ListBuilder<IndexedAIP> aipChildrenListBuilder;
       if (aip.getState().equals(AIPState.DESTROYED) || aip.isOnHold() || aip.getDisposalConfirmationId() != null) {
-        aipChildrenListBuilder = new ListBuilder<>(() -> new ConfigurableAsyncTableCell<>(),
+        aipChildrenListBuilder = new ListBuilder<>(ConfigurableAsyncTableCell::new,
           new AsyncTableCellOptions<>(IndexedAIP.class, "BrowseAIP_aipChildren")
             .withFilter(new Filter(new SimpleFilterParameter(RodaConstants.AIP_PARENT_ID, aip.getId())))
             .withJustActive(justActive).withSummary(messages.listOfAIPs()).bindOpener());
 
       } else {
-        aipChildrenListBuilder = new ListBuilder<>(() -> new ConfigurableAsyncTableCell<>(),
+        aipChildrenListBuilder = new ListBuilder<>(ConfigurableAsyncTableCell::new,
           new AsyncTableCellOptions<>(IndexedAIP.class, "BrowseAIP_aipChildren")
             .withFilter(new Filter(new SimpleFilterParameter(RodaConstants.AIP_PARENT_ID, aip.getId())))
             .withJustActive(justActive).withSummary(messages.listOfAIPs()).bindOpener().withActionable(aipActions)
+            .withActionBlacklist(List.of(AipSearchWrapperActions.AipSearchWrapperAction.NEW_CHILD_AIP_TOP,
+              AipSearchWrapperActions.AipSearchWrapperAction.APPRAISAL_ACCEPT,
+              AipSearchWrapperActions.AipSearchWrapperAction.APPRAISAL_REJECT))
             .withActionableCallback(listActionableCallback));
       }
 
       SearchWrapper aipChildrenSearchWrapper = new SearchWrapper(false)
         .createListAndSearchPanel(aipChildrenListBuilder);
       aipChildrenCard.setWidget(aipChildrenSearchWrapper);
-      aipChildrenCard.setVisible(bundle.getChildAIPCount() > 0);
+      aipChildrenCard.setVisible(response.getChildAipsCount().getResult() > 0);
     } else {
       aipChildrenCard.setVisible(false);
     }
 
-    PermissionClientUtils.bindPermission(newDescriptiveMetadata, aip.getPermissions(),
-      RodaConstants.PERMISSION_METHOD_CREATE_DESCRIPTIVE_METADATA_FILE);
-
     // CSS
-    newDescriptiveMetadata.getElement().setId("aipNewDescriptiveMetadata");
-    addStyleName("browse browse_aip");
+    keyboardFocus.addStyleName("browse browse_aip browse_main_panel");
 
     // make FocusPanel comply with WCAG
     Element firstElement = this.getElement().getFirstChildElement();
     if ("input".equalsIgnoreCase(firstElement.getTagName())) {
       firstElement.setAttribute("title", "browse input");
     }
-
-    // STATE
-    this.addStyleName(aip.getState().toString().toLowerCase());
-    aipState.setHTML(HtmlSnippetUtils.getAIPStateHTML(aip.getState()));
-    aipState.setVisible(!justActive);
 
     // NAVIGATION TOOLBAR
     if (justActive) {
@@ -328,331 +210,149 @@ public class BrowseAIP extends Composite {
       navigationToolbar.build();
     }
 
+    // OBJECT TOOLBAR
+    objectToolbar.setObjectAndBuild(aip, aip.getState(), aip.getPermissions(), handler);
+
     // IDENTIFICATION
-    updateSectionIdentification(bundle);
-
-    // DISPOSAL
-    updateDisposalInformation();
-
-    // DESCRIPTIVE METADATA
-    updateSectionDescriptiveMetadata(bundle);
-
-    // REPRESENTATIONS
-    if (bundle.getRepresentationCount() == 0 && aip.getState().equals(AIPState.ACTIVE) && !aip.isOnHold()
-      && aip.getDisposalConfirmationId() == null) {
-      addRepresentation.setWidget(new ActionableWidgetBuilder<>(representationActions).buildListWithObjects(
-        new ActionableObject<>(IndexedRepresentation.class),
-        Collections.singletonList(RepresentationActions.RepresentationAction.NEW)));
-    }
-
-    addRepresentation.setVisible(bundle.getRepresentationCount() == 0 && aip.getState().equals(AIPState.ACTIVE));
+    updateSectionIdentification(response);
 
     // AIP CHILDREN
-    if (aip.getState().equals(AIPState.ACTIVE)) {
-      if (bundle.getChildAIPCount() > 0) {
-        LastSelectedItemsSingleton.getInstance().setSelectedJustActive(justActive);
-      } else {
-        if (!aip.isOnHold() && aip.getDisposalConfirmationId() == null) {
-          addChildAip.setWidget(
-            new ActionableWidgetBuilder<>(aipActions).buildListWithObjects(new ActionableObject<>(IndexedAIP.class),
-              Collections.singletonList(AipActions.AipAction.NEW_CHILD_AIP_BELOW)));
-        }
+    if (aip.getState().equals(AIPState.ACTIVE) && response.getChildAipsCount().getResult() > 0) {
+      LastSelectedItemsSingleton.getInstance().setSelectedJustActive(justActive);
+    }
+
+    lowerContent.setVisible(response.getChildAipsCount().getResult() > 0);
+
+    // Side panel representations
+    // Check if user has permissions to see the representations
+    if (PermissionClientUtils.hasPermissions(RodaConstants.PERMISSION_METHOD_FIND_REPRESENTATION)
+      && !aip.getState().equals(AIPState.INGEST_PROCESSING)) {
+      boolean showSidePanel = false;
+      if (Boolean.TRUE.equals(response.getIndexedAIP().getHasRepresentations())) {
+        showSidePanel = true;
+        this.representationCards.add(new AIPRepresentationCardList(aipId, justActive));
       }
 
-      addChildAip.setVisible(bundle.getChildAIPCount() == 0);
+      if (response.getDipCount().getResult() > 0) {
+        showSidePanel = true;
+        this.disseminationCards.add(new AIPDisseminationCardList(aipId));
+      }
+
+      this.sidePanel.setVisible(showSidePanel);
+    } else {
+      this.sidePanel.setVisible(false);
     }
 
     keyboardFocus.setFocus(true);
   }
 
-  private void updateSectionDescriptiveMetadata(BrowseAIPBundle bundle) {
-    final List<Pair<String, HTML>> descriptiveMetadataContainers = new ArrayList<>();
-    final Map<String, DescriptiveMetadataViewBundle> bundles = new HashMap<>();
-
-    List<DescriptiveMetadataViewBundle> descMetadata = bundle.getDescriptiveMetadata();
-    if (descMetadata != null) {
-      for (DescriptiveMetadataViewBundle descMetadatum : descMetadata) {
-        String title = descMetadatum.getLabel() != null ? descMetadatum.getLabel() : descMetadatum.getId();
-        HTML container = new HTML();
-        container.addStyleName("metadataContent");
-        descriptiveMetadata.add(container, title);
-        descriptiveMetadataContainers.add(Pair.of(descMetadatum.getId(), container));
-        bundles.put(descMetadatum.getId(), descMetadatum);
-      }
-    }
-
-    descriptiveMetadata.addSelectionHandler(event -> {
-      if (event.getSelectedItem() < descriptiveMetadataContainers.size()) {
-        Pair<String, HTML> pair = descriptiveMetadataContainers.get(event.getSelectedItem());
-        String descId = pair.getFirst();
-        final HTML html = pair.getSecond();
-        final DescriptiveMetadataViewBundle descBundle = bundles.get(descId);
-        if (html.getText().length() == 0) {
-          getDescriptiveMetadataHTML(aipId, descId, descBundle, event.getSelectedItem(), new AsyncCallback<SafeHtml>() {
-
-            @Override
-            public void onFailure(Throwable caught) {
-              if (!AsyncCallbackUtils.treatCommonFailures(caught)) {
-                Toast.showError(messages.errorLoadingDescriptiveMetadata(caught.getMessage()));
-              }
-            }
-
-            @Override
-            public void onSuccess(SafeHtml result) {
-              html.setHTML(result);
-            }
-          });
-        }
+  private void initHandlers() {
+    handlers.put(Actionable.ActionImpact.DESTROYED, () -> {
+      if (StringUtils.isNotBlank(aip.getParentID())) {
+        HistoryUtils.newHistory(BrowseTop.RESOLVER, aip.getParentID());
+      } else {
+        HistoryUtils.newHistory(BrowseTop.RESOLVER);
       }
     });
+    handlers.put(Actionable.ActionImpact.UPDATED, () -> refresh(aipId, new NoAsyncCallback<>()));
+  }
 
-    if (PermissionClientUtils.hasPermissions(aip.getPermissions(),
-      RodaConstants.PERMISSION_METHOD_CREATE_DESCRIPTIVE_METADATA_FILE) && aip.getState().equals(AIPState.ACTIVE)
-      && !aip.isOnHold() && aip.getDisposalConfirmationId() == null) {
-      final int addTabIndex = descriptiveMetadata.getWidgetCount();
-      FlowPanel addTab = new FlowPanel();
-      addTab.add(new HTML(SafeHtmlUtils.fromSafeConstant("<i class=\"fa fa-plus-circle\"></i>")));
-      descriptiveMetadata.add(new Label(), addTab);
-      descriptiveMetadata.addSelectionHandler(event -> {
-        if (event.getSelectedItem() == addTabIndex) {
-          newDescriptiveMetadataRedirect();
+  public static void getAndRefresh(String id, AsyncCallback<Widget> callback) {
+    container = new SimplePanel();
+    refresh(id, new AsyncCallback<IndexedAIP>() {
+      @Override
+      public void onFailure(Throwable caught) {
+        callback.onFailure(caught);
+      }
+
+      @Override
+      public void onSuccess(IndexedAIP result) {
+        callback.onSuccess(container);
+      }
+    });
+  }
+
+  private static void refresh(String id, AsyncCallback<IndexedAIP> callback) {
+
+    Services service = new Services("Retrieve AIP", "get");
+    service
+      .rodaEntityRestService(s -> s.findByUuid(id, LocaleInfo.getCurrentLocale().getLocaleName()), IndexedAIP.class)
+      .whenComplete((aip, error) -> {
+        if (error != null) {
+          if (error instanceof NotFoundException) {
+            Toast.showError(messages.notFoundError());
+            HistoryUtils.newHistory(BrowseTop.RESOLVER);
+          } else {
+            AsyncCallbackUtils.defaultFailureTreatment(error);
+          }
+        } else {
+          CompletableFuture<List<IndexedAIP>> futureAncestors = service.aipResource(s -> s.getAncestors(id));
+
+          CompletableFuture<List<String>> futureRepFields = service
+            .aipResource(AIPRestService::retrieveAIPRuleProperties);
+
+          CompletableFuture<DescriptiveMetadataInfos> futureDescriptiveMetadataInfos = service
+            .aipResource(s -> s.getDescriptiveMetadata(id, LocaleInfo.getCurrentLocale().getLocaleName()))
+            .exceptionally(throwable -> new DescriptiveMetadataInfos());
+
+          CompletableFuture<LongResponse> futureChildAipCount = service
+            .rodaEntityRestService(
+              s -> s.count(new FindRequest.FindRequestBuilder(
+                new Filter(new SimpleFilterParameter(RodaConstants.AIP_PARENT_ID, id)), false).build()),
+              IndexedAIP.class);
+
+          CompletableFuture<LongResponse> futureDipCount = service.rodaEntityRestService(
+            s -> s.count(
+              new CountRequest(new Filter(new SimpleFilterParameter(RodaConstants.DIP_ALL_AIP_UUIDS, id)), false)),
+            IndexedDIP.class);
+
+          // Unused for now, but required to see if the AIP is in the model
+          CompletableFuture<AIP> futureModelAIP = service.aipResource(s -> s.getModelAIP(id));
+
+          futureModelAIP.handle((modelAIP, throwable) -> {
+            if (throwable != null) {
+              if (throwable instanceof AuthorizationDeniedException) {
+                Toast.showError(messages.authorizationDeniedAlert(), "");
+                HistoryUtils.newHistory(BrowseTop.RESOLVER);
+              } else if (throwable instanceof NotFoundException) {
+                Toast.showError(messages.aipNotInStorageError(), "");
+                HistoryUtils.newHistory(BrowseTop.RESOLVER);
+              } else {
+                Toast.showError(throwable.getClass().getSimpleName(), throwable.getMessage());
+                HistoryUtils.newHistory(BrowseTop.RESOLVER);
+              }
+            } else {
+              CompletableFuture.allOf(futureChildAipCount, futureDipCount, futureAncestors, futureRepFields,
+                futureDescriptiveMetadataInfos).thenApply(v -> {
+                  BrowseAIPResponse rp = new BrowseAIPResponse();
+                  rp.setIndexedAIP(aip);
+                  rp.setAncestors(futureAncestors.join());
+                  rp.setRepresentationInformationFields(futureRepFields.join());
+                  rp.setDescriptiveMetadataInfos(futureDescriptiveMetadataInfos.join());
+                  rp.setChildAipsCount(futureChildAipCount.join());
+                  rp.setDipCount(futureDipCount.join());
+                  return rp;
+                }).whenComplete((value, innerThrowable) -> {
+
+                  if (innerThrowable == null) {
+                    container.setWidget(new BrowseAIP(value));
+                    callback.onSuccess(aip);
+                  }
+                });
+            }
+            return null;
+          });
         }
       });
 
-      addTab.addStyleName("addTab");
-      addTab.getElement().setId("aipNewDescriptiveMetadata");
-      addTab.getParent().addStyleName("addTabWrapper");
-    }
-
-    descriptiveMetadataSavedButtons = new HashMap<>();
-    descriptiveMetadataButtons = new SimplePanel();
-    descriptiveMetadataButtons.addStyleName("descriptiveMetadataTabButtons");
-    descriptiveMetadata.getTabBar().getElement().getStyle().clearProperty("width");
-    descriptiveMetadata.getTabBar().getElement().getParentElement()
-      .insertFirst(descriptiveMetadataButtons.getElement());
-    descriptiveMetadata.addSelectionHandler(event -> {
-      if (descriptiveMetadataSavedButtons.containsKey(event.getSelectedItem())) {
-        descriptiveMetadataButtons.setWidget(descriptiveMetadataSavedButtons.get(event.getSelectedItem()));
-      } else {
-        descriptiveMetadataButtons.clear();
-      }
-    });
-
-    if (descMetadata != null && !descMetadata.isEmpty()) {
-      descriptiveMetadata.getParent().setVisible(true);
-      newDescriptiveMetadata.setVisible(false);
-
-      int index = ConfigurationManager.getInt(0, "ui.browser.metadata.index.aip");
-      if (index > 0) {
-        if (descMetadata.size() > index) {
-          descriptiveMetadata.selectTab(index);
-        } else {
-          descriptiveMetadata.selectTab(0);
-        }
-      } else {
-        int count = descMetadata.size() - Math.abs(index);
-        if (descMetadata.size() > count) {
-          descriptiveMetadata.selectTab(count);
-        } else {
-          descriptiveMetadata.selectTab(0);
-        }
-      }
-    } else {
-      descriptiveMetadata.getParent().setVisible(false);
-      newDescriptiveMetadata.setVisible(true);
-    }
-
-    WCAGUtilities.getInstance().makeAccessible(descriptiveMetadata.getElement());
   }
 
-  private void updateSectionIdentification(BrowseAIPBundle bundle) {
-    IndexedAIP aip = bundle.getAip();
+  private void updateSectionIdentification(BrowseAIPResponse response) {
 
     title.setIcon(DescriptionLevelUtils.getElementLevelIconSafeHtml(aip.getLevel(), false));
     title.setText(aip.getTitle() != null ? aip.getTitle() : aip.getId());
 
-    Sliders.createAipInfoSlider(center, navigationToolbar.getInfoSidebarButton(), bundle);
-
-    risksEventsLogs.clear();
-    long incidenceCount = bundle.getRiskIncidenceCount();
-    long eventCount = bundle.getPreservationEventCount();
-    long logCount = bundle.getLogCount();
-
-    if (incidenceCount >= 0) {
-      Anchor risksLink = new Anchor(messages.aipRiskIncidences(bundle.getRiskIncidenceCount()),
-        HistoryUtils.createHistoryHashLink(RiskIncidenceRegister.RESOLVER, aip.getId()));
-      risksEventsLogs.add(risksLink);
-    }
-
-    if (eventCount >= 0) {
-      Anchor eventsLink = new Anchor(messages.aipEvents(bundle.getPreservationEventCount()),
-        HistoryUtils.createHistoryHashLink(PreservationEvents.BROWSE_RESOLVER, aip.getId()));
-
-      if (incidenceCount >= 0) {
-        if (logCount >= 0) {
-          risksEventsLogs.add(new Label(", "));
-        } else {
-          risksEventsLogs.add(new Label(" " + messages.and() + " "));
-        }
-      }
-
-      risksEventsLogs.add(eventsLink);
-    }
-
-    if (logCount >= 0) {
-      Anchor logsLink = new Anchor(messages.aipLogs(bundle.getLogCount()),
-        HistoryUtils.createHistoryHashLink(UserLog.RESOLVER, aip.getId()));
-
-      if (incidenceCount >= 0 || eventCount >= 0) {
-        risksEventsLogs.add(new Label(" " + messages.and() + " "));
-      }
-
-      risksEventsLogs.add(logsLink);
-    }
-
-    navigationToolbar.updateBreadcrumb(bundle);
-
-    if (aip.getCreatedOn() != null && StringUtils.isNotBlank(aip.getCreatedBy()) && aip.getUpdatedOn() != null
-      && StringUtils.isNotBlank(aip.getUpdatedBy())) {
-      dateCreatedAndModified.setText(messages.dateCreatedAndUpdated(Humanize.formatDate(aip.getCreatedOn()),
-        aip.getCreatedBy(), Humanize.formatDate(aip.getUpdatedOn()), aip.getUpdatedBy()));
-    } else if (aip.getCreatedOn() != null && StringUtils.isNotBlank(aip.getCreatedBy())) {
-      dateCreatedAndModified
-        .setText(messages.dateCreated(Humanize.formatDateTime(aip.getCreatedOn()), aip.getCreatedBy()));
-    } else if (aip.getUpdatedOn() != null && StringUtils.isNotBlank(aip.getUpdatedBy())) {
-      dateCreatedAndModified
-        .setText(messages.dateUpdated(Humanize.formatDateTime(aip.getUpdatedOn()), aip.getUpdatedBy()));
-    } else {
-      dateCreatedAndModified.setText("");
-    }
-  }
-
-  private void updateDisposalInformation() {
-    if (DisposalPolicyUtils.showDisposalPolicySummary(aip)) {
-      Anchor disposalPolicyLink = new Anchor(DisposalPolicyUtils.getDisposalPolicySummarySafeHTML(aip),
-        HistoryUtils.createHistoryHashLink(DisposalPolicyAssociationPanel.RESOLVER, aip.getId()));
-      disposalPolicy.add(disposalPolicyLink);
-    } else {
-      disposalPolicy.setVisible(false);
-    }
-  }
-
-  private void getDescriptiveMetadataHTML(final String aipId, final String descId,
-    final DescriptiveMetadataViewBundle bundle, final Integer selectedIndex, final AsyncCallback<SafeHtml> callback) {
-    SafeUri uri = RestUtils.createDescriptiveMetadataHTMLUri(aipId, descId);
-    RequestBuilder requestBuilder = new RequestBuilder(RequestBuilder.GET, uri.asString());
-    try {
-      requestBuilder.sendRequest(null, new RequestCallback() {
-
-        @Override
-        public void onResponseReceived(Request request, Response response) {
-          String escapedDescId = SafeHtmlUtils.htmlEscape(descId);
-
-          if (200 == response.getStatusCode()) {
-            String html = response.getText();
-
-            SafeHtmlBuilder b = new SafeHtmlBuilder();
-            b.append(SafeHtmlUtils.fromSafeConstant("<div class='descriptiveMetadataLinks'>"));
-
-            if (bundle.hasHistory() && PermissionClientUtils.hasPermissions(aip.getPermissions(),
-              RodaConstants.PERMISSION_METHOD_RETRIEVE_DESCRIPTIVE_METADATA_VERSIONS_BUNDLE)) {
-              // History link
-              String historyLink = HistoryUtils.createHistoryHashLink(DescriptiveMetadataHistory.RESOLVER, aipId,
-                escapedDescId);
-              String historyLinkHtml = "<a href='" + historyLink
-                + "' class='toolbarLink'><i class='fa fa-history'></i></a>";
-              b.append(SafeHtmlUtils.fromSafeConstant(historyLinkHtml));
-            }
-
-            // Edit link
-            if (!AIPState.DESTROYED.equals(aip.getState()) && !aip.isOnHold()
-              && aip.getDisposalConfirmationId() == null) {
-              if (PermissionClientUtils.hasPermissions(aip.getPermissions(),
-                RodaConstants.PERMISSION_METHOD_UPDATE_DESCRIPTIVE_METADATA_FILE)) {
-                String editLink = HistoryUtils.createHistoryHashLink(EditDescriptiveMetadata.RESOLVER, aipId,
-                  escapedDescId);
-                String editLinkHtml = "<a href='" + editLink
-                  + "' class='toolbarLink' id='aipEditDescriptiveMetadata'><i class='fa fa-edit'></i></a>";
-                b.append(SafeHtmlUtils.fromSafeConstant(editLinkHtml));
-              }
-            }
-
-            // Download link
-            SafeUri downloadUri = RestUtils.createDescriptiveMetadataDownloadUri(aipId, escapedDescId);
-            String downloadLinkHtml = "<a href='" + downloadUri.asString()
-              + "' class='toolbarLink'><i class='fa fa-download'></i></a>";
-            b.append(SafeHtmlUtils.fromSafeConstant(downloadLinkHtml));
-
-            b.append(SafeHtmlUtils.fromSafeConstant("</div>"));
-            HTMLPanel buttons = new HTMLPanel(b.toSafeHtml());
-            descriptiveMetadataSavedButtons.put(selectedIndex, buttons);
-            descriptiveMetadataButtons.setWidget(buttons);
-
-            b = new SafeHtmlBuilder();
-            b.append(SafeHtmlUtils.fromSafeConstant("<div class='descriptiveMetadataHTML'>"));
-            b.append(SafeHtmlUtils.fromTrustedString(html));
-            b.append(SafeHtmlUtils.fromSafeConstant("</div>"));
-            SafeHtml safeHtml = b.toSafeHtml();
-            callback.onSuccess(safeHtml);
-          } else {
-            String text = response.getText();
-            String message;
-            try {
-              RestErrorOverlayType error = JsonUtils.safeEval(text);
-              message = error.getMessage();
-            } catch (IllegalArgumentException e) {
-              message = text;
-            }
-
-            SafeHtmlBuilder b = new SafeHtmlBuilder();
-            b.append(SafeHtmlUtils.fromSafeConstant("<div class='descriptiveMetadataLinks'>"));
-
-            if (bundle.hasHistory() && PermissionClientUtils.hasPermissions(aip.getPermissions(),
-              RodaConstants.PERMISSION_METHOD_RETRIEVE_DESCRIPTIVE_METADATA_VERSIONS_BUNDLE)) {
-              // History link
-              String historyLink = HistoryUtils.createHistoryHashLink(DescriptiveMetadataHistory.RESOLVER, aipId,
-                escapedDescId);
-              String historyLinkHtml = "<a href='" + historyLink
-                + "' class='toolbarLink'><i class='fa fa-history'></i></a>";
-              b.append(SafeHtmlUtils.fromSafeConstant(historyLinkHtml));
-            }
-
-            // Edit link
-            if (PermissionClientUtils.hasPermissions(aip.getPermissions(),
-              RodaConstants.PERMISSION_METHOD_UPDATE_DESCRIPTIVE_METADATA_FILE)) {
-              String editLink = HistoryUtils.createHistoryHashLink(EditDescriptiveMetadata.RESOLVER, aipId,
-                escapedDescId);
-              String editLinkHtml = "<a href='" + editLink + "' class='toolbarLink'><i class='fa fa-edit'></i></a>";
-              b.append(SafeHtmlUtils.fromSafeConstant(editLinkHtml));
-            }
-
-            b.append(SafeHtmlUtils.fromSafeConstant("</div>"));
-
-            // error message
-            b.append(SafeHtmlUtils.fromSafeConstant("<div class='error'>"));
-            b.append(messages.descriptiveMetadataTransformToHTMLError());
-            b.append(SafeHtmlUtils.fromSafeConstant("<pre><code>"));
-            b.append(SafeHtmlUtils.fromString(message));
-            b.append(SafeHtmlUtils.fromSafeConstant("</core></pre>"));
-            b.append(SafeHtmlUtils.fromSafeConstant("</div>"));
-
-            callback.onSuccess(b.toSafeHtml());
-          }
-        }
-
-        @Override
-        public void onError(Request request, Throwable exception) {
-          callback.onFailure(exception);
-        }
-      });
-    } catch (RequestException e) {
-      callback.onFailure(e);
-    }
-  }
-
-  @UiHandler("newDescriptiveMetadata")
-  void buttonNewDescriptiveMetadataHandler(ClickEvent e) {
-    newDescriptiveMetadataRedirect();
+    navigationToolbar.updateBreadcrumb(aip, response.getAncestors());
   }
 
   private void newDescriptiveMetadataRedirect() {
@@ -660,5 +360,8 @@ public class BrowseAIP extends Composite {
       HistoryUtils.newHistory(BrowseTop.RESOLVER, CreateDescriptiveMetadata.RESOLVER.getHistoryToken(),
         RodaConstants.RODA_OBJECT_AIP, aipId);
     }
+  }
+
+  interface MyUiBinder extends UiBinder<Widget, BrowseAIP> {
   }
 }

@@ -25,6 +25,7 @@ import org.roda.core.data.exceptions.NotFoundException;
 import org.roda.core.data.exceptions.RequestNotValidException;
 import org.roda.core.data.utils.JsonUtils;
 import org.roda.core.data.v2.Void;
+import org.roda.core.data.v2.index.filter.AllFilterParameter;
 import org.roda.core.data.v2.index.filter.DateIntervalFilterParameter;
 import org.roda.core.data.v2.index.filter.Filter;
 import org.roda.core.data.v2.index.filter.FilterParameter;
@@ -35,15 +36,12 @@ import org.roda.core.data.v2.ip.IndexedAIP;
 import org.roda.core.data.v2.ip.IndexedFile;
 import org.roda.core.data.v2.ip.Representation;
 import org.roda.core.data.v2.ip.ShallowFile;
-import org.roda.core.data.v2.ip.StoragePath;
 import org.roda.core.data.v2.ip.metadata.IndexedPreservationEvent;
 import org.roda.core.index.IndexService;
 import org.roda.core.index.utils.IterableIndexResult;
 import org.roda.core.model.ModelService;
-import org.roda.core.model.utils.ModelUtils;
 import org.roda.core.plugins.Plugin;
 import org.roda.core.protocols.protocols.RODAProtocol;
-import org.roda.core.storage.StorageService;
 import org.roda.core.util.IdUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -120,6 +118,8 @@ public class AipPackagePlugin extends RodaEntityPackagesPlugin<AIP> {
     if (fromDate != null) {
       filter.add(
         new DateIntervalFilterParameter(RodaConstants.AIP_UPDATED_ON, RodaConstants.AIP_UPDATED_ON, fromDate, toDate));
+    } else {
+      filter.add(new AllFilterParameter());
     }
     return index.findAll(IndexedAIP.class, filter, Collections.singletonList(RodaConstants.INDEX_UUID));
   }
@@ -139,9 +139,6 @@ public class AipPackagePlugin extends RodaEntityPackagesPlugin<AIP> {
 
   public void createAIPBundle(ModelService model, IndexService index, AIP aip)
     throws RequestNotValidException, AuthorizationDeniedException, GenericException, AlreadyExistsException {
-
-    StorageService storage = model.getStorage();
-    StoragePath aipStoragePath = ModelUtils.getAIPStoragePath(aip.getId());
     Path destinationPath = workingDirPath.resolve(RodaConstants.CORE_STORAGE_FOLDER)
       .resolve(RodaConstants.STORAGE_CONTAINER_AIP).resolve(aip.getId());
 
@@ -153,11 +150,11 @@ public class AipPackagePlugin extends RodaEntityPackagesPlugin<AIP> {
       Path submissionsPath = destinationPath.resolve(RodaConstants.STORAGE_DIRECTORY_SUBMISSION);
       Path aipMetadataPath = destinationPath.resolve(RodaConstants.STORAGE_AIP_METADATA_FILENAME);
 
-      storage.copy(storage, aipStoragePath, documentationPath, RodaConstants.STORAGE_DIRECTORY_DOCUMENTATION);
-      storage.copy(storage, aipStoragePath, metadataPath, RodaConstants.STORAGE_DIRECTORY_METADATA);
-      storage.copy(storage, aipStoragePath, schemasPath, RodaConstants.STORAGE_DIRECTORY_SCHEMAS);
-      storage.copy(storage, aipStoragePath, submissionsPath, RodaConstants.STORAGE_DIRECTORY_SUBMISSION);
-      storage.copy(storage, aipStoragePath, aipMetadataPath, RodaConstants.STORAGE_AIP_METADATA_FILENAME);
+      model.exportToPath(aip, documentationPath, false, RodaConstants.STORAGE_DIRECTORY_DOCUMENTATION);
+      model.exportToPath(aip, metadataPath, false, RodaConstants.STORAGE_DIRECTORY_METADATA);
+      model.exportToPath(aip, schemasPath, false, RodaConstants.STORAGE_DIRECTORY_SCHEMAS);
+      model.exportToPath(aip, submissionsPath, false, RodaConstants.STORAGE_DIRECTORY_SUBMISSION);
+      model.exportToPath(aip, aipMetadataPath, false, RodaConstants.STORAGE_AIP_METADATA_FILENAME);
 
       for (Representation representation : aip.getRepresentations()) {
         Path repDataPath = Paths.get(RodaConstants.STORAGE_DIRECTORY_REPRESENTATIONS, representation.getId(),
@@ -167,7 +164,7 @@ public class AipPackagePlugin extends RodaEntityPackagesPlugin<AIP> {
         Path repMetadataPath = Paths.get(RodaConstants.STORAGE_DIRECTORY_REPRESENTATIONS, representation.getId(),
           RodaConstants.STORAGE_DIRECTORY_METADATA);
         Path repMetadataDestinationPath = destinationPath.resolve(repMetadataPath);
-        storage.copy(storage, aipStoragePath, repMetadataDestinationPath, repMetadataPath.toString());
+        model.exportToPath(aip, repMetadataDestinationPath, false, repMetadataPath.toString());
 
         addFilesToBundle(aip, representation, index, repDataDestinationPath);
       }

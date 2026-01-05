@@ -15,12 +15,11 @@ import java.util.List;
 
 import org.roda.core.data.v2.jobs.IndexedReport;
 import org.roda.core.data.v2.jobs.Report;
-import org.roda.wui.client.browse.BrowserService;
 import org.roda.wui.client.common.UserLogin;
 import org.roda.wui.client.common.lists.pagination.ListSelectionUtils;
 import org.roda.wui.client.common.utils.HtmlSnippetUtils;
-import org.roda.wui.client.common.utils.JavascriptUtils;
 import org.roda.wui.client.process.IngestProcess;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.HistoryResolver;
 import org.roda.wui.common.client.tools.HistoryUtils;
 import org.roda.wui.common.client.tools.Humanize;
@@ -31,6 +30,7 @@ import org.roda.wui.common.client.tools.StringUtils;
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.dom.client.Element;
 import com.google.gwt.event.dom.client.ClickEvent;
+import com.google.gwt.i18n.client.LocaleInfo;
 import com.google.gwt.safehtml.shared.SafeHtmlUtils;
 import com.google.gwt.uibinder.client.UiBinder;
 import com.google.gwt.uibinder.client.UiField;
@@ -57,8 +57,9 @@ public class ShowJobReport extends Composite {
 
     @Override
     public void resolve(List<String> historyTokens, final AsyncCallback<Widget> callback) {
-      if (historyTokens.size() == 1) {
-        String jobReportId = historyTokens.get(0);
+      if (historyTokens.size() == 3) {
+        String jobId = historyTokens.get(0);
+        String jobReportId = historyTokens.get(2);
         retrieveJobReport(jobReportId, callback);
       } else {
         HistoryUtils.newHistory(IngestProcess.RESOLVER);
@@ -92,7 +93,7 @@ public class ShowJobReport extends Composite {
   // empty to get all report information
   private static final List<String> fieldsToReturn = new ArrayList<>();
 
-  private final IndexedReport jobReport;
+  private static IndexedReport jobReport = new IndexedReport();
 
   @UiField
   Label instanceIdLabel;
@@ -137,35 +138,19 @@ public class ShowJobReport extends Composite {
   FocusPanel keyboardFocus;
 
   private static void retrieveJobReport(String jobReportId, AsyncCallback<Widget> callback) {
-    BrowserService.Util.getInstance().retrieve(IndexedReport.class.getName(), jobReportId, fieldsToReturn,
-      new AsyncCallback<IndexedReport>() {
-        @Override
-        public void onFailure(Throwable caught) {
-          callback.onFailure(caught);
-        }
+    Services services = new Services("Get job report items", "get");
 
-        @Override
-        public void onSuccess(IndexedReport jobReport) {
-          retrieveJobReportItems(jobReport, callback);
-        }
-      });
-  }
-
-  private static void retrieveJobReportItems(IndexedReport jobReport, AsyncCallback<Widget> callback) {
-    BrowserService.Util.getInstance().retrieveJobReportItems(jobReport.getJobId(), jobReport.getId(),
-      new AsyncCallback<List<Report>>() {
-        @Override
-        public void onFailure(Throwable caught) {
-          callback.onFailure(caught);
-        }
-
-        @Override
-        public void onSuccess(List<Report> reports) {
-          jobReport.setReports(reports);
-          ShowJobReport showJob = new ShowJobReport(jobReport);
-          callback.onSuccess(showJob);
-        }
-      });
+    services.jobReportResource(s -> s.findByUuid(jobReportId, LocaleInfo.getCurrentLocale().getLocaleName()))
+      .thenCompose(indexedReport -> services.jobsResource(s -> s.getJobReport(indexedReport.getJobId(), jobReportId))
+        .whenComplete((reports, error) -> {
+          if (reports != null) {
+            indexedReport.setReports(reports.getReports());
+            ShowJobReport showJob = new ShowJobReport(indexedReport);
+            callback.onSuccess(showJob);
+          } else if (error != null) {
+            callback.onFailure(error);
+          }
+        }));
   }
 
   public ShowJobReport(IndexedReport jobReport) {
@@ -212,7 +197,6 @@ public class ShowJobReport extends Composite {
 
     boolean hasOutcome = StringUtils.isNotBlank(jobReport.getOutcomeObjectId())
       && !jobReport.getOutcomeObjectId().equals(jobReport.getSourceObjectId());
-
     if (hasOutcome) {
       if (jobReport.getOutcomeObjectLabel() != null) {
         outcomeObject.setText(jobReport.getOutcomeObjectLabel());
@@ -232,7 +216,6 @@ public class ShowJobReport extends Composite {
     outcomeObject.setVisible(hasOutcome);
     outcomeObjectState.setVisible(hasOutcome);
     outcomeObjectLabel.setVisible(hasOutcome);
-
     dateCreated.setText(Humanize.formatDateTime(jobReport.getDateCreated()));
     dateUpdated.setText(Humanize.formatDateTime(jobReport.getDateUpdated()));
     duration.setText(Humanize.durationInDHMS(jobReport.getDateCreated(), jobReport.getDateUpdated(), DHMSFormat.LONG));
@@ -242,9 +225,10 @@ public class ShowJobReport extends Composite {
 
     ListSelectionUtils.bindLayout(jobReport, searchPrevious, searchNext, keyboardFocus, true, false, false);
 
-    //If it is an ingestion, creates a panel to render the type of Ingestion
+    // If it is an ingestion, creates a panel to render the type of Ingestion
     if (jobReport.getIngestType() != null) {
-      ingestType.setText(jobReport.getIngestType().equals("NEW") ? messages.newIngestion() : messages.ingestionUpdate());
+      ingestType
+        .setText(jobReport.getIngestType().equals("NEW") ? messages.newIngestion() : messages.ingestionUpdate());
     } else {
       ingestTypePanel.setVisible(false);
     }
@@ -324,12 +308,6 @@ public class ShowJobReport extends Composite {
     if ("input".equalsIgnoreCase(firstElement.getTagName())) {
       firstElement.removeFromParent();
     }
-  }
-
-  @Override
-  protected void onLoad() {
-    super.onLoad();
-    JavascriptUtils.stickSidebar();
   }
 
   @UiHandler("buttonBack")

@@ -7,23 +7,21 @@
  */
 package org.roda.wui.client.planning;
 
-import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import org.roda.core.data.common.RodaConstants;
 import org.roda.core.data.exceptions.NotFoundException;
-import org.roda.core.data.v2.index.select.SelectedItemsList;
-import org.roda.core.data.v2.jobs.Job;
+import org.roda.core.data.v2.generics.select.SelectedItemsListRequest;
 import org.roda.core.data.v2.ri.RepresentationInformation;
-import org.roda.wui.client.browse.BrowserService;
+import org.roda.core.data.v2.ri.RepresentationInformationCreateRequest;
 import org.roda.wui.client.common.UserLogin;
 import org.roda.wui.client.common.dialogs.Dialogs;
 import org.roda.wui.client.common.utils.AsyncCallbackUtils;
-import org.roda.wui.client.common.utils.JavascriptUtils;
 import org.roda.wui.client.ingest.process.ShowJob;
 import org.roda.wui.client.management.MemberManagement;
 import org.roda.wui.client.process.InternalProcess;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.HistoryResolver;
 import org.roda.wui.common.client.tools.HistoryUtils;
 import org.roda.wui.common.client.tools.ListUtils;
@@ -31,6 +29,7 @@ import org.roda.wui.common.client.widgets.Toast;
 
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.event.dom.client.ClickEvent;
+import com.google.gwt.i18n.client.LocaleInfo;
 import com.google.gwt.uibinder.client.UiBinder;
 import com.google.gwt.uibinder.client.UiField;
 import com.google.gwt.uibinder.client.UiHandler;
@@ -49,18 +48,14 @@ public class EditRepresentationInformation extends Composite {
     @Override
     public void resolve(List<String> historyTokens, final AsyncCallback<Widget> callback) {
       if (historyTokens.size() == 1) {
-        String formatId = historyTokens.get(0);
-        BrowserService.Util.getInstance().retrieve(RepresentationInformation.class.getName(), formatId, fieldsToReturn,
-          new AsyncCallback<RepresentationInformation>() {
-
-            @Override
-            public void onFailure(Throwable caught) {
-              callback.onFailure(caught);
-            }
-
-            @Override
-            public void onSuccess(RepresentationInformation ri) {
-              EditRepresentationInformation editRepresentationInformation = new EditRepresentationInformation(ri);
+        Services services = new Services("Retrieve representation information", "get");
+        services
+          .representationInformationResource(
+            s -> s.findByUuid(historyTokens.get(0), LocaleInfo.getCurrentLocale().getLocaleName()))
+          .whenComplete((representationInformation, throwable) -> {
+            if (throwable == null) {
+              EditRepresentationInformation editRepresentationInformation = new EditRepresentationInformation(
+                representationInformation);
               callback.onSuccess(editRepresentationInformation);
             }
           });
@@ -94,8 +89,6 @@ public class EditRepresentationInformation extends Composite {
 
   private RepresentationInformation ri;
 
-  private static final List<String> fieldsToReturn = new ArrayList<>();
-
   @UiField
   Button buttonApply;
 
@@ -108,22 +101,10 @@ public class EditRepresentationInformation extends Composite {
   @UiField(provided = true)
   RepresentationInformationDataPanel representationInformationDataPanel;
 
-  /**
-   * Create a new panel to create a user
-   *
-   * @param user
-   *          the user to create
-   */
   public EditRepresentationInformation(RepresentationInformation ri) {
     this.ri = ri;
     this.representationInformationDataPanel = new RepresentationInformationDataPanel(true, true, ri);
     initWidget(uiBinder.createAndBindUi(this));
-  }
-
-  @Override
-  protected void onLoad() {
-    super.onLoad();
-    JavascriptUtils.stickSidebar();
   }
 
   @UiHandler("buttonApply")
@@ -132,19 +113,15 @@ public class EditRepresentationInformation extends Composite {
       String formatId = ri.getId();
       ri = representationInformationDataPanel.getRepresentationInformation();
       ri.setId(formatId);
-      BrowserService.Util.getInstance().updateRepresentationInformation(ri,
-        this.representationInformationDataPanel.getExtras(), new AsyncCallback<Void>() {
-
-          @Override
-          public void onFailure(Throwable caught) {
-            errorMessage(caught);
+      Services services = new Services("Update representation information", "update");
+      RepresentationInformationCreateRequest updateRequest = new RepresentationInformationCreateRequest();
+      updateRequest.setRepresentationInformation(ri);
+      updateRequest.setForm(representationInformationDataPanel.getCustomForm());
+      services.representationInformationResource(s -> s.updateRepresentationInformation(updateRequest))
+        .whenComplete((representationInformation, throwable) -> {
+          if (throwable == null) {
+            HistoryUtils.newHistory(ShowRepresentationInformation.RESOLVER, representationInformation.getId());
           }
-
-          @Override
-          public void onSuccess(Void result) {
-            HistoryUtils.newHistory(ShowRepresentationInformation.RESOLVER, ri.getId());
-          }
-
         });
     } else {
       HistoryUtils.newHistory(ShowRepresentationInformation.RESOLVER, ri.getId());
@@ -153,16 +130,12 @@ public class EditRepresentationInformation extends Composite {
 
   @UiHandler("buttonRemove")
   void buttonRemoveHandler(ClickEvent e) {
-    BrowserService.Util.getInstance().deleteRepresentationInformation(
-      new SelectedItemsList<>(Arrays.asList(ri.getUUID()), RepresentationInformation.class.getName()),
-      new AsyncCallback<Job>() {
-        @Override
-        public void onFailure(Throwable caught) {
-          HistoryUtils.newHistory(InternalProcess.RESOLVER);
-        }
-
-        @Override
-        public void onSuccess(Job result) {
+    Services services = new Services("Delete representation information", "delete");
+    services
+      .representationInformationResource(s -> s
+        .deleteMultipleRepresentationInformation(new SelectedItemsListRequest(Collections.singletonList(ri.getUUID()))))
+      .whenComplete((job, throwable) -> {
+        if (throwable == null) {
           Dialogs.showJobRedirectDialog(messages.removeJobCreatedMessage(), new AsyncCallback<Void>() {
 
             @Override
@@ -179,9 +152,11 @@ public class EditRepresentationInformation extends Composite {
 
             @Override
             public void onSuccess(final Void nothing) {
-              HistoryUtils.newHistory(ShowJob.RESOLVER, result.getId());
+              HistoryUtils.newHistory(ShowJob.RESOLVER, job.getId());
             }
           });
+        } else {
+          HistoryUtils.newHistory(InternalProcess.RESOLVER);
         }
       });
   }

@@ -40,6 +40,8 @@ public class SearchWrapper extends Composite {
   private final String preselectedDropdownValue;
 
   private final FlowPanel rootPanel;
+  private final FlowPanel mainPanel;
+  private final FlowPanel sidePanel;
 
   // this being not null means that lists should be created inside a ScrollPanel
   // and that the ScrollPanel should be using the specified CSS classes
@@ -58,6 +60,13 @@ public class SearchWrapper extends Composite {
     this.components = new Components();
 
     rootPanel = new FlowPanel();
+    rootPanel.setStyleName("searchWrapper");
+    mainPanel = new FlowPanel();
+    mainPanel.setStyleName("searchWrapperMainPanel roda6Card");
+    sidePanel = new FlowPanel();
+    sidePanel.setStyleName("searchWrapperSidePanel");
+    rootPanel.add(mainPanel);
+    rootPanel.add(sidePanel);
     initWidget(rootPanel);
   }
 
@@ -92,20 +101,18 @@ public class SearchWrapper extends Composite {
     String defaultLabelText = ConfigurationManager.resolveTranslation(RodaConstants.UI_LISTS_PROPERTY, list.getListId(),
       RodaConstants.UI_LISTS_SEARCH_SELECTEDINFO_LABEL_DEFAULT_I18N_PROPERTY);
     if (defaultLabelText == null) {
-      defaultLabelText = messages.someOfAObject(list.getClassToReturn().getName());
+      defaultLabelText = messages.searchButton() + " "
+        + messages.searchDropdownLabels(list.getClassToReturn().getName());
     }
 
     String dropdownValue = list.getClassToReturn().getSimpleName();
 
     // create
     searchPanel = new SearchPanel<>(list, filter, allFilter, incremental,
-      listBuilder.getOptions().getSearchPlaceholder(), hasMultipleSearchPanels,
-      listBuilder.getOptions().getActionable(), listBuilder.getOptions().getActionableCallback(), showSaveButton, hideListAfterClear);
-    if (hasMultipleSearchPanels) {
-      initSearchPanelSelectionDropdown();
-      searchPanelSelectionDropdown.addItem(defaultLabelText, dropdownValue,
-        SelectedPanel.getIconForList(list.getListId(), list.getClassToReturn().getSimpleName()));
-    } else {
+      listBuilder.getOptions().getSearchPlaceholder(), hasMultipleSearchPanels, showSaveButton, hideListAfterClear);
+    initSearchPanelSelectionDropdown();
+    searchPanelSelectionDropdown.addItem(defaultLabelText, dropdownValue, null);
+    if (!hasMultipleSearchPanels) {
       listClassForSingleSearchPanel = listBuilder.getOptions().getClassToReturn().getSimpleName();
     }
     searchPanel.setVisible(searchEnabled);
@@ -115,7 +122,7 @@ public class SearchWrapper extends Composite {
     // add search panel if none has been added yet, note that if there is a
     // preselectedDropdownValue then only the corresponding search panel should be
     // used as the default search panel
-    if (rootPanel.getWidgetCount() == 0) {
+    if (mainPanel.getWidgetCount() == 0) {
       if (preselectedDropdownValue != null) {
         if (preselectedDropdownValue.equals(dropdownValue)) {
           attachComponents(dropdownValue);
@@ -242,7 +249,7 @@ public class SearchWrapper extends Composite {
 
   private void initSearchPanelSelectionDropdown() {
     if (searchPanelSelectionDropdown == null) {
-      searchPanelSelectionDropdown = new Dropdown();
+      searchPanelSelectionDropdown = new Dropdown(true);
       searchPanelSelectionDropdown.addStyleName("searchInputListBox");
       searchPanelSelectionDropdown.addPopupStyleName("searchInputListBoxPopup");
       searchPanelSelectionDropdown.addValueChangeHandler(event -> attachComponents(event.getValue()));
@@ -253,20 +260,20 @@ public class SearchWrapper extends Composite {
     SearchPanel<T> searchPanel = components.getSearchPanel(objectClassSimpleName);
     AsyncTableCell<T> list = components.getList(objectClassSimpleName);
 
-    rootPanel.clear();
-    rootPanel.add(searchPanel);
+    mainPanel.clear();
+    mainPanel.add(searchPanel);
+    sidePanel.clear();
+    sidePanel.add(list.getSidePanel());
     if (scrollPanelCssClasses != null) {
       ScrollPanel scrollPanel = new ScrollPanel(list);
       scrollPanel.addStyleName(scrollPanelCssClasses);
-      rootPanel.add(scrollPanel);
+      mainPanel.add(scrollPanel);
     } else {
-      rootPanel.add(list);
+      mainPanel.add(list);
     }
 
-    if (hasMultipleSearchPanels) {
-      searchPanelSelectionDropdown.setSelectedValue(objectClassSimpleName, false);
-      searchPanel.attachSearchPanelSelectionDropdown(searchPanelSelectionDropdown);
-    }
+    searchPanelSelectionDropdown.setSelectedValue(objectClassSimpleName, false);
+    searchPanel.attachSearchPanelSelectionDropdown(searchPanelSelectionDropdown);
   }
 
   /**
@@ -327,5 +334,11 @@ public class SearchWrapper extends Composite {
       }
       return null;
     }
+  }
+
+  @Override
+  protected void onDetach() {
+    components.forEachList(AsyncTableCell::pauseAutoUpdate);
+    super.onDetach();
   }
 }

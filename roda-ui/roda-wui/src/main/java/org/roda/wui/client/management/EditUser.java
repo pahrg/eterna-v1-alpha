@@ -10,19 +10,21 @@
  */
 package org.roda.wui.client.management;
 
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 
 import org.roda.core.data.common.SecureString;
 import org.roda.core.data.exceptions.AlreadyExistsException;
 import org.roda.core.data.exceptions.NotFoundException;
+import org.roda.core.data.v2.generics.select.SelectedItemsListRequest;
 import org.roda.core.data.v2.user.User;
-import org.roda.wui.client.browse.BrowserService;
-import org.roda.wui.client.common.NoAsyncCallback;
+import org.roda.core.data.v2.user.requests.ChangeUserStatusRequest;
+import org.roda.core.data.v2.user.requests.UpdateUserRequest;
 import org.roda.wui.client.common.UserLogin;
 import org.roda.wui.client.common.dialogs.Dialogs;
-import org.roda.wui.client.common.utils.JavascriptUtils;
-import org.roda.wui.client.management.access.AccessKeyTablePanel;
-import org.roda.wui.client.management.access.CreateAccessKey;
+import org.roda.wui.client.ingest.process.ShowJob;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.HistoryResolver;
 import org.roda.wui.common.client.tools.HistoryUtils;
 import org.roda.wui.common.client.tools.ListUtils;
@@ -36,7 +38,6 @@ import com.google.gwt.uibinder.client.UiHandler;
 import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.google.gwt.user.client.ui.Button;
 import com.google.gwt.user.client.ui.Composite;
-import com.google.gwt.user.client.ui.FlowPanel;
 import com.google.gwt.user.client.ui.Widget;
 
 import config.i18n.client.ClientMessages;
@@ -53,17 +54,13 @@ public class EditUser extends Composite {
     public void resolve(List<String> historyTokens, final AsyncCallback<Widget> callback) {
       if (historyTokens.size() == 1) {
         String username = historyTokens.get(0);
-        UserManagementService.Util.getInstance().retrieveUser(username, new AsyncCallback<User>() {
-
-          @Override
-          public void onFailure(Throwable caught) {
-            callback.onFailure(caught);
-          }
-
-          @Override
-          public void onSuccess(User user) {
+        Services services = new Services("Get User", "get");
+        services.membersResource(s -> s.getUser(username)).whenComplete((user, error) -> {
+          if (user != null) {
             EditUser editUser = new EditUser(user);
             callback.onSuccess(editUser);
+          } else if (error != null) {
+            callback.onFailure(error);
           }
         });
       } else {
@@ -107,16 +104,10 @@ public class EditUser extends Composite {
   Button buttonRemove;
 
   @UiField
-  Button buttonAddAccessKey;
-
-  @UiField
   Button buttonCancel;
 
   @UiField(provided = true)
   UserDataPanel userDataPanel;
-
-  @UiField
-  FlowPanel accessKeyTablePanel;
 
   /**
    * Create a new panel to edit a user
@@ -126,13 +117,16 @@ public class EditUser extends Composite {
    */
   public EditUser(User user) {
     this.user = user;
-
     this.userDataPanel = new UserDataPanel(true, true, true);
     this.userDataPanel.setUser(user);
+    if (user.getExtra() != null) {
+      this.userDataPanel.setUserExtra(user.getExtra());
+    } else {
+      this.userDataPanel.setUserExtra(new HashSet<>());
+    }
 
     initWidget(uiBinder.createAndBindUi(this));
 
-    accessKeyTablePanel.add(new AccessKeyTablePanel(user.getId()));
     userDataPanel.setUsernameReadOnly(true);
 
     buttonDeActivate.setEnabled(true);
@@ -141,14 +135,8 @@ public class EditUser extends Composite {
     }
   }
 
-  @Override
-  protected void onLoad() {
-    super.onLoad();
-    JavascriptUtils.stickSidebar();
-  }
-
   private SecureString getPassword() {
-    if(userDataPanel.getPassword() != null) {
+    if (userDataPanel.getPassword() != null) {
       return new SecureString(userDataPanel.getPassword().toCharArray());
     } else {
       return null;
@@ -161,20 +149,15 @@ public class EditUser extends Composite {
       if (userDataPanel.isValid()) {
         final User updatedUser = userDataPanel.getUser();
         try (SecureString password = getPassword()) {
-
-          UserManagementService.Util.getInstance().updateUser(updatedUser, password, userDataPanel.getExtra(),
-            new AsyncCallback<Void>() {
-
-              @Override
-              public void onFailure(Throwable caught) {
-                errorMessage(caught, updatedUser);
-              }
-
-              @Override
-              public void onSuccess(Void result) {
-                HistoryUtils.newHistory(MemberManagement.RESOLVER);
-              }
-            });
+          Services services = new Services("Update User", "update");
+          UpdateUserRequest userOperations = new UpdateUserRequest(updatedUser, password, userDataPanel.getUserExtra());
+          services.membersResource(s -> s.updateUser(userOperations)).whenComplete((res, error) -> {
+            if (error == null) {
+              HistoryUtils.newHistory(ShowUser.RESOLVER, res.getId());
+            } else {
+              errorMessage(error, updatedUser);
+            }
+          });
         }
       } else {
         HistoryUtils.newHistory(MemberManagement.RESOLVER);
@@ -185,27 +168,29 @@ public class EditUser extends Composite {
   @UiHandler("buttonDeActivate")
   void buttonDeActivateHandler(ClickEvent e) {
     user.setActive(!user.isActive());
+    Services services = new Services("Update User", "update");
 
-    UserManagementService.Util.getInstance().updateUser(user, null, userDataPanel.getExtra(),
-      new AsyncCallback<Void>() {
+    ChangeUserStatusRequest request = new ChangeUserStatusRequest(
+      new SelectedItemsListRequest(Arrays.asList(user.getUUID())), user.isActive());
+    services.membersResource(s -> s.changeActive(request)).whenComplete((res, error) -> {
+      if (error == null) {
+        Toast.showInfo(messages.runningInBackgroundTitle(), messages.runningInBackgroundDescription());
+        Dialogs.showJobRedirectDialog(messages.jobCreatedMessage(), new AsyncCallback<Void>() {
 
-        @Override
-        public void onSuccess(Void result) {
-          BrowserService.Util.getInstance().deactivateUserAccessKeys(user.getId(), new NoAsyncCallback<Void>());
-          HistoryUtils.newHistory(MemberManagement.RESOLVER);
-        }
+          @Override
+          public void onFailure(Throwable caught) {
+            HistoryUtils.newHistory(MemberManagement.RESOLVER);
+          }
 
-        @Override
-        public void onFailure(Throwable caught) {
-          user.setActive(!user.isActive());
-          errorMessage(caught, null);
-        }
-      });
-  }
+          @Override
+          public void onSuccess(final Void nothing) {
+            HistoryUtils.newHistory(ShowJob.RESOLVER, res.getId());
+          }
+        });
 
-  @UiHandler("buttonAddAccessKey")
-  void buttonAddAccessKeyHandler(ClickEvent e) {
-    HistoryUtils.newHistory(CreateAccessKey.RESOLVER, user.getName());
+        HistoryUtils.newHistory(MemberManagement.RESOLVER);
+      }
+    });
   }
 
   @UiHandler("buttonRemove")
@@ -215,17 +200,12 @@ public class EditUser extends Composite {
         @Override
         public void onSuccess(Boolean confirmed) {
           if (confirmed) {
-            UserManagementService.Util.getInstance().deleteUser(user.getId(), new AsyncCallback<Void>() {
-
-              @Override
-              public void onSuccess(Void result) {
-                BrowserService.Util.getInstance().deleteUserAccessKeys(user.getId(), new NoAsyncCallback<Void>());
+            Services services = new Services("Delete user", "delete");
+            services.membersResource(s -> s.deleteUser(user.getId())).whenComplete((res, error) -> {
+              if (error == null) {
                 HistoryUtils.newHistory(MemberManagement.RESOLVER);
-              }
-
-              @Override
-              public void onFailure(Throwable caught) {
-                errorMessage(caught, null);
+              } else {
+                errorMessage(error, null);
               }
             });
           }

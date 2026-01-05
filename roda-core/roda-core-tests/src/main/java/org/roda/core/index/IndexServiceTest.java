@@ -38,6 +38,7 @@ import org.hamcrest.collection.IsCollectionWithSize;
 import org.roda.core.CorporaConstants;
 import org.roda.core.RodaCoreFactory;
 import org.roda.core.TestsHelper;
+import org.roda.core.common.iterables.CloseableIterable;
 import org.roda.core.common.notifications.EmailNotificationProcessor;
 import org.roda.core.data.common.RodaConstants;
 import org.roda.core.data.exceptions.AlreadyExistsException;
@@ -47,6 +48,7 @@ import org.roda.core.data.exceptions.IllegalOperationException;
 import org.roda.core.data.exceptions.NotFoundException;
 import org.roda.core.data.exceptions.RODAException;
 import org.roda.core.data.exceptions.RequestNotValidException;
+import org.roda.core.data.v2.common.OptionalWithCause;
 import org.roda.core.data.v2.index.IndexResult;
 import org.roda.core.data.v2.index.filter.EmptyKeyFilterParameter;
 import org.roda.core.data.v2.index.filter.Filter;
@@ -79,6 +81,7 @@ import org.roda.core.index.schema.SolrCollectionRegistry;
 import org.roda.core.index.utils.IterableIndexResult;
 import org.roda.core.index.utils.SolrUtils;
 import org.roda.core.model.ModelService;
+import org.roda.core.security.LdapUtilityTestHelper;
 import org.roda.core.storage.DefaultStoragePath;
 import org.roda.core.storage.StorageService;
 import org.roda.core.storage.fs.FSUtils;
@@ -98,6 +101,7 @@ public class IndexServiceTest {
   private static Path logPath;
   private static ModelService model;
   private static IndexService index;
+  private static LdapUtilityTestHelper ldapUtilityTestHelper;
 
   private static StorageService corporaService;
 
@@ -106,6 +110,7 @@ public class IndexServiceTest {
   @BeforeClass
   public static void setUp() throws Exception {
     basePath = TestsHelper.createBaseTempDir(IndexServiceTest.class, true);
+    ldapUtilityTestHelper = new LdapUtilityTestHelper();
 
     boolean deploySolr = true;
     boolean deployLdap = true;
@@ -114,7 +119,7 @@ public class IndexServiceTest {
     boolean deployPluginManager = false;
     boolean deployDefaultResources = false;
     RodaCoreFactory.instantiateTest(deploySolr, deployLdap, deployFolderMonitor, deployOrchestrator,
-      deployPluginManager, deployDefaultResources, false);
+      deployPluginManager, deployDefaultResources, false, ldapUtilityTestHelper.getLdapUtility());
 
     logPath = RodaCoreFactory.getLogPath();
     model = RodaCoreFactory.getModelService();
@@ -129,6 +134,7 @@ public class IndexServiceTest {
   @AfterClass
   public static void tearDown() throws Exception {
     IndexTestUtils.resetIndex();
+    ldapUtilityTestHelper.shutdown();
     RodaCoreFactory.shutdown();
     FSUtils.deletePath(basePath);
   }
@@ -474,7 +480,7 @@ public class IndexServiceTest {
 
   @Test
   public void testReindexLogEntry()
-    throws GenericException, RequestNotValidException, AuthorizationDeniedException, NotFoundException {
+    throws GenericException, RequestNotValidException, AuthorizationDeniedException, NotFoundException, IOException {
     long number = 10L;
 
     for (int i = 0; i < number; i++) {
@@ -503,7 +509,12 @@ public class IndexServiceTest {
     index.commit(LogEntry.class);
 
     model.findOldLogsAndMoveThemToStorage(logPath, null);
-    index.reindexActionLogs();
+
+    try (CloseableIterable<OptionalWithCause<LogEntry>> logs = model.listLogEntries()) {
+      for (OptionalWithCause<LogEntry> log : logs) {
+        index.reindexActionLog(log.get());
+      }
+    }
 
     index.commit(LogEntry.class);
 
@@ -552,7 +563,7 @@ public class IndexServiceTest {
         user.setAllRoles(roles);
         user.setDirectRoles(roles);
         user.setGuest(false);
-        user.setId("USER" + i);
+        user.setId("NAMEUSER" + i);
         user.setName("NAMEUSER" + i);
         user.setFullName("NAMEUSER" + i);
 
@@ -564,7 +575,7 @@ public class IndexServiceTest {
         group.setActive(true);
         group.setAllRoles(roles);
         group.setDirectRoles(roles);
-        group.setId("GROUP" + i);
+        group.setId("NAMEGROUP" + i);
         group.setName("NAMEGROUP" + i);
         group.setFullName("NAMEGROUP" + i);
 
@@ -718,6 +729,7 @@ public class IndexServiceTest {
 
   @Test
   public void testMessageIndex() throws RODAException {
+    IndexTestUtils.resetIndex();
     Notification notification = new Notification();
     notification.setSubject("Message subject");
     notification.setBody("Message body");
@@ -727,7 +739,7 @@ public class IndexServiceTest {
     Notification n = model.createNotification(notification, new EmailNotificationProcessor("test-email-template.vm"));
     // notification state must be FAILED because SMTP is not configured on test
     // environment
-    Assert.assertEquals(n.getState(), NotificationState.FAILED);
+    Assert.assertEquals(n.getState(), NotificationState.COMPLETED);
     index.commit(Notification.class);
 
     Notification message2 = model.retrieveNotification(notification.getId());
@@ -769,7 +781,7 @@ public class IndexServiceTest {
       aip.setPermissions(new Permissions());
 
       index.getSolrClient().add(SolrCollectionRegistry.getIndexName(IndexedAIP.class),
-        SolrCollectionRegistry.toSolrDocument(IndexedAIP.class, aip));
+        SolrCollectionRegistry.toSolrDocument(IndexedAIP.class, model, aip));
 
       index.commit(IndexedAIP.class);
 

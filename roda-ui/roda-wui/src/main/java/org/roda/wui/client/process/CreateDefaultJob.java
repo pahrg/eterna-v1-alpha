@@ -16,6 +16,8 @@ import java.util.List;
 import java.util.Set;
 
 import org.roda.core.data.common.RodaConstants;
+import org.roda.core.data.utils.SelectedItemsUtils;
+import org.roda.core.data.v2.generics.select.SelectedItemsRequest;
 import org.roda.core.data.v2.index.IsIndexed;
 import org.roda.core.data.v2.index.filter.AllFilterParameter;
 import org.roda.core.data.v2.index.filter.Filter;
@@ -30,7 +32,9 @@ import org.roda.core.data.v2.ip.IndexedDIP;
 import org.roda.core.data.v2.ip.IndexedFile;
 import org.roda.core.data.v2.ip.IndexedRepresentation;
 import org.roda.core.data.v2.ip.Representation;
+import org.roda.core.data.v2.jobs.Certificate;
 import org.roda.core.data.v2.jobs.CertificateInfo;
+import org.roda.core.data.v2.jobs.CreateJobRequest;
 import org.roda.core.data.v2.jobs.IndexedReport;
 import org.roda.core.data.v2.jobs.Job;
 import org.roda.core.data.v2.jobs.JobParallelism;
@@ -42,7 +46,6 @@ import org.roda.core.data.v2.jobs.PluginType;
 import org.roda.core.data.v2.jobs.Report;
 import org.roda.core.data.v2.risks.IndexedRisk;
 import org.roda.core.data.v2.risks.Risk;
-import org.roda.wui.client.browse.BrowserService;
 import org.roda.wui.client.common.BadgePanel;
 import org.roda.wui.client.common.UserLogin;
 import org.roda.wui.client.common.dialogs.Dialogs;
@@ -52,10 +55,11 @@ import org.roda.wui.client.common.lists.utils.ListBuilder;
 import org.roda.wui.client.common.lists.utils.ListFactory;
 import org.roda.wui.client.common.search.SearchWrapper;
 import org.roda.wui.client.common.utils.HtmlSnippetUtils;
-import org.roda.wui.client.common.utils.JavascriptUtils;
+import org.roda.wui.client.common.utils.JobUtils;
 import org.roda.wui.client.common.utils.PluginUtils;
 import org.roda.wui.client.ingest.process.PluginOptionsPanel;
 import org.roda.wui.client.main.Theme;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.HistoryResolver;
 import org.roda.wui.common.client.tools.ConfigurationManager;
 import org.roda.wui.common.client.tools.HistoryUtils;
@@ -95,6 +99,8 @@ import config.i18n.client.ClientMessages;
  */
 public class CreateDefaultJob extends Composite {
 
+  private static final ClientMessages messages = GWT.create(ClientMessages.class);
+  private static MyUiBinder uiBinder = GWT.create(MyUiBinder.class);
   public static final HistoryResolver RESOLVER = new HistoryResolver() {
 
     @Override
@@ -123,92 +129,62 @@ public class CreateDefaultJob extends Composite {
       return "create_job";
     }
   };
-
-  public interface MyUiBinder extends UiBinder<Widget, CreateDefaultJob> {
-  }
-
-  private static MyUiBinder uiBinder = GWT.create(MyUiBinder.class);
-  private static final ClientMessages messages = GWT.create(ClientMessages.class);
-
+  private static List<PluginType> pluginTypes = PluginUtils.getPluginTypesWithoutIngest();
+  @UiField
+  TextBox name;
+  @UiField
+  FlowPanel workflowListTitle;
+  @UiField
+  Label workflowCategoryLabel;
+  @UiField
+  FlowPanel workflowCategoryList;
+  @UiField
+  TabPanel workflowTabPanel;
+  @UiField
+  FlowPanel workflowList, workflowStoreList;
+  @UiField
+  FlowPanel workflowListPluginStatus;
+  @UiField
+  FlowPanel workflowListDescription;
+  @UiField
+  FlowPanel workflowListDescriptionCategories;
+  @UiField
+  FlowPanel workflowPanel;
+  @UiField
+  PluginOptionsPanel workflowOptions;
+  @UiField
+  Label selectedObject;
+  @UiField
+  ListBox targetList;
+  @UiField
+  FlowPanel targetListPanel;
+  @UiField
+  Button buttonCreate;
+  @UiField
+  Button buttonObtainCommand;
+  @UiField
+  Button buttonCancel;
+  @UiField
+  FlowPanel jobPriorityRadioButtons;
+  @UiField
+  FlowPanel jobParallelismRadioButtons;
+  @UiField(provided = true)
+  RadioButton highPriorityRadioButton;
+  @UiField(provided = true)
+  RadioButton mediumPriorityRadioButton;
+  @UiField(provided = true)
+  RadioButton lowPriorityRadioButton;
+  @UiField(provided = true)
+  RadioButton normalParallelismRadioButton;
+  @UiField(provided = true)
+  RadioButton limitedParallelismRadioButton;
+  @SuppressWarnings("rawtypes")
   private SearchWrapper search = null;
   private List<PluginInfo> plugins = null;
   private PluginInfo selectedPlugin = null;
   private boolean isListEmpty = true;
   private JobPriority priority = JobPriority.MEDIUM;
   private JobParallelism parallelism = JobParallelism.NORMAL;
-  private static List<PluginType> pluginTypes = PluginUtils.getPluginTypesWithoutIngest();
-
-  @UiField
-  TextBox name;
-
-  @UiField
-  FlowPanel workflowListTitle;
-
-  @UiField
-  Label workflowCategoryLabel;
-
-  @UiField
-  FlowPanel workflowCategoryList;
-
-  @UiField
-  TabPanel workflowTabPanel;
-
-  @UiField
-  FlowPanel workflowList;
-
-  @UiField
-  FlowPanel workflowListPluginStatus;
-
-  @UiField
-  FlowPanel workflowListDescription;
-
-  @UiField
-  FlowPanel workflowListDescriptionCategories;
-
-  @UiField
-  FlowPanel workflowPanel;
-
-  @UiField
-  PluginOptionsPanel workflowOptions;
-
-  @UiField
-  Label selectedObject;
-
-  @UiField
-  ListBox targetList;
-
-  @UiField
-  FlowPanel targetListPanel;
-
-  @UiField
-  Button buttonCreate;
-
-  @UiField
-  Button buttonObtainCommand;
-
-  @UiField
-  Button buttonCancel;
-
-  @UiField
-  FlowPanel jobPriorityRadioButtons;
-
-  @UiField
-  FlowPanel jobParallelismRadioButtons;
-
-  @UiField(provided = true)
-  RadioButton highPriorityRadioButton;
-
-  @UiField(provided = true)
-  RadioButton mediumPriorityRadioButton;
-
-  @UiField(provided = true)
-  RadioButton lowPriorityRadioButton;
-
-  @UiField(provided = true)
-  RadioButton normalParallelismRadioButton;
-
-  @UiField(provided = true)
-  RadioButton limitedParallelismRadioButton;
 
   public CreateDefaultJob() {
     highPriorityRadioButton = new RadioButton("priority", HtmlSnippetUtils.getJobPriorityHtml(JobPriority.HIGH, false));
@@ -222,24 +198,14 @@ public class CreateDefaultJob extends Composite {
 
     initWidget(uiBinder.createAndBindUi(this));
 
-    BrowserService.Util.getInstance().retrievePluginsInfo(pluginTypes, new AsyncCallback<List<PluginInfo>>() {
-
-      @Override
-      public void onFailure(Throwable caught) {
-        // do nothing
-      }
-
-      @Override
-      public void onSuccess(List<PluginInfo> pluginsInfo) {
-        init(pluginsInfo);
-      }
-    });
-  }
-
-  @Override
-  protected void onLoad() {
-    super.onLoad();
-    JavascriptUtils.stickSidebar();
+    Services services = new Services("Retrieve plugin information", "get");
+    pluginTypes.remove(PluginType.INTERNAL);
+    services.configurationsResource(s -> s.retrievePluginsInfo(pluginTypes, true))
+      .whenComplete((pluginInfoList, throwable) -> {
+        if (throwable == null) {
+          init(pluginInfoList.getPluginInfoList());
+        }
+      });
   }
 
   public void init(List<PluginInfo> plugins) {
@@ -248,7 +214,7 @@ public class CreateDefaultJob extends Composite {
     name.setText(messages.processNewDefaultName(new Date()));
     workflowOptions.setPlugins(plugins);
     configurePlugins();
-    workflowCategoryList.addStyleName("form-listbox-job");
+    workflowCategoryList.addStyleName("form-listbox-job roda6Card");
   }
 
   private void configureOrchestration() {
@@ -579,13 +545,7 @@ public class CreateDefaultJob extends Composite {
       } else if (CertificateInfo.CertificateStatus.VERIFIED.equals(certificateStatus)) {
         badgePanel.setIcon("fas fa-shield-alt");
         badgePanel.addStyleName("badge-panel-success");
-        CertificateInfo.Certificate certificate = certificateInfo.getCertificates().iterator().next();
-        String issuer = certificate.getOrganizationName(certificate.getIssuerDN());
-        statusMessage.setHTML(messages.pluginTrustedMessage(issuer));
-      } else if (CertificateInfo.CertificateStatus.LICENSED.equals(certificateStatus)) {
-        badgePanel.setIcon("fas fa-shield-alt");
-        badgePanel.addStyleName("badge-panel-success");
-        CertificateInfo.Certificate certificate = certificateInfo.getCertificates().iterator().next();
+        Certificate certificate = certificateInfo.getCertificates().iterator().next();
         String issuer = certificate.getOrganizationName(certificate.getIssuerDN());
         String subject = certificate.getOrganizationName(certificate.getSubjectDN());
         statusMessage.setHTML(messages.pluginLicensedMessage(issuer, subject));
@@ -696,30 +656,33 @@ public class CreateDefaultJob extends Composite {
   public void buttonCreateHandler(ClickEvent e) {
     buttonCreate.setEnabled(false);
     String jobName = getName().getText();
-    SelectedItems selected = search.getSelectedItemsInCurrentList();
-
+    SelectedItems<? extends IsIndexed> selected = search.getSelectedItemsInCurrentList();
     if (org.roda.core.data.v2.Void.class.getName().equals(targetList.getSelectedValue())) {
-      selected = new SelectedItemsNone();
+      selected = new SelectedItemsNone<>();
     } else if (isListEmpty) {
       selected = SelectedItemsAll.create(targetList.getSelectedValue());
     }
 
-    BrowserService.Util.getInstance().createProcess(jobName, priority, parallelism, selected,
-      getSelectedPlugin().getId(), getWorkflowOptions().getValue(), selected.getSelectedClass(),
-      new AsyncCallback<Job>() {
+    CreateJobRequest jobRequest = new CreateJobRequest();
+    jobRequest.setName(jobName);
+    jobRequest.setPlugin(getSelectedPlugin().getId());
+    jobRequest.setPluginParameters(getWorkflowOptions().getValue());
+    SelectedItemsRequest selectedItemsRequest = SelectedItemsUtils.convertToRESTRequest(selected);
+    jobRequest.setSourceObjects(selectedItemsRequest);
+    jobRequest.setPriority(priority.name());
+    jobRequest.setParallelism(parallelism.name());
+    jobRequest.setSourceObjectsClass(selected.getSelectedClass());
 
-        @Override
-        public void onFailure(Throwable caught) {
-          Toast.showError(messages.dialogFailure(), caught.getMessage());
-          buttonCreate.setEnabled(true);
-        }
-
-        @Override
-        public void onSuccess(Job result) {
-          Toast.showInfo(messages.dialogDone(), messages.processCreated());
-          HistoryUtils.newHistory(ActionProcess.RESOLVER);
-        }
-      });
+    Services services = new Services("Create job", "create");
+    services.jobsResource(s -> s.createJob(jobRequest)).whenComplete((job1, throwable) -> {
+      if (throwable != null) {
+        // Toast.showError(messages.dialogFailure(), caught.getMessage());
+        buttonCreate.setEnabled(true);
+      } else {
+        Toast.showInfo(messages.dialogDone(), messages.processCreated());
+        HistoryUtils.newHistory(ActionProcess.RESOLVER);
+      }
+    });
   }
 
   @SuppressWarnings("rawtypes")
@@ -734,20 +697,17 @@ public class CreateDefaultJob extends Composite {
       selected = SelectedItemsAll.create(targetList.getSelectedValue());
     }
 
-    BrowserService.Util.getInstance().createProcessJson(jobName, priority, parallelism, selected,
-      getSelectedPlugin().getId(), getWorkflowOptions().getValue(), selected.getSelectedClass(),
-      new AsyncCallback<String>() {
+    Services services = new Services("Obtain cURL command", "get");
+    Job job = JobUtils.createJob(jobName, priority, parallelism, selected, getSelectedPlugin().getId(),
+      getWorkflowOptions().getValue());
 
-        @Override
-        public void onFailure(Throwable caught) {
-          Toast.showError(messages.dialogFailure(), caught.getMessage());
-        }
-
-        @Override
-        public void onSuccess(String result) {
-          Dialogs.showInformationDialog(messages.createJobCurlCommand(), result, messages.closeButton(), true);
-        }
-      });
+    services.jobsResource(s -> s.obtainJobCommand(job)).whenComplete((result, throwable) -> {
+      if (throwable != null) {
+        Toast.showError(messages.dialogFailure(), throwable.getCause().getMessage());
+      } else {
+        Dialogs.showInformationDialog(messages.createJobCurlCommand(), result.getValue(), messages.closeButton(), true);
+      }
+    });
   }
 
   @UiHandler("buttonCancel")
@@ -778,6 +738,9 @@ public class CreateDefaultJob extends Composite {
 
   public FlowPanel getCategoryList() {
     return workflowCategoryList;
+  }
+
+  public interface MyUiBinder extends UiBinder<Widget, CreateDefaultJob> {
   }
 
 }

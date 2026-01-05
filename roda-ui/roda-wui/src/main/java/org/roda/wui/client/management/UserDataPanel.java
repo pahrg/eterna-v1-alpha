@@ -16,9 +16,9 @@ import java.util.List;
 import java.util.Set;
 
 import org.roda.core.data.exceptions.AuthorizationDeniedException;
+import org.roda.core.data.v2.generics.MetadataValue;
 import org.roda.core.data.v2.user.Group;
 import org.roda.core.data.v2.user.User;
-import org.roda.wui.client.browse.bundle.UserExtraBundle;
 import org.roda.wui.client.common.utils.AsyncCallbackUtils;
 import org.roda.wui.client.common.utils.FormUtilities;
 import org.roda.wui.common.client.ClientLogger;
@@ -110,7 +110,7 @@ public class UserDataPanel extends Composite implements HasValueChangeHandlers<U
   // has to be true to detected new field changes
   private boolean changed = true;
   private boolean checked = false;
-  private UserExtraBundle userExtraBundle = null;
+  private Set<MetadataValue> userExtra;
 
   @UiField
   HTML errors;
@@ -145,18 +145,18 @@ public class UserDataPanel extends Composite implements HasValueChangeHandlers<U
    * Create a new user data panel
    *
    * @param visible
-   * @param editmode
+   * @param editMode
    * @param enableGroupSelect
    * @param enablePermissions
    */
-  public UserDataPanel(boolean visible, boolean editmode, boolean enableGroupSelect, boolean enablePermissions) {
+  public UserDataPanel(boolean visible, boolean editMode, boolean enableGroupSelect, boolean enablePermissions) {
 
-    password = new PasswordPanel(editmode);
+    password = new PasswordPanel(editMode);
     groupSelect = new GroupSelect();
 
     initWidget(uiBinder.createAndBindUi(this));
 
-    this.editmode = editmode;
+    this.editmode = editMode;
     super.setVisible(visible);
     this.enableGroupSelect = enableGroupSelect;
 
@@ -252,35 +252,14 @@ public class UserDataPanel extends Composite implements HasValueChangeHandlers<U
     this.username.setText(user.getName());
     this.fullname.setText(user.getFullName());
     this.email.setText(user.getEmail());
-
+    this.userExtra = user.getExtra();
     this.setMemberGroups(user.getGroups());
     this.setPermissions(user.getDirectRoles(), user.getAllRoles());
-
-    UserManagementService.Util.getInstance().retrieveUserExtraBundle(user.getName(),
-      new AsyncCallback<UserExtraBundle>() {
-
-        @Override
-        public void onFailure(Throwable caught) {
-          if (caught instanceof AuthorizationDeniedException) {
-            // TODO inform user he does not have permissions to see to which
-            // groups he belongs to.
-            GWT.log("No permissions: " + caught.getMessage());
-          } else {
-            AsyncCallbackUtils.defaultFailureTreatment(caught);
-          }
-        }
-
-        @Override
-        public void onSuccess(UserExtraBundle userExtra) {
-          UserDataPanel.this.userExtraBundle = userExtra;
-          createForm(userExtra);
-        }
-      });
   }
 
-  public void setExtraBundle(UserExtraBundle bundle) {
-    UserDataPanel.this.userExtraBundle = bundle;
-    createForm(bundle);
+  public void setUserExtra(Set<MetadataValue> extra) {
+    UserDataPanel.this.userExtra = extra;
+    createForm(extra);
   }
 
   private void setPermissions(final Set<String> directRoles, final Set<String> allRoles) {
@@ -339,9 +318,9 @@ public class UserDataPanel extends Composite implements HasValueChangeHandlers<U
     return user;
   }
 
-  public void createForm(UserExtraBundle bundle) {
+  public void createForm(Set<MetadataValue> userExtra) {
     extra.clear();
-    FormUtilities.create(extra, bundle.getValues(), false);
+    FormUtilities.create(extra, userExtra, false);
   }
 
   /**
@@ -406,7 +385,7 @@ public class UserDataPanel extends Composite implements HasValueChangeHandlers<U
    */
   public boolean isValid() {
     List<String> errorList = new ArrayList<>();
-    if (username.getText().length() == 0) {
+    if (username.getText().isEmpty()) {
       username.addStyleName("isWrong");
       usernameError.setText(messages.mandatoryField());
       usernameError.setVisible(true);
@@ -429,7 +408,7 @@ public class UserDataPanel extends Composite implements HasValueChangeHandlers<U
       errorList.add(messages.passwordIsTooSmall());
     }
 
-    if (fullname.getText().length() == 0) {
+    if (fullname.getText().isEmpty()) {
       fullname.addStyleName("isWrong");
       fullnameError.setText(messages.mandatoryField());
       fullnameError.setVisible(true);
@@ -464,7 +443,7 @@ public class UserDataPanel extends Composite implements HasValueChangeHandlers<U
       emailError.setVisible(false);
     }
 
-    List<String> extraErrors = FormUtilities.validate(userExtraBundle.getValues(), extra);
+    List<String> extraErrors = FormUtilities.validate(userExtra, extra);
     errorList.addAll(extraErrors);
     checked = true;
 
@@ -479,7 +458,8 @@ public class UserDataPanel extends Composite implements HasValueChangeHandlers<U
     } else {
       errors.setVisible(false);
     }
-    return errorList.isEmpty() ? true : false;
+
+    return errorList.isEmpty();
   }
 
   /**
@@ -550,7 +530,7 @@ public class UserDataPanel extends Composite implements HasValueChangeHandlers<U
     return getUser();
   }
 
-  public UserExtraBundle getExtra() {
-    return userExtraBundle;
+  public Set<MetadataValue> getUserExtra() {
+    return userExtra;
   }
 }

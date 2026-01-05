@@ -15,7 +15,6 @@ import java.io.InputStreamReader;
 import java.io.Serializable;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
-import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
 import java.nio.file.FileVisitResult;
@@ -23,16 +22,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
-import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -44,20 +40,12 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import javax.xml.validation.Schema;
 
-import org.apache.commons.configuration.CombinedConfiguration;
-import org.apache.commons.configuration.CompositeConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.commons.configuration.tree.MergeCombiner;
-import org.apache.commons.configuration.tree.NodeCombiner;
 import org.apache.commons.io.FilenameUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrServerException;
@@ -76,10 +64,6 @@ import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.zookeeper.KeeperException;
-import org.reflections.Reflections;
-import org.reflections.scanners.Scanners;
-import org.reflections.util.ClasspathHelper;
-import org.reflections.util.ConfigurationBuilder;
 import org.roda.core.common.MarketUtils;
 import org.roda.core.common.Messages;
 import org.roda.core.common.PremisV3Utils;
@@ -87,6 +71,9 @@ import org.roda.core.common.RodaUtils;
 import org.roda.core.common.iterables.CloseableIterable;
 import org.roda.core.common.monitor.TransferUpdateStatus;
 import org.roda.core.common.monitor.TransferredResourcesScanner;
+import org.roda.core.config.ConfigurationManager;
+import org.roda.core.config.DirectoryInitializer;
+import org.roda.core.config.SpringContext;
 import org.roda.core.data.common.RodaConstants;
 import org.roda.core.data.common.RodaConstants.DistributedModeType;
 import org.roda.core.data.common.RodaConstants.NodeType;
@@ -103,9 +90,10 @@ import org.roda.core.data.exceptions.MarketException;
 import org.roda.core.data.exceptions.NotFoundException;
 import org.roda.core.data.exceptions.RequestNotValidException;
 import org.roda.core.data.exceptions.ReturnWithExceptions;
-import org.roda.core.data.exceptions.RoleAlreadyExistsException;
 import org.roda.core.data.utils.YamlUtils;
 import org.roda.core.data.v2.common.Pair;
+import org.roda.core.data.v2.disposal.hold.DisposalHold;
+import org.roda.core.data.v2.disposal.schedule.DisposalSchedule;
 import org.roda.core.data.v2.index.IndexResult;
 import org.roda.core.data.v2.index.facet.Facets;
 import org.roda.core.data.v2.index.filter.BasicSearchFilterParameter;
@@ -117,8 +105,6 @@ import org.roda.core.data.v2.index.sort.Sorter;
 import org.roda.core.data.v2.index.sublist.Sublist;
 import org.roda.core.data.v2.ip.IndexedFile;
 import org.roda.core.data.v2.ip.TransferredResource;
-import org.roda.core.data.v2.ip.disposal.DisposalHold;
-import org.roda.core.data.v2.ip.disposal.DisposalSchedule;
 import org.roda.core.data.v2.ip.metadata.IndexedPreservationAgent;
 import org.roda.core.data.v2.ip.metadata.IndexedPreservationEvent;
 import org.roda.core.data.v2.synchronization.SynchronizingStatus;
@@ -137,6 +123,7 @@ import org.roda.core.index.schema.SolrCollectionRegistry;
 import org.roda.core.index.utils.SolrUtils;
 import org.roda.core.index.utils.ZkController;
 import org.roda.core.migration.MigrationManager;
+import org.roda.core.model.DefaultModelService;
 import org.roda.core.model.ModelObserver;
 import org.roda.core.model.ModelService;
 import org.roda.core.model.utils.LdapUtility;
@@ -154,6 +141,7 @@ import org.roda.core.storage.StorageService;
 import org.roda.core.storage.StorageServiceWrapper;
 import org.roda.core.storage.fs.FSUtils;
 import org.roda.core.storage.fs.FileStorageService;
+import org.roda.core.transaction.RODATransactionManager;
 import org.roda.core.util.IdUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -164,9 +152,6 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 
-import ch.qos.logback.classic.LoggerContext;
-import ch.qos.logback.classic.joran.JoranConfigurator;
-import ch.qos.logback.core.joran.spi.JoranException;
 import io.prometheus.client.dropwizard.DropwizardExports;
 import io.prometheus.client.exporter.HTTPServer;
 import io.prometheus.client.hotspot.DefaultExports;
@@ -176,36 +161,27 @@ import io.prometheus.client.hotspot.DefaultExports;
  */
 public class RodaCoreFactory {
   private static final Logger LOGGER = LoggerFactory.getLogger(RodaCoreFactory.class);
-
   private static boolean instantiated = false;
   private static boolean instantiatedWithoutErrors = true;
+  private static ConfigurationManager configurationManager;
+  private static DirectoryInitializer directoryInitializer;
   private static NodeType nodeType;
   private static String instanceId = "";
   private static boolean migrationMode = false;
   private static List<Path> toDeleteDuringShutdown = new ArrayList<>();
 
   // Distributed instance related objects
-  private static DistributedModeType distributedModeType;
   private static LocalInstance localInstance;
   private static String apiSecretKey;
   private static long accessKeyValidity;
   private static long accessTokenValidity;
 
   // Core related objects
-  private static Path rodaHomePath;
-  private static Path storagePath;
-  private static Path indexDataPath;
   private static Optional<Path> tempIndexConfigsPath;
-  private static Path dataPath;
-  private static Path logPath;
-  private static Path configPath;
   private static Path workingDirectoryPath;
   private static Path reportDirectoryPath;
   private static Path disposalBinDirectoryPath;
-  private static Path exampleConfigPath;
-  private static Path defaultPath;
   private static Path fileShallowTmpDirectoryPath;
-  private static Path synchronizationDirectoryPath;
   private static Path localInstanceConfigPath;
   private static Path jobAttachmentsDirectoryPath;
 
@@ -243,66 +219,15 @@ public class RodaCoreFactory {
   private static EventsManager eventsManager;
 
   private static LdapUtility ldapUtility;
-  private static Path rodaApacheDSDataDirectory = null;
 
   // TransferredResources related objects
   private static TransferredResourcesScanner transferredResourcesScanner;
-
-  // Configuration related objects
-  private static CompositeConfiguration rodaConfiguration = null;
-  private static List<String> configurationFiles = null;
 
   // Caches
   private static CacheLoader<Pair<String, String>, Optional<Schema>> RODA_SCHEMAS_LOADER = new SchemasCacheLoader();
   private static LoadingCache<Pair<String, String>, Optional<Schema>> RODA_SCHEMAS_CACHE = CacheBuilder.newBuilder()
     .build(RODA_SCHEMAS_LOADER);
 
-  private static LoadingCache<Locale, Messages> I18N_CACHE = CacheBuilder.newBuilder()
-    .build(new CacheLoader<Locale, Messages>() {
-      @Override
-      public Messages load(Locale locale) throws Exception {
-        return new Messages(locale, getConfigPath().resolve(RodaConstants.CORE_I18N_FOLDER));
-      }
-    });
-  /**
-   * Shared configuration and message properties (cache). Includes properties from
-   * {@code rodaConfiguration} and translations from ServerMessages, filtered by
-   * the {@code ui.sharedProperties.*} properties in {@code roda-wui.properties}.
-   *
-   * This cache provides the complete set of properties to be shared with the
-   * client browser.
-   */
-  private static LoadingCache<Locale, Map<String, List<String>>> SHARED_PROPERTIES_CACHE = CacheBuilder.newBuilder()
-    .build(new CacheLoader<Locale, Map<String, List<String>>>() {
-      @Override
-      public Map<String, List<String>> load(Locale locale) {
-        Map<String, List<String>> sharedProperties = new HashMap<>(getRodaSharedConfigurationProperties());
-        Messages messages = getI18NMessages(locale);
-
-        if (messages != null) {
-          List<String> prefixes = RodaCoreFactory
-            .getRodaConfigurationAsList("ui.sharedProperties.whitelist.messages.prefix");
-          for (String prefix : prefixes) {
-            Map<String, String> translations = messages.getTranslations(prefix, String.class, false);
-            for (Map.Entry<String, String> translationEntry : translations.entrySet()) {
-              sharedProperties.put("i18n." + translationEntry.getKey(),
-                Collections.singletonList(translationEntry.getValue()));
-            }
-          }
-
-          List<String> properties = RodaCoreFactory
-            .getRodaConfigurationAsList("ui.display.properties.tika.fixed");
-          for (String propertyKey : properties) {
-            if (messages.containsTranslation(propertyKey)) {
-              sharedProperties.put("i18n." + propertyKey,
-                Collections.singletonList(messages.getTranslation(propertyKey)));
-            }
-          }
-        }
-
-        return sharedProperties;
-      }
-    });
   private static LoadingCache<String, DisposalSchedule> DISPOSAL_SCHEDULE_CACHE = CacheBuilder.newBuilder()
     .build(new CacheLoader<String, DisposalSchedule>() {
       @Override
@@ -317,20 +242,14 @@ public class RodaCoreFactory {
         return model.retrieveDisposalHold(disposalHoldId);
       }
     });
-  private static List<String> CONFIGURATIONS = new ArrayList<>(Arrays.asList("roda-core.properties",
-    "roda-roles.properties", "roda-permissions.properties", "roda-instance.properties"));
-  private static Map<String, Map<String, String>> rodaPropertiesCache = null;
-  /**
-   * Cache of shared configuration properties
-   *
-   * @see RodaCoreFactory#getRodaSharedConfigurationProperties
-   */
-  private static Map<String, List<String>> rodaSharedConfigurationPropertiesCache = null;
-  private static boolean configSymbolicLinksAllowed;
 
   private static HTTPServer prometheusMetricsServer;
 
   private static Map<String, Function<Locale, ResourceBundle>> pluginMessageRegistry = new HashMap<>();
+
+  private static RODATransactionManager RODATransactionManager;
+
+  private static RodaCoreFactory instance;
 
   /** Private empty constructor */
   private RodaCoreFactory() {
@@ -344,11 +263,6 @@ public class RodaCoreFactory {
 
   public static ResourceBundle getPluginMessages(String pluginId, Locale locale) {
     return pluginMessageRegistry.get(pluginId).apply(locale);
-  }
-
-  public static void addDefaultConfiguration(String configuration) {
-    CONFIGURATIONS.add(configuration);
-    LOGGER.info("Added configuration: '{}'", configuration);
   }
 
   public static boolean instantiatedWithoutErrors() {
@@ -381,9 +295,8 @@ public class RodaCoreFactory {
   }
 
   public static void instantiate() {
-    NodeType nodeType = NodeType
-      .valueOf(getProperty(RodaConstants.CORE_NODE_TYPE, RodaConstants.DEFAULT_NODE_TYPE.name()));
-
+    configurationManager = ConfigurationManager.getInstance();
+    NodeType nodeType = configurationManager.getNodeType();
     if (nodeType == NodeType.PRIMARY) {
       instantiate(NodeType.PRIMARY);
     } else if (nodeType == NodeType.TEST) {
@@ -421,6 +334,20 @@ public class RodaCoreFactory {
   }
 
   public static void instantiateTest(boolean deploySolr, boolean deployLdap, boolean deployTransferredResourcesScanner,
+    boolean deployOrchestrator, boolean deployPluginManager, boolean deployDefaultResources,
+    boolean deployProtocolManager, LdapUtility ldapUtility) {
+    INSTANTIATE_SOLR = deploySolr;
+    INSTANTIATE_LDAP = deployLdap;
+    INSTANTIATE_SCANNER = deployTransferredResourcesScanner;
+    INSTANTIATE_PLUGIN_ORCHESTRATOR = deployOrchestrator;
+    INSTANTIATE_PLUGIN_MANAGER = deployPluginManager;
+    INSTANTIATE_DEFAULT_RESOURCES = deployDefaultResources;
+    INSTANTIATE_PROTOCOL_MANAGER = deployProtocolManager;
+    RodaCoreFactory.ldapUtility = ldapUtility;
+    instantiateTest();
+  }
+
+  public static void instantiateTest(boolean deploySolr, boolean deployLdap, boolean deployTransferredResourcesScanner,
     boolean deployOrchestrator, boolean deployPluginManager, boolean deployDefaultResources, SolrType solrType) {
     INSTANTIATE_SOLR_TYPE = solrType;
     instantiateTest(deploySolr, deployLdap, deployTransferredResourcesScanner, deployOrchestrator, deployPluginManager,
@@ -431,6 +358,8 @@ public class RodaCoreFactory {
     INSTANTIATE_CONFIGURE_LOGBACK = false;
     INSTANTIATE_EXAMPLE_RESOURCES = false;
     instantiated = false;
+    configurationManager = ConfigurationManager.getInstance();
+    configurationManager.setNodeType(NodeType.TEST);
     instantiate(NodeType.TEST);
   }
 
@@ -470,32 +399,18 @@ public class RodaCoreFactory {
 
   private static void instantiate(NodeType nodeType) {
     RodaCoreFactory.nodeType = nodeType;
-    instanceId = getProperty(RodaConstants.CORE_NODE_INSTANCE_ID, "");
 
     if (!instantiated) {
       try {
-        // basic settings
-        configSymbolicLinksAllowed = !Boolean
-          .parseBoolean(System.getenv(RodaConstants.ENV_CONFIG_SYMBOLIC_LINKS_FORBIDDEN));
-
-        // determine RODA HOME
-        rodaHomePath = determineRodaHomePath();
-        LOGGER.debug("RODA HOME is {}", rodaHomePath);
+        // load core configurations
+        if (INSTANTIATE_CONFIGURE_LOGBACK) {
+          configurationManager.configureLogback();
+          LOGGER.debug("Finished logback configuration");
+        }
 
         // instantiate essential directories
         instantiateEssentialDirectories();
         LOGGER.debug("Finished instantiating essential directories");
-
-        // load core configurations
-        rodaConfiguration = new CompositeConfiguration();
-        configurationFiles = new ArrayList<>();
-        rodaPropertiesCache = new HashMap<>();
-
-        for (String configuration : CONFIGURATIONS) {
-          addConfiguration(configuration);
-          LOGGER.debug("Loaded {}", configuration);
-        }
-        LOGGER.debug("Finished loading configurations");
 
         // initialize working directory
         initializeWorkingDirectory();
@@ -516,6 +431,11 @@ public class RodaCoreFactory {
         // instantiate storage and model service
         instantiateStorageAndModel();
         LOGGER.debug("Finished instantiating storage & model");
+
+        if (!configurationManager.isLegacyImplementationEnabled()) {
+          instantiateTransactionManager(nodeType);
+          LOGGER.debug("Finished instantiating transaction manager");
+        }
 
         // initialize disposal bin directory
         initializeDisposalBinDirectory();
@@ -547,7 +467,7 @@ public class RodaCoreFactory {
         LOGGER.debug("Finished instantiating node specific objects");
 
         // verify if is necessary to perform a model/index migration
-        MigrationManager migrationManager = new MigrationManager(dataPath);
+        MigrationManager migrationManager = new MigrationManager(configurationManager.getDataPath());
         if (NodeType.PRIMARY == nodeType
           && migrationManager.isNecessaryToPerformMigration(getSolr(), tempIndexConfigsPath)) {
           // migrationManager.setupModelMigrations();
@@ -577,11 +497,16 @@ public class RodaCoreFactory {
           LOGGER.debug("Finished clean unfinished jobs operation (doing jobs clean up asynchronously)");
         }
 
+        instanceId = getProperty(RodaConstants.CORE_NODE_INSTANCE_ID, "");
+
+        if (!configurationManager.isLegacyImplementationEnabled() && nodeType == NodeType.PRIMARY
+          && RODATransactionManager != null && RODATransactionManager.isInitialized()) {
+          RODATransactionManager.cleanUnfinishedTransactions();
+          LOGGER.debug("Finished clean unfinished transactions operation");
+        }
+
         instantiated = true;
 
-      } catch (ConfigurationException e) {
-        LOGGER.error("Error loading roda properties", e);
-        instantiatedWithoutErrors = false;
       } catch (GenericException e) {
         if (!migrationMode) {
           LOGGER.error("Error instantiating storage model", e);
@@ -602,7 +527,8 @@ public class RodaCoreFactory {
 
   private static void initializeDisposalBinDirectory() {
     try {
-      String disposalBinFolder = getConfigurationString("disposal_bin.folder", RodaConstants.CORE_DISPOSAL_BIN_FOLDER);
+      String disposalBinFolder = configurationManager.getConfigurationString("disposal_bin.folder",
+        RodaConstants.CORE_DISPOSAL_BIN_FOLDER);
       disposalBinDirectoryPath = getDataPath().resolve(disposalBinFolder);
       Files.createDirectories(disposalBinDirectoryPath);
     } catch (IOException e) {
@@ -613,7 +539,7 @@ public class RodaCoreFactory {
 
   private static void initializeFileShallowTmpDirectoryPath() {
     try {
-      String fileShallowTmpFolder = getConfigurationString("file_shallow_tmp.folder",
+      String fileShallowTmpFolder = configurationManager.getConfigurationString("file_shallow_tmp.folder",
         RodaConstants.CORE_FILE_SHALLOW_TMP_FOLDER);
       fileShallowTmpDirectoryPath = Files.createTempDirectory(getWorkingDirectory(), fileShallowTmpFolder);
       toDeleteDuringShutdown.add(fileShallowTmpDirectoryPath);
@@ -625,7 +551,7 @@ public class RodaCoreFactory {
 
   private static void initializeLocalInstanceConfigDirectory() {
     try {
-      final String localInstanceFolder = getConfigurationString("local_instance.folder",
+      final String localInstanceFolder = configurationManager.getConfigurationString("local_instance.folder",
         RodaConstants.CORE_LOCAL_INSTANCE_FOLDER);
       localInstanceConfigPath = getConfigPath().resolve(localInstanceFolder);
       Files.createDirectories(localInstanceConfigPath);
@@ -637,21 +563,21 @@ public class RodaCoreFactory {
 
   private static void initializeSynchronizationStateDir() {
     try {
-      String synchronizationFolder = getConfigurationString("synchronization.folder",
+      String synchronizationFolder = configurationManager.getConfigurationString("synchronization.folder",
         RodaConstants.CORE_SYNCHRONIZATION_FOLDER);
-      synchronizationDirectoryPath = getDataPath().resolve(synchronizationFolder);
+      Path synchronizationDirectoryPath = getDataPath().resolve(synchronizationFolder);
+      configurationManager.setSynchronizationDirectoryPath(synchronizationDirectoryPath);
       Files.createDirectories(synchronizationDirectoryPath);
       Files.createDirectories(synchronizationDirectoryPath.resolve(RodaConstants.CORE_SYNCHRONIZATION_INCOMING_FOLDER));
       Files.createDirectories(synchronizationDirectoryPath.resolve(RodaConstants.CORE_SYNCHRONIZATION_OUTCOME_FOLDER));
     } catch (IOException e) {
-      throw new RuntimeException(
-        "Unable to create Synchronization DIRECTORY " + synchronizationDirectoryPath + ", Aborting...", e);
+      throw new RuntimeException("Unable to create Synchronization DIRECTORY , Aborting...", e);
     }
   }
 
   private static void initializeJobAttachmentsDir() {
     try {
-      String jobAttachmentsFolder = getConfigurationString("jobAttachments.folder",
+      String jobAttachmentsFolder = configurationManager.getConfigurationString("jobAttachments.folder",
         RodaConstants.CORE_JOB_ATTACHMENTS_FOLDER);
       jobAttachmentsDirectoryPath = getDataPath().resolve(jobAttachmentsFolder);
       Files.createDirectories(jobAttachmentsDirectoryPath);
@@ -663,7 +589,8 @@ public class RodaCoreFactory {
 
   private static void initializeMarketDir() {
     try {
-      String marketFolder = getConfigurationString("market.folder", RodaConstants.CORE_MARKET_FOLDER);
+      String marketFolder = configurationManager.getConfigurationString("market.folder",
+        RodaConstants.CORE_MARKET_FOLDER);
       marketDirectoryPath = getConfigPath().resolve(marketFolder);
       Files.createDirectories(marketDirectoryPath);
     } catch (IOException e) {
@@ -671,49 +598,16 @@ public class RodaCoreFactory {
     }
   }
 
-  /**
-   * Try to get property from 1) system property (passed in command-line via -D;
-   * if property does not start by "roda.", it will be prepended); 2) environment
-   * variable (upper case, replace '.' by '_' and if property does not start by
-   * "RODA_" after replacements, it will be prepended); 3) RODA configuration
-   * files (with original property value, ensuring that it does not start by
-   * "roda."); 4) return default value
-   * 
-   * <p>
-   * Example 1: for property = 'roda.node.type' this method will try to find the
-   * following:
-   * <ul>
-   * <li>system property: roda.node.type</li>
-   * <li>environment variable: RODA_NODE_TYPE</li>
-   * <li>configuration files: node.type</li>
-   * </p>
-   * <p>
-   * Example 2: for property = 'node.type' this method will try to find the
-   * following:
-   * <ul>
-   * <li>system property: roda.node.type</li>
-   * <li>environment variable: RODA_NODE_TYPE</li>
-   * <li>configuration files: node.type</li>
-   * </p>
-   */
+  public static void setLdapUtility(LdapUtility ldapUtility) {
+    RodaCoreFactory.ldapUtility = ldapUtility;
+  }
+
+  public static void setConfigurationManager(ConfigurationManager configurationManager) {
+    RodaCoreFactory.configurationManager = configurationManager;
+  }
+
   public static String getProperty(String property, String defaultValue) {
-    String sysProperty = property;
-    if (!sysProperty.startsWith("roda.")) {
-      sysProperty = "roda." + sysProperty;
-    }
-    String ret = System.getProperty(sysProperty);
-    if (ret == null) {
-      String envProperty = sysProperty.toUpperCase().replace('.', '_');
-      ret = System.getenv(envProperty);
-      if (ret == null && getRodaConfiguration() != null) {
-        String confProperty = property.replaceFirst("^roda.", "");
-        ret = getRodaConfiguration().getString(confProperty, defaultValue);
-      }
-    }
-    if (ret == null) {
-      ret = defaultValue;
-    }
-    return ret;
+    return configurationManager.getProperty(property, defaultValue);
   }
 
   /**
@@ -774,12 +668,18 @@ public class RodaCoreFactory {
     return Integer.parseInt(getProperty(property, Integer.toString(defaultValue)));
   }
 
-  public static boolean isConfigSymbolicLinksAllowed() {
-    return configSymbolicLinksAllowed;
+  public static void setConfigSymbolicLinksAllowed(boolean configSymbolicLinksAllowed) {
+    configurationManager.setConfigSymbolicLinksAllowed(configSymbolicLinksAllowed);
   }
 
-  public static void setConfigSymbolicLinksAllowed(boolean configSymbolicLinksAllowed) {
-    RodaCoreFactory.configSymbolicLinksAllowed = configSymbolicLinksAllowed;
+  private static void instantiateEssentialDirectories() {
+    directoryInitializer = DirectoryInitializer.getInstance(configurationManager);
+    if (INSTANTIATE_EXAMPLE_RESOURCES) {
+      directoryInitializer.instantiateExampleResources();
+    }
+    if (!directoryInitializer.isInstantiatedWithoutErrors()) {
+      instantiatedWithoutErrors = false;
+    }
   }
 
   private static void initializeWorkingDirectory() {
@@ -827,115 +727,10 @@ public class RodaCoreFactory {
     }
   }
 
-  private static Path determineRodaHomePath() {
-    Path rodaHomePath;
-    if (System.getProperty(RodaConstants.INSTALL_FOLDER_SYSTEM_PROPERTY) != null) {
-      rodaHomePath = Paths.get(System.getProperty(RodaConstants.INSTALL_FOLDER_SYSTEM_PROPERTY));
-    } else if (System.getenv(RodaConstants.INSTALL_FOLDER_ENVIRONMENT_VARIABLE) != null) {
-      rodaHomePath = Paths.get(System.getenv(RodaConstants.INSTALL_FOLDER_ENVIRONMENT_VARIABLE));
-    } else {
-      // last attempt (using user home and hidden directory called .roda)
-      String userHome = System.getProperty("user.home");
-      rodaHomePath = Paths.get(userHome, ".roda");
-      if (!FSUtils.exists(rodaHomePath)) {
-        try {
-          Files.createDirectories(rodaHomePath);
-        } catch (IOException e) {
-          throw new RuntimeException("Unable to create RODA HOME " + rodaHomePath + ". Aborting...", e);
-        }
-      }
-    }
-    // set roda.home in order to correctly configure logging even if no
-    // property has been defined
-    System.setProperty(RodaConstants.INSTALL_FOLDER_SYSTEM_PROPERTY, rodaHomePath.toString());
-
-    // instantiate essential directories
-    configPath = getEssentialDirectoryPath(rodaHomePath, RodaConstants.CORE_CONFIG_FOLDER);
-    exampleConfigPath = getEssentialDirectoryPath(rodaHomePath, RodaConstants.CORE_EXAMPLE_CONFIG_FOLDER);
-    defaultPath = getEssentialDirectoryPath(rodaHomePath, RodaConstants.CORE_DEFAULT_FOLDER);
-    dataPath = getEssentialDirectoryPath(rodaHomePath, RodaConstants.CORE_DATA_FOLDER);
-    logPath = getEssentialDirectoryPath(dataPath, RodaConstants.CORE_LOG_FOLDER);
-    storagePath = getEssentialDirectoryPath(dataPath, RodaConstants.CORE_STORAGE_FOLDER);
-    indexDataPath = getEssentialDirectoryPath(dataPath, RodaConstants.CORE_INDEX_FOLDER);
-
-    // configure logback
-    if (INSTANTIATE_CONFIGURE_LOGBACK) {
-      configureLogback();
-    }
-
-    return rodaHomePath;
-  }
-
-  private static Path getEssentialDirectoryPath(Path basePath, String directoryName) {
-    String configuredPath = System.getenv(RodaConstants.CORE_ESSENTIAL_DIRECTORY_PREFIX + directoryName.toUpperCase());
-
-    Path ret;
-
-    if (StringUtils.isNotBlank(configuredPath)) {
-      ret = Paths.get(FilenameUtils.normalize(configuredPath));
-    } else {
-      ret = basePath.resolve(directoryName);
-    }
-
-    return ret;
-  }
-
-  private static void configureLogback() {
-    try {
-      LoggerContext context = (LoggerContext) LoggerFactory.getILoggerFactory();
-      JoranConfigurator configurator = new JoranConfigurator();
-      configurator.setContext(context);
-      context.reset();
-      configurator.doConfigure(getConfigurationFile("logback.xml"));
-    } catch (JoranException e) {
-      LOGGER.error("Error configuring logback", e);
-    }
-  }
-
-  private static void instantiateEssentialDirectories() {
-    List<Path> essentialDirectories = new ArrayList<>();
-    essentialDirectories.add(configPath);
-    essentialDirectories.add(rodaHomePath.resolve(RodaConstants.CORE_LOG_FOLDER));
-    essentialDirectories.add(dataPath);
-    essentialDirectories.add(logPath);
-    essentialDirectories.add(storagePath);
-    essentialDirectories.add(indexDataPath);
-    essentialDirectories.add(exampleConfigPath);
-
-    for (Path path : essentialDirectories) {
-      try {
-        if (!FSUtils.exists(path)) {
-          Files.createDirectories(path);
-        }
-      } catch (IOException e) {
-        LOGGER.error("Unable to create " + path, e);
-        instantiatedWithoutErrors = false;
-      }
-    }
-
-    if (INSTANTIATE_EXAMPLE_RESOURCES) {
-      // copy configs folder from classpath to example folder
-      try {
-        FSUtils.deletePathQuietly(exampleConfigPath);
-        Files.createDirectories(exampleConfigPath);
-        copyFilesFromClasspath(RodaConstants.CORE_CONFIG_FOLDER + "/", exampleConfigPath, true,
-          Arrays.asList(RodaConstants.CORE_CONFIG_FOLDER + "/" + RodaConstants.CORE_LDAP_FOLDER,
-            RodaConstants.CORE_CONFIG_FOLDER + "/" + RodaConstants.CORE_I18N_FOLDER + "/"
-              + RodaConstants.CORE_I18N_CLIENT_FOLDER,
-            RodaConstants.CORE_CONFIG_FOLDER + "/" + RodaConstants.CORE_I18N_FOLDER + "/"
-              + RodaConstants.CORE_I18_GWT_XML_FILE));
-      } catch (IOException e) {
-        LOGGER.error("Unable to create " + exampleConfigPath, e);
-        instantiatedWithoutErrors = false;
-      }
-    }
-
-  }
-
   private static void instantiateDefaultObjects() {
     if (INSTANTIATE_DEFAULT_RESOURCES) {
-      try (CloseableIterable<Resource> resources = getStorageService()
-        .listResourcesUnderContainer(DefaultStoragePath.parse(""), true)) {
+      try (CloseableIterable<Resource> resources = storage.listResourcesUnderContainer(DefaultStoragePath.parse(""),
+        true)) {
 
         Iterator<Resource> resourceIterator = resources.iterator();
         boolean hasFileResources = false;
@@ -949,11 +744,18 @@ public class RodaCoreFactory {
         }
 
         if (!hasFileResources) {
-          copyFilesFromClasspath(RodaConstants.CORE_DEFAULT_FOLDER + "/", rodaHomePath, true);
-          Path staticDataDefaultFolder = rodaHomePath.resolve(RodaConstants.CORE_DEFAULT_FOLDER)
-            .resolve(RodaConstants.CORE_DATA_FOLDER);
-          Path targetPath = rodaHomePath.resolve(RodaConstants.CORE_DATA_FOLDER);
+          try {
+            RodaUtils.copyFilesFromClasspath(RodaConstants.CORE_DEFAULT_FOLDER + "/",
+              configurationManager.getRodaHomePath(), true);
+          } catch (IOException e) {
+            instantiatedWithoutErrors = false;
+          }
+          Path staticDataDefaultFolder = configurationManager.getRodaHomePath()
+            .resolve(RodaConstants.CORE_DEFAULT_FOLDER).resolve(RodaConstants.CORE_DATA_FOLDER);
+          Path targetPath = configurationManager.getRodaHomePath().resolve(RodaConstants.CORE_DATA_FOLDER);
 
+          // TODO: We should avoid using FileSystem if we want to add support for other
+          // storage types
           if (FSUtils.exists(staticDataDefaultFolder)) {
             try {
               Files.walkFileTree(staticDataDefaultFolder, new SimpleFileVisitor<Path>() {
@@ -986,94 +788,16 @@ public class RodaCoreFactory {
           // 20160712 hsilva: it needs to be this way as the resources are
           // copied to the file system and storage can be of a different type
           // (e.g. fedora)
-          FileStorageService fileStorageService = new FileStorageService(storagePath);
+          FileStorageService fileStorageService = new FileStorageService(configurationManager.getStoragePath());
 
           getIndexService().reindexRisks(fileStorageService);
           getIndexService().reindexRepresentationInformation(fileStorageService);
-          getIndexService().reindexAIPs();
-          // reindex other default objects HERE
         }
       } catch (AuthorizationDeniedException | RequestNotValidException | NotFoundException | GenericException
         | IOException e) {
         LOGGER.error("Cannot load default objects", e);
       }
     }
-  }
-
-  private static void copyFilesFromClasspath(String classpathPrefix, Path destinationDirectory,
-    boolean removeClasspathPrefixFromFinalPath) {
-    copyFilesFromClasspath(classpathPrefix, destinationDirectory, removeClasspathPrefixFromFinalPath,
-      Collections.emptyList());
-  }
-
-  private static void copyFilesFromClasspath(String classpathPrefix, Path destinationDirectory,
-    boolean removeClasspathPrefixFromFinalPath, List<String> excludePaths) {
-
-    List<ClassLoader> classLoadersList = new LinkedList<>();
-    classLoadersList.add(ClasspathHelper.contextClassLoader());
-
-    Reflections reflections = new Reflections(new ConfigurationBuilder()
-      .forPackage(classpathPrefix, ClasspathHelper.contextClassLoader(), ClasspathHelper.staticClassLoader())
-      .setScanners(Scanners.Resources));
-
-    Set<String> resources = reflections.getResources(Pattern.compile(".*"));
-    resources = resources.stream().filter(r -> !shouldExclude(r, classpathPrefix, excludePaths))
-      .collect(Collectors.toSet());
-
-    LOGGER.info("Copying files from classpath prefix={}, destination={}, removePrefix={}, excludePaths={}",
-      classpathPrefix, destinationDirectory, removeClasspathPrefixFromFinalPath, excludePaths);
-
-    for (String resource : resources) {
-
-      InputStream originStream = RodaCoreFactory.class.getClassLoader().getResourceAsStream(resource);
-      Path destinyPath;
-
-      String resourceFileName = resource;
-
-      // Removing ":" escape
-      resourceFileName = resourceFileName.replace("::", ":");
-
-      if (removeClasspathPrefixFromFinalPath) {
-        destinyPath = destinationDirectory.resolve(resourceFileName.replaceFirst(classpathPrefix, ""));
-      } else {
-        destinyPath = destinationDirectory.resolve(resourceFileName);
-      }
-
-      try {
-        // create all parent directories
-        Files.createDirectories(destinyPath.getParent());
-        // copy file
-        Files.copy(originStream, destinyPath, StandardCopyOption.REPLACE_EXISTING);
-      } catch (IOException e) {
-        LOGGER.error("Error copying file from classpath: {} to {} (reason: {})", originStream, destinyPath,
-          e.getMessage());
-        instantiatedWithoutErrors = false;
-      } finally {
-        RodaUtils.closeQuietly(originStream);
-      }
-
-    }
-  }
-
-  private static boolean shouldExclude(String resource, String classpathPrefix, List<String> excludePaths) {
-    boolean exclude = false;
-
-    if (resource.startsWith(classpathPrefix)) {
-
-      for (String excludePath : excludePaths) {
-        if (resource.startsWith(excludePath)) {
-          exclude = true;
-          break;
-        }
-      }
-    } else {
-      exclude = true;
-    }
-    return exclude;
-  }
-
-  private static void copyFilesFromClasspath(String classpathPrefix, Path destinationDirectory) {
-    copyFilesFromClasspath(classpathPrefix, destinationDirectory, false);
   }
 
   private static void instantiatePluginManager() {
@@ -1090,7 +814,7 @@ public class RodaCoreFactory {
       }
 
       try {
-        pluginManager = PluginManager.instantiatePluginManager(getConfigPath(), getPluginsPath());
+        pluginManager = PluginManager.instantiatePluginManager(configurationManager);
       } catch (PluginManagerException e) {
         LOGGER.error("Error instantiating PluginManager", e);
         instantiatedWithoutErrors = false;
@@ -1148,7 +872,7 @@ public class RodaCoreFactory {
   private static void instantiateStorageAndModel() throws GenericException {
     storage = new StorageServiceWrapper(instantiateStorage(), nodeType);
     LOGGER.debug("Finished instantiating storage...");
-    model = new ModelService(storage, eventsManager, nodeType, instanceId);
+    model = new DefaultModelService(storage, eventsManager, nodeType, instanceId);
     LOGGER.debug("Finished instantiating model...");
   }
 
@@ -1159,11 +883,12 @@ public class RodaCoreFactory {
         Class<?> storageClass = Class.forName(newStorageService);
         Constructor<?> constructor = storageClass.getConstructor(Path.class, String.class);
 
-        LOGGER.debug("Going to instantiate '{}' on '{}'", storageClass.getSimpleName(), storagePath);
+        LOGGER.debug("Going to instantiate '{}' on '{}'", storageClass.getSimpleName(),
+          configurationManager.getStoragePath());
         String trashDirName = getRodaConfiguration().getString("core.storage.filesystem.trash",
           RodaConstants.TRASH_CONTAINER);
 
-        return (StorageService) constructor.newInstance(storagePath, trashDirName);
+        return (StorageService) constructor.newInstance(configurationManager.getStoragePath(), trashDirName);
       } catch (ClassNotFoundException | NoSuchMethodException | IllegalAccessException | InstantiationException
         | InvocationTargetException e) {
         LOGGER.warn("Error instantiating storage service defined on properties, falling back to a default service", e);
@@ -1173,16 +898,44 @@ public class RodaCoreFactory {
     StorageType storageType = StorageType.valueOf(
       getRodaConfiguration().getString(RodaConstants.CORE_STORAGE_TYPE, RodaConstants.DEFAULT_STORAGE_TYPE.toString()));
     if (storageType == RodaConstants.StorageType.FILESYSTEM) {
-      LOGGER.debug("Going to instantiate Filesystem on '{}'", storagePath);
+      LOGGER.debug("Going to instantiate Filesystem on '{}'", configurationManager.getStoragePath());
       String trashDirName = getRodaConfiguration().getString("core.storage.filesystem.trash",
         RodaConstants.TRASH_CONTAINER);
-      StorageService fileStorageService = new FileStorageService(storagePath, trashDirName);
+      StorageService fileStorageService = new FileStorageService(configurationManager.getStoragePath(), trashDirName);
       return fileStorageService;
     } else {
       LOGGER.error("Unknown storage service '{}'", storageType.name());
       throw new GenericException();
     }
 
+  }
+
+  private static void instantiateTransactionManager(NodeType nodeType) throws GenericException {
+    LOGGER.warn("RODA transactions are an experimental feature and may be unstable. Use with caution.");
+    if (nodeType.equals(NodeType.TEST)) {
+      // TODO: Handle test mode
+      return;
+    }
+    if (SpringContext.isContextInitialized()) {
+      RODATransactionManager = SpringContext.getBean(RODATransactionManager.class);
+      RODATransactionManager.setMainModelService(model);
+      RODATransactionManager.setInitialized(true);
+    } else {
+      throw new GenericException(
+        "Unable to instantiate RODA transaction manager, because Spring context is not initialized");
+    }
+  }
+
+  public static RODATransactionManager getTransactionManager() throws GenericException {
+    if (nodeType.equals(NodeType.TEST)) {
+      // TODO: Handle test mode
+      return null;
+    }
+    if (RODATransactionManager == null && !configurationManager.isLegacyImplementationEnabled()) {
+      instantiateTransactionManager(nodeType);
+      LOGGER.debug("Finished instantiating transaction manager");
+    }
+    return RODATransactionManager;
   }
 
   /**
@@ -1209,7 +962,7 @@ public class RodaCoreFactory {
 
       if (nodeType == NodeType.PRIMARY || nodeType == NodeType.REPLICA) {
         tempIndexConfigsPath = Optional.empty();
-        solrHome = configPath.resolve(RodaConstants.CORE_INDEX_FOLDER);
+        solrHome = configurationManager.getConfigPath().resolve(RodaConstants.CORE_INDEX_FOLDER);
         if (!FSUtils.exists(solrHome) || FEATURE_OVERRIDE_INDEX_CONFIGS) {
           try {
             Path tempConfig = Files.createTempDirectory(getWorkingDirectory(), RodaConstants.CORE_INDEX_FOLDER);
@@ -1248,31 +1001,16 @@ public class RodaCoreFactory {
         }
 
         // instantiate index related object
-        index = new IndexService(solr, model, metricsRegistry, rodaConfiguration, nodeType);
+        index = new IndexService(solr, model, metricsRegistry, getRodaConfiguration(), nodeType);
       }
     }
 
-  }
-
-  private static String getConfigurationString(String key, String defaultValue) {
-    String envKey = "RODA_" + key.toUpperCase().replace('.', '_');
-    String value = System.getenv(envKey);
-    if (value == null) {
-      value = getRodaConfiguration().getString(key, defaultValue);
-
-      if (value.startsWith("${env:")) {
-        // if value is a non-interpolated env variable consider default
-        value = defaultValue;
-      }
-    }
-
-    return value;
   }
 
   private static SolrClient instantiateSolr(Path solrHome, boolean writeIsAllowed)
     throws GenericException, InterruptedException {
-    SolrType solrType = SolrType
-      .valueOf(getConfigurationString(RodaConstants.CORE_SOLR_TYPE, RodaConstants.DEFAULT_SOLR_TYPE.toString()));
+    SolrType solrType = SolrType.valueOf(configurationManager.getConfigurationString(RodaConstants.CORE_SOLR_TYPE,
+      RodaConstants.DEFAULT_SOLR_TYPE.toString()));
 
     if (INSTANTIATE_SOLR_TYPE != null) {
       solrType = INSTANTIATE_SOLR_TYPE;
@@ -1280,7 +1018,7 @@ public class RodaCoreFactory {
 
     Field.initialize();
 
-    String solrCloudZooKeeperUrls = getConfigurationString(RodaConstants.CORE_SOLR_CLOUD_URLS,
+    String solrCloudZooKeeperUrls = configurationManager.getConfigurationString(RodaConstants.CORE_SOLR_CLOUD_URLS,
       "localhost:2181,localhost:2182,localhost:2183");
     LOGGER.info("Instantiating SOLR Cloud at {}", solrCloudZooKeeperUrls);
 
@@ -1449,8 +1187,12 @@ public class RodaCoreFactory {
 
       Path commonConf = solrHome.resolve(SolrUtils.COMMON).resolve(SolrUtils.CONF);
 
-      copyFilesFromClasspath(RodaConstants.CORE_CONFIG_FOLDER + "/" + RodaConstants.CORE_INDEX_FOLDER + "/"
-        + SolrUtils.COMMON + "/" + SolrUtils.CONF + "/", commonConf, true);
+      try {
+        RodaUtils.copyFilesFromClasspath(RodaConstants.CORE_CONFIG_FOLDER + "/" + RodaConstants.CORE_INDEX_FOLDER + "/"
+          + SolrUtils.COMMON + "/" + SolrUtils.CONF + "/", commonConf, true);
+      } catch (IOException e) {
+        instantiatedWithoutErrors = false;
+      }
 
       for (String collection : SolrCollectionRegistry.registryIndexNames()) {
         if (!existingCollections.contains(collection)) {
@@ -1506,9 +1248,9 @@ public class RodaCoreFactory {
 
   private static void instantiateNodeSpecificObjects(NodeType nodeType) {
     if (INSTANTIATE_LDAP) {
-      LOGGER.debug("Starting up ApacheDS");
-      startApacheDS();
-      LOGGER.debug("Finishing starting up ApacheDS");
+      LOGGER.debug("Instantiate LDAP Server");
+      initializeLdapServer(nodeType);
+      LOGGER.debug("Finishing instantiate LDAP Server");
     }
 
     if (INSTANTIATE_SCANNER) {
@@ -1549,8 +1291,9 @@ public class RodaCoreFactory {
 
   private static void instantiateDistributedMode() {
     initializeLocalInstanceConfigDirectory();
-    distributedModeType = DistributedModeType.valueOf(
+    DistributedModeType distributedModeType = DistributedModeType.valueOf(
       getProperty(RodaConstants.DISTRIBUTED_MODE_TYPE_PROPERTY, RodaConstants.DEFAULT_DISTRIBUTED_MODE_TYPE.name()));
+    configurationManager.setDistributedModeType(distributedModeType);
     try {
       if (DistributedModeType.CENTRAL.equals(distributedModeType)) {
         if (getLocalInstance() == null) {
@@ -1601,7 +1344,7 @@ public class RodaCoreFactory {
     URL loggerConfigurationFileUrl = getConfigurationFile(loggerConfigurationFile);
     if (loggerConfigurationFileUrl != null) {
       System.setProperty("roda.logback.include", loggerConfigurationFileUrl.toString());
-      configureLogback();
+      configurationManager.configureLogback();
     }
   }
 
@@ -1622,9 +1365,6 @@ public class RodaCoreFactory {
           LOGGER.error("Error shutting down SOLR", e);
         }
       }
-      if (INSTANTIATE_LDAP) {
-        stopApacheDS();
-      }
       if (INSTANTIATE_PLUGIN_MANAGER) {
         pluginManager.shutdown();
       }
@@ -1633,10 +1373,6 @@ public class RodaCoreFactory {
       }
       if (INSTANTIATE_PLUGIN_ORCHESTRATOR) {
         pluginOrchestrator.shutdown();
-      }
-      if (nodeType == NodeType.TEST) {
-        // final cleanup
-        FSUtils.deletePathQuietly(workingDirectoryPath);
       }
 
       if (getProperty(RodaConstants.CORE_EVENTS_ENABLED, false)) {
@@ -1653,6 +1389,15 @@ public class RodaCoreFactory {
         prometheusMetricsServer.stop();
       }
 
+      if (nodeType == NodeType.TEST) {
+        // final cleanup
+        FSUtils.deletePathQuietly(workingDirectoryPath);
+        ConfigurationManager.resetInstanceAfterTest();
+        DirectoryInitializer.resetInstanceAfterTest();
+        configurationManager = null;
+        directoryInitializer = null;
+      }
+
       // delete resources that are no longer needed
       toDeleteDuringShutdown.forEach(e -> FSUtils.deletePathQuietly(e));
     }
@@ -1663,125 +1408,19 @@ public class RodaCoreFactory {
   }
 
   /**
-   * Start ApacheDS.
+   * Instantiate Ldap server.
    */
-  private static void startApacheDS() {
-    rodaApacheDSDataDirectory = getEssentialDirectoryPath(dataPath, RodaConstants.CORE_LDAP_FOLDER);
-
+  private static void initializeLdapServer(NodeType nodeType) {
     try {
-      final Configuration rodaConfig = RodaCoreFactory.getRodaConfiguration();
-
-      final boolean ldapStartServer = rodaConfig.getBoolean("core.ldap.startServer",
-        rodaConfig.getBoolean("ldap.startServer", false));
-
-      final int ldapPort = rodaConfig.getInt("core.ldap.port",
-        rodaConfig.getInt("ldap.port", RodaConstants.CORE_LDAP_DEFAULT_PORT));
-
-      final String ldapBaseDN = rodaConfig.getString("core.ldap.baseDN",
-        rodaConfig.getString("ldap.baseDN", "dc=roda,dc=org"));
-
-      final String ldapPeopleDN = rodaConfig.getString("core.ldap.peopleDN",
-        rodaConfig.getString("ldap.peopleDN", "ou=users,dc=roda,dc=org"));
-
-      final String ldapGroupsDN = rodaConfig.getString("core.ldap.groupsDN",
-        rodaConfig.getString("ldap.groupsDN", "ou=groups,dc=roda,dc=org"));
-
-      final String ldapRolesDN = rodaConfig.getString("core.ldap.rolesDN",
-        rodaConfig.getString("ldap.rolesDN", "ou=roles,dc=roda,dc=org"));
-
-      final String ldapAdminDN = rodaConfig.getString("core.ldap.adminDN",
-        rodaConfig.getString("ldap.adminDN", "uid=admin,ou=system"));
-
-      final String ldapAdminPassword = rodaConfig.getString("core.ldap.adminPassword",
-        rodaConfig.getString("ldap.adminPassword", "eterna"));
-
-      final String ldapPasswordDigestAlgorithm = rodaConfig.getString("core.ldap.passwordDigestAlgorithm",
-        rodaConfig.getString("ldap.passwordDigestAlgorithm", "PKCS5S2"));
-
-      final List<String> ldapProtectedUsers = RodaUtils.copyList(rodaConfig.getList("core.ldap.protectedUsers"));
-      ldapProtectedUsers.addAll(RodaUtils.copyList(rodaConfig.getList("core.ldap.protectedUsers")));
-
-      final List<String> ldapProtectedGroups = RodaUtils.copyList(rodaConfig.getList("core.ldap.protectedGroups"));
-      ldapProtectedGroups.addAll(RodaUtils.copyList(rodaConfig.getList("core.ldap.protectedGroups")));
-
-      final String rodaGuestDN = rodaConfig.getString("core.ldap.rodaGuestDN",
-        rodaConfig.getString("ldap.rodaGuestDN", "uid=guest,ou=users,dc=roda,dc=org"));
-
-      final String rodaAdminDN = rodaConfig.getString("core.ldap.rodaAdminDN",
-        rodaConfig.getString("ldap.rodaAdminDN", "uid=admin,ou=users,dc=roda,dc=org"));
-
-      final String rodaAdministratorsDN = rodaConfig.getString("core.ldap.rodaAdministratorsDN",
-        rodaConfig.getString("ldap.rodaAdministratorsDN", "cn=administrators,ou=groups,dc=roda,dc=org"));
-
-      RodaCoreFactory.ldapUtility = new LdapUtility(ldapStartServer, ldapPort, ldapBaseDN, ldapPeopleDN, ldapGroupsDN,
-        ldapRolesDN, ldapAdminDN, ldapAdminPassword, ldapPasswordDigestAlgorithm, ldapProtectedUsers,
-        ldapProtectedGroups, rodaGuestDN, rodaAdminDN, rodaApacheDSDataDirectory);
-      ldapUtility.setRODAAdministratorsDN(rodaAdministratorsDN);
-
+      RodaCoreFactory.ldapUtility.initialize(nodeType);
       UserUtility.setLdapUtility(ldapUtility);
 
-      if (!FSUtils.exists(rodaApacheDSDataDirectory) || FSUtils.isDirEmpty(rodaApacheDSDataDirectory)) {
-        Files.createDirectories(rodaApacheDSDataDirectory);
-        final List<String> ldifFileNames = Arrays.asList("users.ldif", "groups.ldif", "roles.ldif");
-        final List<String> ldifs = new ArrayList<>();
-        for (String ldifFileName : ldifFileNames) {
-          final InputStream ldifInputStream = RodaCoreFactory.getConfigurationFileAsStream(getConfigPath(),
-            RodaConstants.CORE_LDAP_FOLDER + "/" + ldifFileName);
-          if (ldifInputStream != null) {
-            ldifs.add(IOUtils.toString(ldifInputStream, RodaConstants.DEFAULT_ENCODING));
-            RodaUtils.closeQuietly(ldifInputStream);
-          }
-        }
-
-        RodaCoreFactory.ldapUtility.initDirectoryService(ldifs);
-      } else {
-        RodaCoreFactory.ldapUtility.initDirectoryService();
-      }
-
-      createRoles(rodaConfig);
       if (checkIfWriteIsAllowed(getNodeType())) {
         indexUsersAndGroupsFromLDAP();
       }
-    } catch (final Exception e) {
-      LOGGER.error("Error starting up embedded ApacheDS", e);
+    } catch (Exception e) {
+      LOGGER.error("Error starting ldap server", e);
       instantiatedWithoutErrors = false;
-    }
-  }
-
-  private static void stopApacheDS() {
-    try {
-      RodaCoreFactory.ldapUtility.stopService();
-    } catch (final Exception e) {
-      LOGGER.error("Error while shutting down ApacheDS embedded server", e);
-    }
-  }
-
-  /**
-   * For each role in roda-roles.properties create the role in LDAP if it don't
-   * exist already.
-   *
-   * @param rodaConfig
-   *          roda configuration
-   * @throws GenericException
-   *           if something unexpected happens creating roles.
-   */
-  private static void createRoles(final Configuration rodaConfig) throws GenericException {
-    final Iterator<String> keys = rodaConfig.getKeys("core.roles");
-    final Set<String> roles = new HashSet<>();
-
-    while (keys.hasNext()) {
-      roles.addAll(Arrays.asList(rodaConfig.getStringArray(keys.next())));
-    }
-
-    for (final String role : roles) {
-      try {
-        if (StringUtils.isNotBlank(role)) {
-          RodaCoreFactory.ldapUtility.addRole(role);
-          LOGGER.debug("Created LDAP role {}", role);
-        }
-      } catch (final RoleAlreadyExistsException e) {
-        LOGGER.trace("Role {} already exists.", role, e);
-      }
     }
   }
 
@@ -1790,8 +1429,7 @@ public class RodaCoreFactory {
       getModelService().notifyUserUpdated(user).failOnError();
       if (INSTANTIATE_SOLR) {
         try {
-          PremisV3Utils.createOrUpdatePremisUserAgentBinary(user.getName(), getModelService(), getIndexService(),
-            false);
+          PremisV3Utils.createOrUpdatePremisUserAgentBinary(user.getName(), getModelService(), getIndexService(), true);
         } catch (ValidationException | NotFoundException | RequestNotValidException | AuthorizationDeniedException
           | AlreadyExistsException e) {
           LOGGER.error("Could not create PREMIS agent for default users");
@@ -1806,9 +1444,9 @@ public class RodaCoreFactory {
 
   public static void instantiateTransferredResourcesScanner() {
     try {
-      String transferredResourcesFolder = getConfigurationString("transferredResources.folder",
+      String transferredResourcesFolder = configurationManager.getConfigurationString("transferredResources.folder",
         RodaConstants.CORE_TRANSFERREDRESOURCE_FOLDER);
-      Path transferredResourcesFolderPath = dataPath.resolve(transferredResourcesFolder);
+      Path transferredResourcesFolderPath = configurationManager.getDataPath().resolve(transferredResourcesFolder);
 
       if (!FSUtils.exists(transferredResourcesFolderPath)) {
         Files.createDirectories(transferredResourcesFolderPath);
@@ -1831,14 +1469,17 @@ public class RodaCoreFactory {
     TransferUpdateStatus.getInstance().setUpdatingStatus(folderRelativePath, isUpdating);
   }
 
+  @Deprecated
   public static StorageService getStorageService() {
     return storage;
   }
 
+  @Deprecated
   public static ModelService getModelService() {
     return model;
   }
 
+  @Deprecated
   public static IndexService getIndexService() {
     return index;
   }
@@ -1867,32 +1508,45 @@ public class RodaCoreFactory {
     return transferredResourcesScanner;
   }
 
+  public static ConfigurationManager getConfigurationManager() {
+    return configurationManager;
+  }
+
   public static NodeType getNodeType() {
     return nodeType;
   }
 
+  public static String getInstanceId() {
+    return instanceId;
+  }
+
+  @Deprecated
   public static DistributedModeType getDistributedModeType() {
-    return distributedModeType;
+    return configurationManager.getDistributedModeType();
   }
 
+  @Deprecated
   public static Path getRodaHomePath() {
-    return rodaHomePath;
+    return configurationManager.getRodaHomePath();
   }
 
+  @Deprecated
   public static Path getConfigPath() {
-    return configPath;
+    return configurationManager.getConfigPath();
   }
 
+  @Deprecated
   public static Path getDefaultPath() {
-    return defaultPath;
+    return configurationManager.getDefaultPath();
   }
 
   public static Path getWorkingDirectory() {
     return workingDirectoryPath;
   }
 
+  @Deprecated
   public static Path getReportsDirectory() {
-    return reportDirectoryPath;
+    return configurationManager.getReportPath();
   }
 
   public static Path getDisposalBinDirectoryPath() {
@@ -1903,8 +1557,9 @@ public class RodaCoreFactory {
     return fileShallowTmpDirectoryPath;
   }
 
+  @Deprecated
   public static Path getSynchronizationDirectoryPath() {
-    return synchronizationDirectoryPath;
+    return configurationManager.getSynchronizationDirectoryPath();
   }
 
   public static Path getLocalInstanceConfigPath() {
@@ -1919,24 +1574,29 @@ public class RodaCoreFactory {
     return marketDirectoryPath;
   }
 
+  @Deprecated
   public static Path getDataPath() {
-    return dataPath;
+    return configurationManager.getDataPath();
   }
 
+  @Deprecated
   public static Path getStoragePath() {
-    return storagePath;
+    return configurationManager.getStoragePath();
   }
 
+  @Deprecated
   public static Path getLogPath() {
-    return logPath;
+    return configurationManager.getLogPath();
   }
 
+  @Deprecated
   public static Path getPluginsPath() {
-    return configPath.resolve(RodaConstants.CORE_PLUGINS_FOLDER);
+    return configurationManager.getPluginsPath();
   }
 
+  @Deprecated
   public static Path getProtocolsPath() {
-    return configPath.resolve(RodaConstants.CORE_PROTOCOLS_FOLDER);
+    return configurationManager.getProtocolsPath();
   }
 
   public static ProtocolManager getProtocolManager() {
@@ -1958,182 +1618,44 @@ public class RodaCoreFactory {
   /*
    * Configuration related functionalities
    */
+  @Deprecated
   public static void addConfiguration(String configurationFile) throws ConfigurationException {
-    Configuration configuration = getConfiguration(configurationFile);
-    rodaConfiguration.addConfiguration(configuration);
-    configurationFiles.add(configurationFile);
+    configurationManager.addConfiguration(configurationFile);
   }
 
+  @Deprecated
   public static void addExternalConfiguration(Path configurationPath) throws ConfigurationException {
-    Configuration configuration = getExternalConfiguration(configurationPath);
-    rodaConfiguration.addConfiguration(configuration);
+    configurationManager.addExternalConfiguration(configurationPath);
   }
 
-  private static Configuration getConfiguration(String configurationFile) throws ConfigurationException {
-    Path config = RodaCoreFactory.getConfigPath().resolve(configurationFile);
-
-    NodeCombiner combiner = new MergeCombiner();
-    CombinedConfiguration cc = new CombinedConfiguration(combiner);
-
-    if (FSUtils.exists(config)) {
-      cc.addConfiguration(getExternalConfiguration(config));
-    }
-
-    cc.addConfiguration(getInternalConfiguration(configurationFile));
-
-    // do variable interpolation
-    Configuration configuration = cc.interpolatedConfiguration();
-
-    return configuration;
-  }
-
-  private static PropertiesConfiguration initConfiguration() {
-    PropertiesConfiguration propertiesConfiguration = new PropertiesConfiguration();
-    propertiesConfiguration.setDelimiterParsingDisabled(true);
-    propertiesConfiguration.setEncoding(RodaConstants.DEFAULT_ENCODING);
-    return propertiesConfiguration;
-  }
-
-  private static PropertiesConfiguration getInternalConfiguration(String configurationFile)
-    throws ConfigurationException {
-    PropertiesConfiguration propertiesConfiguration = initConfiguration();
-    InputStream inputStream = RodaCoreFactory.class
-      .getResourceAsStream("/" + RodaConstants.CORE_CONFIG_FOLDER + "/" + configurationFile);
-    if (inputStream != null) {
-      LOGGER.trace("Loading configuration from classpath {}", configurationFile);
-      propertiesConfiguration.load(inputStream);
-
-    } else {
-      LOGGER.trace("Configuration {} doesn't exist", configurationFile);
-    }
-
-    return propertiesConfiguration;
-  }
-
-  private static PropertiesConfiguration getExternalConfiguration(Path config) throws ConfigurationException {
-    PropertiesConfiguration propertiesConfiguration = initConfiguration();
-    LOGGER.trace("Loading configuration from file {}", config);
-    propertiesConfiguration.load(config.toFile());
-    RodaPropertiesReloadStrategy rodaPropertiesReloadStrategy = new RodaPropertiesReloadStrategy();
-    rodaPropertiesReloadStrategy.setRefreshDelay(5000);
-    propertiesConfiguration.setReloadingStrategy(rodaPropertiesReloadStrategy);
-
-    return propertiesConfiguration;
-  }
-
+  @Deprecated
   public static boolean checkPathIsWithin(Path path, Path folder) {
-    return checkPathIsWithin(path, folder, configSymbolicLinksAllowed);
+    return configurationManager.checkPathIsWithin(path, folder);
   }
 
-  private static boolean checkPathIsWithin(Path path, Path folder, boolean allowSymbolicLinks) {
-    boolean ret = true;
-
-    Path absolutePath = path.toAbsolutePath();
-
-    // check against real path
-    if (!allowSymbolicLinks) {
-      Path realPath;
-      try {
-        realPath = absolutePath.toRealPath();
-        ret &= realPath.isAbsolute();
-        ret &= realPath.startsWith(folder.toAbsolutePath());
-      } catch (IOException e) {
-        LOGGER.warn("Error checking for path transversal", e);
-        ret = false;
-      }
-    }
-
-    // check against normalized path
-    Path normalized = absolutePath.normalize();
-    ret &= normalized.isAbsolute();
-    ret &= normalized.startsWith(folder);
-
-    return ret;
-  }
-
+  @Deprecated
   public static URL getConfigurationFile(String configurationFile) {
-    Path config = RodaCoreFactory.getConfigPath().resolve(configurationFile);
-    URL configUri;
-    if (FSUtils.exists(config) && !FSUtils.isDirectory(config) && checkPathIsWithin(config, getConfigPath())) {
-      try {
-        configUri = config.toUri().toURL();
-      } catch (MalformedURLException e) {
-        LOGGER.error("Configuration {} is malformed: {}", configurationFile, e.getMessage());
-        configUri = null;
-      }
-    } else {
-      URL resource = RodaCoreFactory.class
-        .getResource("/" + RodaConstants.CORE_CONFIG_FOLDER + "/" + configurationFile);
-      if (resource != null) {
-        configUri = resource;
-      } else {
-        LOGGER.trace("Configuration {} doesn't exist", configurationFile);
-        configUri = null;
-      }
-    }
-
-    return configUri;
+    return configurationManager.getConfigurationFile(configurationFile);
   }
 
+  @Deprecated
   public static InputStream getScopedConfigurationFileAsStream(Path relativeConfigPath, String untrustedUserPath)
     throws GenericException {
-
-    // security checks
-    if (relativeConfigPath.isAbsolute()) {
-      throw new GenericException("Relative config path must be relative");
-    }
-
-    Path normalizedBasePath = getConfigPath().resolve(relativeConfigPath).normalize();
-
-    if (!normalizedBasePath.startsWith(getConfigPath())) {
-      throw new GenericException(String.format("Relative config path %1$s must be within config path %2$s",
-        normalizedBasePath, getConfigPath()));
-    }
-
-    Path finalPath = normalizedBasePath.resolve(untrustedUserPath).normalize();
-
-    if (!checkPathIsWithin(finalPath, normalizedBasePath)) {
-      throw new GenericException(
-        String.format("Untrusted user path %1$s must be within base path %2$s", finalPath, normalizedBasePath));
-    }
-
-    String configurationFile = relativeConfigPath.resolve(untrustedUserPath).toString();
-    return getConfigurationFileAsStream(getConfigPath(), configurationFile);
+    return configurationManager.getScopedConfigurationFileAsStream(relativeConfigPath, untrustedUserPath);
   }
 
+  @Deprecated
   public static InputStream getConfigurationFileAsStream(String configurationFile) {
     return getConfigurationFileAsStream(getConfigPath(), configurationFile);
   }
 
+  @Deprecated
   public static InputStream getConfigurationFileAsStream(Path baseConfigPath, String configurationFile) {
-    Path configFile = baseConfigPath.resolve(configurationFile);
-    InputStream inputStream = null;
-    try {
-      if (FSUtils.exists(configFile) && !FSUtils.isDirectory(configFile)
-        && checkPathIsWithin(configFile, baseConfigPath)) {
-        inputStream = Files.newInputStream(configFile);
-        LOGGER.trace("Loading configuration from file {}", configFile);
-      }
-    } catch (IOException e) {
-      // do nothing
-    }
-
-    if (inputStream == null) {
-      Path relativizedPath = getConfigPath().getParent().relativize(baseConfigPath);
-      inputStream = RodaCoreFactory.class
-        .getResourceAsStream("/" + relativizedPath.toString() + "/" + configurationFile);
-      LOGGER.trace("Loading configuration from classpath {}", configurationFile);
-    }
-
-    return inputStream;
+    return configurationManager.getConfigurationFileAsStream(baseConfigPath, configurationFile);
   }
 
   public static InputStream getConfigurationFileAsStream(String configurationFile, String fallbackConfigurationFile) {
-    InputStream inputStream = getConfigurationFileAsStream(getConfigPath(), configurationFile);
-    if (inputStream == null) {
-      inputStream = getConfigurationFileAsStream(getConfigPath(), fallbackConfigurationFile);
-    }
-    return inputStream;
+    return configurationManager.getConfigurationFileAsStream(configurationFile, fallbackConfigurationFile);
   }
 
   public static InputStream getDefaultFileAsStream(String defaultFile, ClassLoader... extraClassLoaders) {
@@ -2170,11 +1692,8 @@ public class RodaCoreFactory {
   }
 
   public static void clearRodaCachableObjectsAfterConfigurationChange() {
-    rodaPropertiesCache.clear();
-    rodaSharedConfigurationPropertiesCache = null;
+    configurationManager.clearRodaCachableObjectsAfterConfigurationChange();
     RODA_SCHEMAS_CACHE.invalidateAll();
-    I18N_CACHE.invalidateAll();
-    SHARED_PROPERTIES_CACHE.invalidateAll();
     DISPOSAL_SCHEDULE_CACHE.invalidateAll();
     DISPOSAL_HOLD_CACHE.invalidateAll();
     processPreservationEventTypeProperties();
@@ -2211,91 +1730,28 @@ public class RodaCoreFactory {
     return schema;
   }
 
+  @Deprecated
   public static Configuration getRodaConfiguration() {
-    return rodaConfiguration;
+    return configurationManager.getRodaConfiguration();
   }
 
-  public static String getConfigurationKey(String... keyParts) {
-    StringBuilder sb = new StringBuilder();
-    for (String part : keyParts) {
-      if (sb.length() != 0) {
-        sb.append('.');
-      }
-      sb.append(part);
-    }
-    return sb.toString();
-  }
-
+  @Deprecated
   public static String getRodaConfigurationAsString(String... keyParts) {
-    return rodaConfiguration.getString(getConfigurationKey(keyParts));
+    return configurationManager.getRodaConfigurationAsString(keyParts);
   }
 
+  @Deprecated
   public static int getRodaConfigurationAsInt(int defaultValue, String... keyParts) {
-    return rodaConfiguration.getInt(getConfigurationKey(keyParts), defaultValue);
+    return configurationManager.getRodaConfigurationAsInt(defaultValue, keyParts);
   }
 
+  @Deprecated
   public static List<String> getRodaConfigurationAsList(String... keyParts) {
-    String[] array = rodaConfiguration.getStringArray(getConfigurationKey(keyParts));
-    return Arrays.stream(array).filter(StringUtils::isNotBlank).collect(Collectors.toList());
-  }
-
-  /**
-   * Gets (with caching) the shared configuration properties from
-   * {@code rodaConfiguration}.
-   *
-   * The properties that should be shared with the client browser are defined by
-   * the {@code ui.sharedProperties.*} properties in {@code roda-wui.properties}.
-   *
-   * @return The configuration properties that should be shared with the client
-   *         browser.
-   */
-  private static Map<String, List<String>> getRodaSharedConfigurationProperties() {
-    if (rodaSharedConfigurationPropertiesCache == null) {
-      rodaSharedConfigurationPropertiesCache = new HashMap<>();
-      Configuration configuration = RodaCoreFactory.getRodaConfiguration();
-
-      List<String> prefixes = RodaCoreFactory
-        .getRodaConfigurationAsList("ui.sharedProperties.whitelist.configuration.prefix");
-
-      rodaSharedConfigurationPropertiesCache.put(RodaConstants.RODA_NODE_TYPE_KEY,
-        Collections.singletonList(getNodeType().toString()));
-
-      rodaSharedConfigurationPropertiesCache.put(RodaConstants.DISTRIBUTED_MODE_TYPE_PROPERTY,
-        Collections.singletonList(getDistributedModeType().toString()));
-
-      rodaSharedConfigurationPropertiesCache.put(RodaConstants.CORE_SYNCHRONIZATION_FOLDER,
-        Collections.singletonList(getSynchronizationDirectoryPath().toString()));
-
-      Iterator<String> keys = configuration.getKeys();
-      while (keys.hasNext()) {
-        String key = keys.next();
-        for (String prefix : prefixes) {
-          if (key.startsWith(prefix + ".")) {
-            rodaSharedConfigurationPropertiesCache.put(key, getRodaConfigurationAsList(key));
-            break;
-          }
-        }
-      }
-
-      List<String> properties = RodaCoreFactory
-        .getRodaConfigurationAsList("ui.sharedProperties.whitelist.configuration.property");
-      for (String propertyKey : properties) {
-        if (configuration.containsKey(propertyKey)) {
-          rodaSharedConfigurationPropertiesCache.put(propertyKey, getRodaConfigurationAsList(propertyKey));
-        }
-      }
-    }
-    return rodaSharedConfigurationPropertiesCache;
+    return configurationManager.getRodaConfigurationAsList(keyParts);
   }
 
   public static Map<String, List<String>> getRodaSharedProperties(Locale locale) {
-    checkForChangesInI18N();
-    try {
-      return SHARED_PROPERTIES_CACHE.get(locale);
-    } catch (ExecutionException e) {
-      LOGGER.debug("Could not load shared properties", e);
-      return Collections.emptyMap();
-    }
+    return configurationManager.getRodaSharedProperties(locale);
   }
 
   public static int getRodaConfigurationAsInt(String... keyParts) {
@@ -2310,32 +1766,8 @@ public class RodaCoreFactory {
     return algorithms;
   }
 
-  public static Map<String, String> getPropertiesFromCache(String cacheName, List<String> prefixesToCache) {
-    if (rodaPropertiesCache.get(cacheName) == null) {
-      fillInPropertiesToCache(cacheName, prefixesToCache);
-    }
-    return rodaPropertiesCache.get(cacheName);
-  }
-
-  private static void fillInPropertiesToCache(String cacheName, List<String> prefixesToCache) {
-    if (rodaPropertiesCache.get(cacheName) == null) {
-      HashMap<String, String> newCacheEntry = new HashMap<>();
-
-      Configuration configuration = RodaCoreFactory.getRodaConfiguration();
-      Iterator<String> keys = configuration.getKeys();
-      while (keys.hasNext()) {
-        String key = String.class.cast(keys.next());
-        String value = configuration.getString(key, "");
-        for (String prefixToCache : prefixesToCache) {
-          if (key.startsWith(prefixToCache)) {
-            newCacheEntry.put(key, value);
-            break;
-          }
-        }
-      }
-
-      rodaPropertiesCache.put(cacheName, newCacheEntry);
-    }
+  public Map<String, String> getPropertiesFromCache(String cacheName, List<String> prefixesToCache) {
+    return configurationManager.getPropertiesFromCache(cacheName, prefixesToCache);
   }
 
   public static DisposalSchedule getDisposalSchedule(String disposalScheduleId) {
@@ -2395,19 +1827,7 @@ public class RodaCoreFactory {
   }
 
   public static Messages getI18NMessages(Locale locale) {
-    checkForChangesInI18N();
-    try {
-      return I18N_CACHE.get(locale);
-    } catch (ExecutionException e) {
-      LOGGER.debug("Could not load messages", e);
-      return null;
-    }
-  }
-
-  private static void checkForChangesInI18N() {
-    // i18n is cached and that cache is re-done when changes occur to
-    // roda-*.properties (for convenience)
-    getRodaConfiguration().getString("");
+    return configurationManager.getI18NMessages(locale);
   }
 
   /*
@@ -2607,7 +2027,7 @@ public class RodaCoreFactory {
         printMigrateUsage();
       } else {
         final String migrateParam = migrateParams.get(0);
-        MigrationManager migrationManager = new MigrationManager(RodaCoreFactory.dataPath);
+        MigrationManager migrationManager = new MigrationManager(configurationManager.getDataPath());
         if ("model".equals(migrateParam)) {
           migrationManager.setupModelMigrations();
           migrationManager.performModelMigrations();

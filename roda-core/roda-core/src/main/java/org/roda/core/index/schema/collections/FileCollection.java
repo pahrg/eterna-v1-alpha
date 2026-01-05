@@ -31,14 +31,15 @@ import org.roda.core.data.exceptions.RequestNotValidException;
 import org.roda.core.data.v2.ip.AIP;
 import org.roda.core.data.v2.ip.File;
 import org.roda.core.data.v2.ip.IndexedFile;
-import org.roda.core.data.v2.ip.StoragePath;
+import org.roda.core.data.v2.ip.Representation;
 import org.roda.core.data.v2.ip.metadata.FileFormat;
+import org.roda.core.data.v2.ip.metadata.TechnicalMetadata;
 import org.roda.core.index.IndexingAdditionalInfo;
 import org.roda.core.index.schema.AbstractSolrCollection;
 import org.roda.core.index.schema.CopyField;
 import org.roda.core.index.schema.Field;
 import org.roda.core.index.utils.SolrUtils;
-import org.roda.core.model.utils.ModelUtils;
+import org.roda.core.model.ModelService;
 import org.roda.core.storage.Binary;
 import org.roda.core.util.IdUtils;
 import org.slf4j.Logger;
@@ -107,6 +108,7 @@ public class FileCollection extends AbstractSolrCollection<IndexedFile, File> {
     fields.add(new Field(RodaConstants.FILE_HASH, Field.TYPE_STRING).setMultiValued(true));
     fields.add(new Field(RodaConstants.FILE_ANCESTORS, Field.TYPE_STRING).setMultiValued(true));
     fields.add(new Field(RodaConstants.FILE_ANCESTORS_PATH, Field.TYPE_STRING).setMultiValued(true));
+    fields.add(new Field(RodaConstants.FILE_TECHNICAL_METADATA_ID, Field.TYPE_STRING).setMultiValued(true));
 
     // AIP
     fields.add(new Field(RodaConstants.INGEST_SIP_IDS, Field.TYPE_STRING).setMultiValued(true));
@@ -153,17 +155,17 @@ public class FileCollection extends AbstractSolrCollection<IndexedFile, File> {
   }
 
   @Override
-  public SolrInputDocument toSolrDocument(File file, IndexingAdditionalInfo info)
+  public SolrInputDocument toSolrDocument(ModelService model, File file, IndexingAdditionalInfo info)
     throws RequestNotValidException, GenericException, NotFoundException, AuthorizationDeniedException {
 
-    SolrInputDocument doc = super.toSolrDocument(file, info);
+    SolrInputDocument doc = super.toSolrDocument(model, file, info);
 
     List<String> path = file.getPath();
     doc.addField(RodaConstants.FILE_PATH, path);
     if (path != null && !path.isEmpty()) {
       List<String> ancestorsPath = SolrUtils.getFileAncestorsPath(file.getAipId(), file.getRepresentationId(), path);
       if (!ancestorsPath.isEmpty()) {
-        doc.addField(RodaConstants.FILE_PARENT_UUID, ancestorsPath.get(ancestorsPath.size() - 1));
+        doc.addField(RodaConstants.FILE_PARENT_UUID, ancestorsPath.getLast());
         doc.addField(RodaConstants.FILE_ANCESTORS_PATH, ancestorsPath);
       }
     }
@@ -177,15 +179,10 @@ public class FileCollection extends AbstractSolrCollection<IndexedFile, File> {
       if (file.isReference()) {
         doc.addField(RodaConstants.FILE_REFERENCE_UUID, file.getReferenceUUID());
         doc.addField(RodaConstants.FILE_REFERENCE_URL, file.getReferenceUrl());
-        StoragePath filePath = ModelUtils.getFileStoragePath(file.getAipId(), file.getRepresentationId(),
-          file.getPath(), RodaConstants.RODA_MANIFEST_EXTERNAL_FILES);
-        doc.addField(RodaConstants.FILE_REFERENCE_MANIFEST,
-          RodaCoreFactory.getStorageService().getStoragePathAsString(filePath, false));
+        doc.addField(RodaConstants.FILE_REFERENCE_MANIFEST, model.getObjectPathAsString(file, false));
       }
 
-      StoragePath filePath = ModelUtils.getFileStoragePath(file);
-      doc.addField(RodaConstants.FILE_STORAGEPATH,
-        RodaCoreFactory.getStorageService().getStoragePathAsString(filePath, false));
+      doc.addField(RodaConstants.FILE_STORAGEPATH, model.getObjectPathAsString(file, false));
     } catch (RequestNotValidException e) {
       LOGGER.warn("Could not index file storage path", e);
     }
@@ -198,8 +195,11 @@ public class FileCollection extends AbstractSolrCollection<IndexedFile, File> {
 
     Long sizeInBytes = 0L;
 
+    SolrUtils.indexRepresentationTechnicalMetadata(model,
+      getRepresentationTechnicalMetadata(((Info) info).aip, file.getRepresentationId()), fileId, doc);
+
     // Add information from PREMIS
-    Binary premisFile = getFilePremisFile(file);
+    Binary premisFile = getFilePremisFile(model, file);
     if (premisFile != null) {
       try {
         SolrInputDocument premisSolrDoc = PremisV3Utils.getSolrDocument(premisFile);
@@ -213,7 +213,7 @@ public class FileCollection extends AbstractSolrCollection<IndexedFile, File> {
     info.getAccumulators().put(RodaConstants.FILE_SIZE, sizeInBytes);
 
     // Add full text
-    String fulltext = getFileFulltext(file);
+    String fulltext = getFileFulltext(model, file);
     if (fulltext != null) {
       doc.addField(RodaConstants.FILE_FULLTEXT, fulltext);
     }
@@ -251,10 +251,10 @@ public class FileCollection extends AbstractSolrCollection<IndexedFile, File> {
 
   }
 
-  private Binary getFilePremisFile(File file) {
+  private Binary getFilePremisFile(ModelService model, File file) {
     Binary premisFile = null;
     try {
-      premisFile = RodaCoreFactory.getModelService().retrievePreservationFile(file);
+      premisFile = model.retrievePreservationFile(file);
     } catch (NotFoundException e) {
       LOGGER.trace("Could not find PREMIS for file: {}", file);
     } catch (RODAException e) {
@@ -263,11 +263,22 @@ public class FileCollection extends AbstractSolrCollection<IndexedFile, File> {
     return premisFile;
   }
 
-  private String getFileFulltext(File file) {
+  private List<TechnicalMetadata> getRepresentationTechnicalMetadata(AIP aip, String representationId) {
+    List<TechnicalMetadata> technicalMetadata = new ArrayList<>();
+    for (Representation representation : aip.getRepresentations()) {
+      if (representation.getId().equals(representationId)) {
+        technicalMetadata.addAll(representation.getTechnicalMetadata());
+      }
+    }
+
+    return technicalMetadata;
+  }
+
+  private String getFileFulltext(ModelService model, File file) {
     String fulltext = "";
     try {
-      Binary fulltextBinary = RodaCoreFactory.getModelService().retrieveOtherMetadataBinary(file.getAipId(),
-        file.getRepresentationId(), file.getPath(), file.getId(), RodaConstants.TIKA_FILE_SUFFIX_FULLTEXT,
+      Binary fulltextBinary = model.retrieveOtherMetadataBinary(file.getAipId(), file.getRepresentationId(),
+        file.getPath(), file.getId(), RodaConstants.TIKA_FILE_SUFFIX_FULLTEXT,
         RodaConstants.OTHER_METADATA_TYPE_APACHE_TIKA);
       if (fulltextBinary.getSizeInBytes() < RodaCoreFactory.getRodaConfigurationAsInt(TEN_MB_IN_BYTES,
         "core.index.fulltext_threshold_in_bytes")) {
@@ -295,6 +306,7 @@ public class FileCollection extends AbstractSolrCollection<IndexedFile, File> {
     String representationUUID = SolrUtils.objectToString(doc.get(RodaConstants.FILE_REPRESENTATION_UUID), null);
     String parentUUID = SolrUtils.objectToString(doc.get(RodaConstants.FILE_PARENT_UUID), null);
     List<String> ancestorsPath = SolrUtils.objectToListString(doc.get(RodaConstants.FILE_ANCESTORS_PATH));
+    List<String> technicalMetadataIds = SolrUtils.objectToListString(doc.get(RodaConstants.FILE_TECHNICAL_METADATA_ID));
 
     String originalName = SolrUtils.objectToString(doc.get(RodaConstants.FILE_ORIGINALNAME), null);
     List<String> hash = SolrUtils.objectToListString(doc.get(RodaConstants.FILE_HASH));
@@ -347,6 +359,7 @@ public class FileCollection extends AbstractSolrCollection<IndexedFile, File> {
     ret.setRepresentationUUID(representationUUID);
     ret.setPath(path);
     ret.setAncestorsPath(ancestorsPath);
+    ret.setTechnicalMetadataIds(technicalMetadataIds);
     ret.setFileFormat(fileFormat);
     ret.setOriginalName(originalName);
     ret.setSize(size);

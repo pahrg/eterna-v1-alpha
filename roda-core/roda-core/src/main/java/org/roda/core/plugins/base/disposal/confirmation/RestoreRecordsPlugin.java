@@ -23,27 +23,24 @@ import org.roda.core.data.exceptions.NotFoundException;
 import org.roda.core.data.exceptions.RequestNotValidException;
 import org.roda.core.data.utils.JsonUtils;
 import org.roda.core.data.v2.LiteOptionalWithCause;
+import org.roda.core.data.v2.disposal.confirmation.DisposalConfirmation;
+import org.roda.core.data.v2.disposal.confirmation.DisposalConfirmationAIPEntry;
+import org.roda.core.data.v2.disposal.confirmation.DisposalConfirmationState;
 import org.roda.core.data.v2.ip.AIP;
 import org.roda.core.data.v2.ip.AIPState;
-import org.roda.core.data.v2.ip.StoragePath;
-import org.roda.core.data.v2.ip.disposal.DisposalConfirmation;
-import org.roda.core.data.v2.ip.disposal.DisposalConfirmationAIPEntry;
-import org.roda.core.data.v2.ip.disposal.DisposalConfirmationState;
 import org.roda.core.data.v2.jobs.Job;
 import org.roda.core.data.v2.jobs.PluginState;
 import org.roda.core.data.v2.jobs.PluginType;
 import org.roda.core.data.v2.jobs.Report;
 import org.roda.core.index.IndexService;
 import org.roda.core.model.ModelService;
-import org.roda.core.model.utils.ModelUtils;
 import org.roda.core.plugins.AbstractPlugin;
 import org.roda.core.plugins.Plugin;
 import org.roda.core.plugins.PluginException;
+import org.roda.core.plugins.PluginHelper;
 import org.roda.core.plugins.RODAObjectProcessingLogic;
 import org.roda.core.plugins.orchestrate.JobPluginInfo;
-import org.roda.core.plugins.PluginHelper;
 import org.roda.core.storage.Binary;
-import org.roda.core.storage.StorageService;
 import org.roda.core.storage.fs.FSUtils;
 import org.roda.core.util.CommandException;
 import org.slf4j.Logger;
@@ -107,29 +104,27 @@ public class RestoreRecordsPlugin extends AbstractPlugin<DisposalConfirmation> {
   }
 
   @Override
-  public Report beforeAllExecute(IndexService index, ModelService model, StorageService storage)
-    throws PluginException {
+  public Report beforeAllExecute(IndexService index, ModelService model) throws PluginException {
     // do nothing
     return null;
   }
 
   @Override
-  public Report execute(IndexService index, ModelService model, StorageService storage,
-    List<LiteOptionalWithCause> liteList) throws PluginException {
+  public Report execute(IndexService index, ModelService model, List<LiteOptionalWithCause> liteList)
+    throws PluginException {
     return PluginHelper.processObjects(this,
-      (RODAObjectProcessingLogic<DisposalConfirmation>) (indexService, modelService, storageService, report, cachedJob,
-        jobPluginInfo, plugin, object) -> processDisposalConfirmation(indexService, modelService, storageService,
-          report, cachedJob, jobPluginInfo, object),
-      index, model, storage, liteList);
+      (RODAObjectProcessingLogic<DisposalConfirmation>) (indexService, modelService, report, cachedJob, jobPluginInfo,
+        plugin,
+        object) -> processDisposalConfirmation(indexService, modelService, report, cachedJob, jobPluginInfo, object),
+      index, model, liteList);
   }
 
-  private void processDisposalConfirmation(IndexService index, ModelService model, StorageService storage,
-    Report report, Job cachedJob, JobPluginInfo jobPluginInfo, DisposalConfirmation disposalConfirmation) {
+  private void processDisposalConfirmation(IndexService index, ModelService model, Report report, Job cachedJob,
+    JobPluginInfo jobPluginInfo, DisposalConfirmation disposalConfirmation) {
 
     try {
-      StoragePath disposalConfirmationAIPsPath = ModelUtils
-        .getDisposalConfirmationAIPsPath(disposalConfirmation.getId());
-      Binary binary = storage.getBinary(disposalConfirmationAIPsPath);
+      Binary binary = model.getBinary(disposalConfirmation,
+        RodaConstants.STORAGE_DIRECTORY_DISPOSAL_CONFIRMATION_AIPS_FILENAME);
 
       try (BufferedReader reader = new BufferedReader(new InputStreamReader(binary.getContent().createInputStream()))) {
         jobPluginInfo.setSourceObjectsCount(disposalConfirmation.getNumberOfAIPs().intValue());
@@ -240,7 +235,7 @@ public class RestoreRecordsPlugin extends AbstractPlugin<DisposalConfirmation> {
     }
 
     model.createEvent(aipEntry.getAipId(), null, null, null, RodaConstants.PreservationEventType.RECOVERY,
-      EVENT_DESCRIPTION, null, null, pluginState, outcomeText, "", cachedJob.getUsername(), true);
+      EVENT_DESCRIPTION, null, null, pluginState, outcomeText, "", cachedJob.getUsername(), true, null);
 
     jobPluginInfo.incrementObjectsProcessed(pluginState);
 
@@ -251,7 +246,7 @@ public class RestoreRecordsPlugin extends AbstractPlugin<DisposalConfirmation> {
   }
 
   @Override
-  public Report afterAllExecute(IndexService index, ModelService model, StorageService storage) throws PluginException {
+  public Report afterAllExecute(IndexService index, ModelService model) throws PluginException {
     // do nothing
     return null;
   }

@@ -18,8 +18,8 @@ import org.roda.core.data.exceptions.GenericException;
 import org.roda.core.data.exceptions.NotFoundException;
 import org.roda.core.data.exceptions.RequestNotValidException;
 import org.roda.core.data.v2.LiteOptionalWithCause;
-import org.roda.core.data.v2.ip.disposal.DisposalConfirmation;
-import org.roda.core.data.v2.ip.disposal.DisposalConfirmationState;
+import org.roda.core.data.v2.disposal.confirmation.DisposalConfirmation;
+import org.roda.core.data.v2.disposal.confirmation.DisposalConfirmationState;
 import org.roda.core.data.v2.jobs.Job;
 import org.roda.core.data.v2.jobs.PluginState;
 import org.roda.core.data.v2.jobs.PluginType;
@@ -29,10 +29,9 @@ import org.roda.core.model.ModelService;
 import org.roda.core.plugins.AbstractPlugin;
 import org.roda.core.plugins.Plugin;
 import org.roda.core.plugins.PluginException;
+import org.roda.core.plugins.PluginHelper;
 import org.roda.core.plugins.RODAObjectProcessingLogic;
 import org.roda.core.plugins.orchestrate.JobPluginInfo;
-import org.roda.core.plugins.PluginHelper;
-import org.roda.core.storage.StorageService;
 import org.roda.core.storage.fs.FSUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,23 +42,23 @@ import org.slf4j.LoggerFactory;
 public class PermanentlyDeleteRecordsPlugin extends AbstractPlugin<DisposalConfirmation> {
   private static final Logger LOGGER = LoggerFactory.getLogger(PermanentlyDeleteRecordsPlugin.class);
 
-  @Override
-  public String getVersionImpl() {
-    return "1.0";
-  }
-
   public static String getStaticName() {
     return "Permanently delete records from disposal confirmation report";
-  }
-
-  @Override
-  public String getName() {
-    return getStaticName();
   }
 
   public static String getStaticDescription() {
     return "Permanently deletes from the disposal bin the original records destroyed releasing storage space from the repository."
       + "A PREMIS event is recorded after finishing the task.";
+  }
+
+  @Override
+  public String getVersionImpl() {
+    return "1.0";
+  }
+
+  @Override
+  public String getName() {
+    return getStaticName();
   }
 
   @Override
@@ -93,22 +92,21 @@ public class PermanentlyDeleteRecordsPlugin extends AbstractPlugin<DisposalConfi
   }
 
   @Override
-  public Report beforeAllExecute(IndexService index, ModelService model, StorageService storage)
-    throws PluginException {
+  public Report beforeAllExecute(IndexService index, ModelService model) throws PluginException {
     // do nothing
     return null;
   }
 
   @Override
-  public Report execute(IndexService index, ModelService model, StorageService storage,
-    List<LiteOptionalWithCause> liteList) throws PluginException {
+  public Report execute(IndexService index, ModelService model, List<LiteOptionalWithCause> liteList)
+    throws PluginException {
     return PluginHelper.processObjects(this, new RODAObjectProcessingLogic<DisposalConfirmation>() {
       @Override
-      public void process(IndexService index, ModelService model, StorageService storage, Report report, Job cachedJob,
+      public void process(IndexService index, ModelService model, Report report, Job cachedJob,
         JobPluginInfo jobPluginInfo, Plugin<DisposalConfirmation> plugin, DisposalConfirmation object) {
         processDisposalConfirmation(model, report, cachedJob, jobPluginInfo, object);
       }
-    }, index, model, storage, liteList);
+    }, index, model, liteList);
   }
 
   private void processDisposalConfirmation(ModelService model, Report report, Job cachedJob,
@@ -142,11 +140,11 @@ public class PermanentlyDeleteRecordsPlugin extends AbstractPlugin<DisposalConfi
 
     model.createRepositoryEvent(getPreservationEventType(), getPreservationEventDescription(), state,
       PluginState.FAILURE.equals(state) ? getPreservationEventFailureMessage() : getPreservationEventSuccessMessage(),
-      confirmation.getId(), cachedJob.getUsername(), true);
+      confirmation.getId(), cachedJob.getUsername(), true, null);
   }
 
   @Override
-  public Report afterAllExecute(IndexService index, ModelService model, StorageService storage) throws PluginException {
+  public Report afterAllExecute(IndexService index, ModelService model) throws PluginException {
     // do nothing
     return null;
   }

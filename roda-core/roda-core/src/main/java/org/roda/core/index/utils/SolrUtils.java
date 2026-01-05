@@ -7,7 +7,6 @@
  */
 package org.roda.core.index.utils;
 
-import dev.failsafe.Failsafe;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.Serializable;
@@ -25,15 +24,16 @@ import java.util.Date;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
+import java.util.stream.Collectors;
 
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.stream.FactoryConfigurationError;
@@ -45,10 +45,10 @@ import javax.xml.xpath.XPathExpressionException;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.solr.client.solrj.SolrClient;
-import org.apache.solr.client.solrj.SolrRequest.METHOD;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrQuery.ORDER;
 import org.apache.solr.client.solrj.SolrQuery.SortClause;
+import org.apache.solr.client.solrj.SolrRequest.METHOD;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.response.FacetField;
 import org.apache.solr.client.solrj.response.FacetField.Count;
@@ -61,6 +61,8 @@ import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.SolrInputField;
 import org.apache.solr.common.params.CursorMarkParams;
 import org.apache.solr.common.params.FacetParams;
+import org.apache.solr.common.params.MapSolrParams;
+import org.apache.solr.common.params.SolrParams;
 import org.roda.core.RodaCoreFactory;
 import org.roda.core.common.MetadataFileUtils;
 import org.roda.core.common.RodaUtils;
@@ -74,18 +76,28 @@ import org.roda.core.data.exceptions.RODAException;
 import org.roda.core.data.exceptions.RequestNotValidException;
 import org.roda.core.data.exceptions.ReturnWithExceptions;
 import org.roda.core.data.exceptions.SolrRetryException;
-import org.roda.core.data.utils.JsonUtils;
+import org.roda.core.data.utils.URNUtils;
 import org.roda.core.data.v2.IsModelObject;
 import org.roda.core.data.v2.LiteRODAObject;
 import org.roda.core.data.v2.common.Pair;
+import org.roda.core.data.v2.disposal.schedule.DisposalActionCode;
+import org.roda.core.data.v2.disposal.schedule.DisposalSchedule;
+import org.roda.core.data.v2.disposal.schedule.RetentionPeriodCalculation;
+import org.roda.core.data.v2.disposal.schedule.RetentionPeriodIntervalCode;
+import org.roda.core.data.v2.index.FindRequest;
 import org.roda.core.data.v2.index.IndexResult;
 import org.roda.core.data.v2.index.IndexRunnable;
 import org.roda.core.data.v2.index.IsIndexed;
-import org.roda.core.data.v2.index.facet.*;
+import org.roda.core.data.v2.index.collapse.Collapse;
+import org.roda.core.data.v2.index.collapse.HintEnum;
+import org.roda.core.data.v2.index.collapse.NullPolicyEnum;
+import org.roda.core.data.v2.index.facet.FacetFieldResult;
+import org.roda.core.data.v2.index.facet.FacetParameter;
 import org.roda.core.data.v2.index.facet.FacetParameter.SORT;
 import org.roda.core.data.v2.index.filter.AllFilterParameter;
 import org.roda.core.data.v2.index.filter.AndFiltersParameters;
 import org.roda.core.data.v2.index.filter.BasicSearchFilterParameter;
+import org.roda.core.data.v2.index.filter.ChildOfFilterParameter;
 import org.roda.core.data.v2.index.filter.DateIntervalFilterParameter;
 import org.roda.core.data.v2.index.filter.DateRangeFilterParameter;
 import org.roda.core.data.v2.index.filter.EmptyKeyFilterParameter;
@@ -96,6 +108,7 @@ import org.roda.core.data.v2.index.filter.LongRangeFilterParameter;
 import org.roda.core.data.v2.index.filter.NotSimpleFilterParameter;
 import org.roda.core.data.v2.index.filter.OneOfManyFilterParameter;
 import org.roda.core.data.v2.index.filter.OrFiltersParameters;
+import org.roda.core.data.v2.index.filter.ParentWhichFilterParameter;
 import org.roda.core.data.v2.index.filter.SimpleFilterParameter;
 import org.roda.core.data.v2.index.sort.SortParameter;
 import org.roda.core.data.v2.index.sort.Sorter;
@@ -112,12 +125,9 @@ import org.roda.core.data.v2.ip.Permissions.PermissionType;
 import org.roda.core.data.v2.ip.Representation;
 import org.roda.core.data.v2.ip.StoragePath;
 import org.roda.core.data.v2.ip.TransferredResource;
-import org.roda.core.data.v2.ip.disposal.DisposalActionCode;
-import org.roda.core.data.v2.ip.disposal.DisposalSchedule;
-import org.roda.core.data.v2.ip.disposal.RetentionPeriodCalculation;
-import org.roda.core.data.v2.ip.disposal.RetentionPeriodIntervalCode;
 import org.roda.core.data.v2.ip.metadata.DescriptiveMetadata;
 import org.roda.core.data.v2.ip.metadata.OtherMetadata;
+import org.roda.core.data.v2.ip.metadata.TechnicalMetadata;
 import org.roda.core.data.v2.ri.RelationObjectType;
 import org.roda.core.data.v2.ri.RepresentationInformationRelation;
 import org.roda.core.data.v2.user.User;
@@ -128,11 +138,13 @@ import org.roda.core.model.ModelService;
 import org.roda.core.model.utils.ModelUtils;
 import org.roda.core.model.utils.UserUtility;
 import org.roda.core.storage.Binary;
+import org.roda.core.storage.utils.RODAInstanceUtils;
 import org.roda.core.util.IdUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xml.sax.SAXException;
 
+import dev.failsafe.Failsafe;
 import dev.failsafe.Fallback;
 
 /**
@@ -143,17 +155,14 @@ import dev.failsafe.Fallback;
  * @author Sébastien Leroux <sleroux@keep.pt>
  */
 public class SolrUtils {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SolrUtils.class);
-
-  private static final String DEFAULT_QUERY_PARSER_OPERATOR = "AND";
-  private static final Set<String> NON_REPEATABLE_FIELDS = new HashSet<>(Arrays.asList(RodaConstants.AIP_TITLE,
-    RodaConstants.AIP_LEVEL, RodaConstants.AIP_DATE_INITIAL, RodaConstants.AIP_DATE_FINAL));
-
-  private static Map<String, List<String>> liteFieldsForEachClass = new HashMap<>();
-
   public static final String COMMON = "common";
   public static final String CONF = "conf";
   public static final String SCHEMA = "managed-schema.xml";
+  private static final Logger LOGGER = LoggerFactory.getLogger(SolrUtils.class);
+  private static final String DEFAULT_QUERY_PARSER_OPERATOR = "AND";
+  private static final Set<String> NON_REPEATABLE_FIELDS = new HashSet<>(Arrays.asList(RodaConstants.AIP_TITLE,
+    RodaConstants.AIP_LEVEL, RodaConstants.AIP_DATE_INITIAL, RodaConstants.AIP_DATE_FINAL));
+  private static Map<String, List<String>> liteFieldsForEachClass = new HashMap<>();
 
   private SolrUtils() {
     // do nothing
@@ -171,8 +180,8 @@ public class SolrUtils {
 
   public static <T extends IsIndexed> Long count(SolrClient index, Class<T> classToRetrieve, Filter filter, User user,
     boolean justActive) throws GenericException, RequestNotValidException {
-    return find(index, classToRetrieve, filter, null, new Sublist(0, 0), null, user, justActive, new ArrayList<>())
-      .getTotalCount();
+    FindRequest findRequest = FindRequest.getBuilder(filter, justActive).build();
+    return find(index, classToRetrieve, findRequest, user).getTotalCount();
   }
 
   public static <T extends IsIndexed> T retrieve(SolrClient index, Class<T> classToRetrieve, String id, User user,
@@ -183,14 +192,23 @@ public class SolrUtils {
   }
 
   public static <T extends IsIndexed> T retrieve(SolrClient index, Class<T> classToRetrieve, String id,
-    List<String> fieldsToReturn) throws NotFoundException, GenericException {
+    List<String> fieldsToReturn, boolean appendChildren) throws NotFoundException, GenericException {
     if (id == null) {
       throw new GenericException("Could not retrieve object from a null id");
     }
 
     T ret;
+    SolrDocument doc;
     try {
-      SolrDocument doc = index.getById(SolrCollectionRegistry.getIndexName(classToRetrieve), id);
+      if (appendChildren) {
+        Map<String, String> param = new HashMap<>();
+        param.put("fl", "*, [child]");
+        SolrParams params = new MapSolrParams(param);
+        doc = index.getById(SolrCollectionRegistry.getIndexName(classToRetrieve), id, params);
+      } else {
+        doc = index.getById(SolrCollectionRegistry.getIndexName(classToRetrieve), id);
+      }
+
       if (doc != null) {
         ret = SolrCollectionRegistry.fromSolrDocument(classToRetrieve, doc, fieldsToReturn);
       } else {
@@ -200,6 +218,11 @@ public class SolrUtils {
       throw new GenericException("Could not retrieve object from index", e);
     }
     return ret;
+  }
+
+  public static <T extends IsIndexed> T retrieve(SolrClient index, Class<T> classToRetrieve, String id,
+    List<String> fieldsToReturn) throws NotFoundException, GenericException {
+    return retrieve(index, classToRetrieve, id, fieldsToReturn, false);
   }
 
   public static <T extends IsIndexed> List<T> retrieve(SolrClient index, Class<T> classToRetrieve, List<String> id,
@@ -324,25 +347,44 @@ public class SolrUtils {
     return ret;
   }
 
-  public static <T extends IsIndexed> IndexResult<T> find(SolrClient index, Class<T> classToRetrieve, Filter filter,
-    Sorter sorter, Sublist sublist, Facets facets, User user, boolean justActive, List<String> fieldsToReturn)
-    throws GenericException, RequestNotValidException {
+  public static <T extends IsIndexed> IndexResult<T> find(SolrClient index, Class<T> classToRetrieve,
+    FindRequest findRequest, User user) throws GenericException, RequestNotValidException {
     IndexResult<T> ret;
     SolrQuery query = new SolrQuery();
     query.setParam("q.op", DEFAULT_QUERY_PARSER_OPERATOR);
-    query.setQuery(parseFilter(filter));
-    query.setSorts(parseSorter(sorter));
-    query.setStart(sublist.getFirstElementIndex());
-    query.setRows(sublist.getMaximumElementCount());
-    query.setFields(fieldsToReturn.toArray(new String[fieldsToReturn.size()]));
-    parseAndConfigureFacets(facets, query);
-    if (hasPermissionFilters(classToRetrieve)) {
-      query.addFilterQuery(getFilterQueries(user, justActive, classToRetrieve));
+    query.setSorts(parseSorter(findRequest.getSorter()));
+    query.setStart(findRequest.getSublist().getFirstElementIndex());
+    query.setRows(findRequest.getSublist().getMaximumElementCount());
+    query.setFields(parseFieldsToReturn(findRequest));
+    parseAndConfigureFacets(findRequest.getFacets(), query);
+    if (hasPermissionFilters(classToRetrieve) && !hasNestedDocumentsFilter(findRequest.getFilter(), classToRetrieve)) {
+      query.addFilterQuery(getFilterQueries(user, findRequest.isOnlyActive(), classToRetrieve));
+    }
+
+    if (hasNestedDocumentsFilter(findRequest.getFilter(), classToRetrieve)) {
+      ChildOfFilterParameter childOfFilter = (ChildOfFilterParameter) findRequest.getFilter().getParameters()
+        .getFirst();
+      if (childOfFilter.getParentFilter() != null) {
+        FilterParameter filterParameter = buildQueryPermissions(user);
+        AndFiltersParameters andFiltersParameters = new AndFiltersParameters(
+          List.of(childOfFilter.getParentFilter(), filterParameter));
+        childOfFilter.setParentFilter(andFiltersParameters);
+      } else {
+        childOfFilter.setParentFilter(buildQueryPermissions(user));
+      }
+      query.setQuery(parseFilter(findRequest.getFilter()));
+    } else {
+      query.setQuery(parseFilter(findRequest.getFilter()));
+    }
+
+    if (findRequest.getCollapse() != null) {
+      query.addFilterQuery(parseCollapse(findRequest.getCollapse()));
     }
 
     try {
       QueryResponse response = query(index, classToRetrieve, query);
-      ret = queryResponseToIndexResult(response, classToRetrieve, facets, fieldsToReturn);
+      ret = queryResponseToIndexResult(response, classToRetrieve, findRequest.getFacets(),
+        findRequest.getFieldsToReturn());
     } catch (NotSupportedException e) {
       throw new GenericException("Could not query index", e);
     }
@@ -350,10 +392,100 @@ public class SolrUtils {
     return ret;
   }
 
+  private static FilterParameter buildQueryPermissions(User user) {
+    List<FilterParameter> filters = new ArrayList<>();
+
+    filters
+      .add(new SimpleFilterParameter(RodaConstants.INDEX_PERMISSION_USERS_PREFIX + PermissionType.READ, user.getId()));
+
+    for (String group : user.getGroups()) {
+      filters.add(new SimpleFilterParameter(RodaConstants.INDEX_PERMISSION_GROUPS_PREFIX + PermissionType.READ, group));
+    }
+
+    return new OrFiltersParameters(filters);
+  }
+
+  private static <T extends IsIndexed> boolean hasNestedDocumentsFilter(Filter filter, Class<T> classToRetrieve) {
+    if (!IndexedAIP.class.isAssignableFrom(classToRetrieve)) {
+      return false;
+    }
+
+    return filter.getParameters().stream().anyMatch(ChildOfFilterParameter.class::isInstance);
+  }
+
   /*
    * "Internal" helper methods
    * ____________________________________________________________________________________________________________________
    */
+  private static String[] parseFieldsToReturn(FindRequest findRequest) throws RequestNotValidException {
+    if (findRequest.getChildren()) {
+      List<String> fieldsToReturn = new ArrayList<>(findRequest.getFieldsToReturn());
+
+      fieldsToReturn.add(parseChildTransformer(findRequest));
+      return fieldsToReturn.toArray(new String[0]);
+    }
+
+    return findRequest.getFieldsToReturn().toArray(new String[0]);
+  }
+
+  private static String parseChildTransformer(FindRequest findRequest) throws RequestNotValidException {
+    String childrenFilter = findRequest.getChildrenFilter() != null ? parseFilter(findRequest.getChildrenFilter())
+      : null;
+
+    String childrenLimit = String
+      .valueOf(findRequest.getChildrenLimit() != null ? findRequest.getChildrenLimit() : 100);
+
+    String childrenFl = (findRequest.getChildrenFieldsToReturn() != null
+      && !findRequest.getChildrenFieldsToReturn().isEmpty())
+        ? findRequest.getChildrenFieldsToReturn().stream().filter(Objects::nonNull).collect(Collectors.joining(", "))
+        : null;
+
+    return buildChildDocTransformerString(childrenFl, childrenLimit, childrenFilter);
+  }
+
+  private static String buildChildDocTransformerString(String fl, String limit, String childFilter) {
+    StringBuilder sb = new StringBuilder("[child");
+
+    if (fl != null) {
+      sb.append(" fl=").append(fl);
+    }
+    if (limit != null) {
+      sb.append(" limit=").append(limit);
+    }
+    if (childFilter != null) {
+      sb.append(" childFilter=").append(childFilter);
+    }
+
+    sb.append(']');
+    return sb.toString();
+  }
+
+  private static String parseCollapse(Collapse collapse) {
+    return "{" + "!collapse field=" + collapse.getField() + " " + parseCollapseNullPolicy(collapse.getNullPolicy())
+      + " " + parseCollapseHint(collapse.getHint()) + " " + parseCollapseSorter(collapse.getSorter()) + "}";
+  }
+
+  private static String parseCollapseSorter(Sorter sorter) {
+    // sort='numeric_field asc, score desc'
+    StringBuilder sb = new StringBuilder();
+
+    if (sorter != null && sorter.getParameters().length != 0) {
+      sb.append("sort='");
+      for (SortParameter sortParameter : sorter.getParameters()) {
+        sb.append(sortParameter.getName()).append(" ").append(sortParameter.isDescending() ? ORDER.desc : ORDER.asc);
+      }
+      sb.append("'");
+    }
+    return sb.toString();
+  }
+
+  private static String parseCollapseHint(HintEnum hintEnum) {
+    return "hint=" + hintEnum.toString();
+  }
+
+  private static String parseCollapseNullPolicy(NullPolicyEnum nullPolicyEnum) {
+    return "nullPolicy=" + nullPolicyEnum.toString();
+  }
 
   private static <T> boolean hasPermissionFilters(Class<T> resultClass) {
     return HasPermissionFilters.class.isAssignableFrom(resultClass);
@@ -391,34 +523,6 @@ public class SolrUtils {
       }
     } else {
       LOGGER.error("Could not convert Solr object to List<String> ({})", object.getClass().getName());
-      ret = new ArrayList<>();
-    }
-    return ret;
-  }
-
-  public static List<RepresentationInformationRelation> objectToListRelation(Object object) {
-    List<RepresentationInformationRelation> ret;
-    if (object == null) {
-      ret = new ArrayList<>();
-    } else if (object instanceof String) {
-      try {
-        List<LinkedHashMap<String, String>> l = JsonUtils.getObjectFromJson((String) object, List.class);
-        ret = new ArrayList<>();
-        for (LinkedHashMap<String, String> entry : l) {
-          ret.add(
-            new RepresentationInformationRelation(entry.get(RodaConstants.REPRESENTATION_INFORMATION_RELATION_TYPE),
-              RelationObjectType.valueOf(entry.get(RodaConstants.REPRESENTATION_INFORMATION_OBJECT_TYPE)),
-              entry.get(RodaConstants.REPRESENTATION_INFORMATION_LINK),
-              entry.get(RodaConstants.REPRESENTATION_INFORMATION_TITLE)));
-        }
-      } catch (GenericException e) {
-        LOGGER.error("Could not convert Solr object to List<RepresentationInformationRelation> ({})",
-          object.getClass().getName(), e);
-        ret = new ArrayList<>();
-      }
-    } else {
-      LOGGER.error("Could not convert Solr object to List<RepresentationInformationRelation> ({})",
-        object.getClass().getName());
       ret = new ArrayList<>();
     }
     return ret;
@@ -659,11 +763,43 @@ public class SolrUtils {
     return Enum.valueOf(enumeration, enumValue);
   }
 
+  public static List<RepresentationInformationRelation> objectToRepresentationInformationRelation(Object object) {
+    List<RepresentationInformationRelation> relations = new ArrayList<>();
+
+    if (object == null) {
+      return relations;
+    }
+
+    if (object instanceof SolrDocument doc) {
+      RepresentationInformationRelation relation = new RepresentationInformationRelation();
+      relation.setTitle(SolrUtils.objectToString(doc.get(RodaConstants.REPRESENTATION_INFORMATION_TITLE), null));
+      relation.setRelationType(
+        SolrUtils.objectToString(doc.get(RodaConstants.REPRESENTATION_INFORMATION_RELATION_TYPE), null));
+      relation.setLink(SolrUtils.objectToString(doc.get(RodaConstants.REPRESENTATION_INFORMATION_LINK), null));
+      relation.setObjectType(SolrUtils.objectToEnum(doc.get(RodaConstants.REPRESENTATION_INFORMATION_OBJECT_TYPE),
+        RelationObjectType.class, null));
+      relations.add(relation);
+    } else {
+      List<SolrDocument> documents = (List<SolrDocument>) object;
+      documents.forEach(doc -> {
+        RepresentationInformationRelation relation = new RepresentationInformationRelation();
+        relation.setTitle(SolrUtils.objectToString(doc.get(RodaConstants.REPRESENTATION_INFORMATION_TITLE), null));
+        relation.setRelationType(
+          SolrUtils.objectToString(doc.get(RodaConstants.REPRESENTATION_INFORMATION_RELATION_TYPE), null));
+        relation.setLink(SolrUtils.objectToString(doc.get(RodaConstants.REPRESENTATION_INFORMATION_LINK), null));
+        relation.setObjectType(SolrUtils.objectToEnum(doc.get(RodaConstants.REPRESENTATION_INFORMATION_OBJECT_TYPE),
+          RelationObjectType.class, null));
+        relations.add(relation);
+      });
+    }
+
+    return relations;
+  }
+
   public static <E extends Enum<E>> E objectToEnum(Object object, Class<E> enumeration, E defaultValue) {
     E ret = defaultValue;
     if (object != null) {
-      if (object instanceof String) {
-        String name = (String) object;
+      if (object instanceof String name) {
         try {
           ret = parseEnum(enumeration, name);
         } catch (IllegalArgumentException e) {
@@ -775,24 +911,21 @@ public class SolrUtils {
     return doc == null ? new SolrInputDocument() : validateDescriptiveMetadataFields(doc);
   }
 
-
-  public static SolrInputDocument getTechnicalMetadataFields(Binary binary, String metadataType,
-                                                               String metadataVersion) throws GenericException {
+  public static SolrInputDocument getTechnicalMetadataFields(Binary binary, String metadataType, String metadataVersion)
+    throws GenericException {
     SolrInputDocument doc;
 
     Map<String, String> parameters = new HashMap<>();
     parameters.put("prefix", RodaConstants.INDEX_OTHER_DESCRIPTIVE_DATA_PREFIX);
 
-    String lowerCaseMetadataTypeWithVersion = metadataType.toLowerCase() + RodaConstants.METADATA_VERSION_SEPARATOR
-      + metadataVersion;
+    String technicalMetadataStylesheetName = getTechnicalMetadataStylesheetName(metadataType, metadataVersion);
 
-    if ((RodaCoreFactory.getConfigurationFileAsStream(
-      RodaConstants.CORE_CROSSWALKS_INGEST + lowerCaseMetadataTypeWithVersion + ".xslt")) == null) {
+    if ((RodaCoreFactory.getConfigurationFileAsStream(technicalMetadataStylesheetName)) == null) {
       return new SolrInputDocument();
     }
 
-    try (Reader transformationResult = RodaUtils.applyMetadataStylesheet(binary, RodaConstants.CORE_CROSSWALKS_INGEST,
-      metadataType, metadataVersion, parameters)) {
+    try (Reader transformationResult = RodaUtils.applyMetadataStylesheet(binary,
+      RodaConstants.CORE_CROSSWALKS_TECHNICAL, metadataType, metadataVersion, parameters)) {
 
       if (!transformationResult.ready()) {
         return new SolrInputDocument();
@@ -824,13 +957,21 @@ public class SolrUtils {
     return doc == null ? new SolrInputDocument() : validateDescriptiveMetadataFields(doc);
   }
 
+  private static String getTechnicalMetadataStylesheetName(String type, String version) {
+    if (StringUtils.isBlank(version)) {
+      return RodaConstants.CORE_CROSSWALKS_TECHNICAL + type.toLowerCase() + ".xslt";
+    }
+
+    return RodaConstants.CORE_CROSSWALKS_TECHNICAL + type.toLowerCase() + RodaConstants.METADATA_VERSION_SEPARATOR
+      + version + ".xslt";
+  }
 
   private static SolrInputDocument validateDescriptiveMetadataFields(SolrInputDocument doc) {
     if (doc.get(RodaConstants.AIP_DATE_INITIAL) != null) {
       Object value = doc.get(RodaConstants.AIP_DATE_INITIAL).getValue();
-      if (value instanceof String) {
+      if (value instanceof String stringDate) {
         try {
-          Date d = parseDate((String) value);
+          Date d = parseDate(stringDate);
           doc.setField(RodaConstants.AIP_DATE_INITIAL, d);
         } catch (ParseException pe) {
           doc.remove(RodaConstants.AIP_DATE_INITIAL);
@@ -841,9 +982,9 @@ public class SolrUtils {
 
     if (doc.get(RodaConstants.AIP_DATE_FINAL) != null) {
       Object value = doc.get(RodaConstants.AIP_DATE_FINAL).getValue();
-      if (value instanceof String) {
+      if (value instanceof String stringDate) {
         try {
-          Date d = parseDate((String) value);
+          Date d = parseDate(stringDate);
           doc.setField(RodaConstants.AIP_DATE_FINAL, d);
         } catch (ParseException pe) {
           doc.remove(RodaConstants.AIP_DATE_FINAL);
@@ -900,14 +1041,49 @@ public class SolrUtils {
         prefixWithANDOperatorIfBuilderNotEmpty);
     } else if (parameter instanceof OrFiltersParameters || parameter instanceof AndFiltersParameters) {
       FiltersParameters filters = (FiltersParameters) parameter;
-      appendFiltersWithOperator(ret, parameter instanceof OrFiltersParameters ? "OR" : "AND",
-          filters.getValues(),
-          prefixWithANDOperatorIfBuilderNotEmpty);
+      appendFiltersWithOperator(ret, parameter instanceof OrFiltersParameters ? "OR" : "AND", filters.getValues(),
+        prefixWithANDOperatorIfBuilderNotEmpty);
     } else if (parameter instanceof AllFilterParameter) {
       appendSelectAll(ret, prefixWithANDOperatorIfBuilderNotEmpty);
+    } else if (parameter instanceof ParentWhichFilterParameter nestParentFilterParameter) {
+      appendBlockJoinFilterParameter(ret, nestParentFilterParameter, prefixWithANDOperatorIfBuilderNotEmpty);
+    } else if (parameter instanceof ChildOfFilterParameter nestChildOfFilterParameter) {
+      appendBlockJoinChildrenFilterParameter(ret, nestChildOfFilterParameter, prefixWithANDOperatorIfBuilderNotEmpty);
     } else {
       LOGGER.error("Unsupported filter parameter class: {}", parameter.getClass().getName());
       throw new RequestNotValidException("Unsupported filter parameter class: " + parameter.getClass().getName());
+    }
+  }
+
+  private static void appendBlockJoinChildrenFilterParameter(StringBuilder ret, ChildOfFilterParameter parameter,
+    boolean prefixWithANDOperatorIfBuilderNotEmpty) throws RequestNotValidException {
+    StringBuilder blockMask = new StringBuilder();
+    parseFilterParameter(blockMask, parameter.getChildrenOfFilter(), prefixWithANDOperatorIfBuilderNotEmpty);
+    String replace = blockMask.toString().replace(": ", ":");
+
+    if (parameter.getParentFilter() != null) {
+      StringBuilder someParents = new StringBuilder();
+      parseFilterParameter(someParents, parameter.getParentFilter(), prefixWithANDOperatorIfBuilderNotEmpty);
+
+      ret.append("{!child of=").append(replace).append("} ").append(someParents);
+    } else {
+      ret.append("{!child of=").append(replace).append("}");
+    }
+  }
+
+  private static void appendBlockJoinFilterParameter(StringBuilder ret, ParentWhichFilterParameter parameter,
+    boolean prefixWithANDOperatorIfBuilderNotEmpty) throws RequestNotValidException {
+    StringBuilder blockMask = new StringBuilder();
+    parseFilterParameter(blockMask, parameter.getParentFilter(), prefixWithANDOperatorIfBuilderNotEmpty);
+    String replace = blockMask.toString().replace(": ", ":");
+
+    if (parameter.getChildrenFilter() != null) {
+      StringBuilder someChildren = new StringBuilder();
+      parseFilterParameter(someChildren, parameter.getChildrenFilter(), prefixWithANDOperatorIfBuilderNotEmpty);
+
+      ret.append("{!parent which=").append(replace).append("} ").append(someChildren);
+    } else {
+      ret.append("{!parent which=").append(replace).append("}");
     }
   }
 
@@ -918,13 +1094,13 @@ public class SolrUtils {
   }
 
   private static void appendANDOperator(StringBuilder ret, boolean prefixWithANDOperatorIfBuilderNotEmpty) {
-    if (prefixWithANDOperatorIfBuilderNotEmpty && ret.length() > 0) {
+    if (prefixWithANDOperatorIfBuilderNotEmpty && !ret.isEmpty()) {
       ret.append(" AND ");
     }
   }
 
   private static void appendOROperator(StringBuilder ret, boolean prefixWithOROperatorIfBuilderNotEmpty) {
-    if (prefixWithOROperatorIfBuilderNotEmpty && ret.length() > 0) {
+    if (prefixWithOROperatorIfBuilderNotEmpty && !ret.isEmpty()) {
       ret.append(" OR ");
     }
   }
@@ -932,7 +1108,7 @@ public class SolrUtils {
   private static void appendExactMatch(StringBuilder ret, String key, String value, boolean appendDoubleQuotes,
     boolean prefixWithANDOperatorIfBuilderNotEmpty) {
     appendANDOperator(ret, prefixWithANDOperatorIfBuilderNotEmpty);
-    ret.append("(").append(key).append(": ");
+    ret.append("(").append(key).append(":");
     if (appendDoubleQuotes) {
       ret.append("\"");
     }
@@ -1001,9 +1177,9 @@ public class SolrUtils {
         ret.append(" ").append(operator).append(" ");
       }
       if (split[i].matches("(AND|OR|NOT)")) {
-        ret.append(key).append(": \"").append(split[i]).append("\"");
+        ret.append(key).append(":\"").append(split[i]).append("\"");
       } else {
-        ret.append(key).append(": (").append(escapeSolrSpecialChars(split[i])).append(")");
+        ret.append(key).append(":(").append(escapeSolrSpecialChars(split[i])).append(")");
       }
     }
     ret.append(")");
@@ -1145,10 +1321,9 @@ public class SolrUtils {
         FacetParameter facetParameter = parameter.getValue();
         setSolrFacetParameterSort(query, facetParameter);
 
-        if (facetParameter instanceof SimpleFacetParameter) {
-          setQueryFacetParameter(query, (SimpleFacetParameter) facetParameter);
-          appendValuesUsingOROperator(filterQuery, facetParameter.getName(),
-            facetParameter.getValues(), true);
+        if (facetParameter instanceof SimpleFacetParameter simpleFacetParameter) {
+          setQueryFacetParameter(query, simpleFacetParameter);
+          appendValuesUsingOROperator(filterQuery, facetParameter.getName(), facetParameter.getValues(), true);
         } else if (facetParameter instanceof RangeFacetParameter) {
           query.add("facet", "true");
           query.add("facet.range", facetParameter.getName());
@@ -1162,7 +1337,7 @@ public class SolrUtils {
           LOGGER.error("Unsupported facet parameter class: {}", facetParameter.getClass().getName());
         }
       }
-      if (filterQuery.length() > 0) {
+      if (!filterQuery.isEmpty()) {
         query.addFilterQuery(filterQuery.toString());
         LOGGER.trace("Query after defining facets: {}", query);
       }
@@ -1196,25 +1371,30 @@ public class SolrUtils {
   private static <T extends IsIndexed> String getFilterQueries(User user, boolean justActive,
     Class<T> classToRetrieve) {
 
-    StringBuilder fq = new StringBuilder();
-
-    // TODO find a better way to define admin super powers
-    if (user != null && !RodaConstants.ADMIN.equals(user.getName())) {
-      fq.append("(");
-      String usersKey = RodaConstants.INDEX_PERMISSION_USERS_PREFIX + PermissionType.READ;
-      appendExactMatch(fq, usersKey, user.getId(), true, false);
-
-      String groupsKey = RodaConstants.INDEX_PERMISSION_GROUPS_PREFIX + PermissionType.READ;
-      appendValuesUsingOROperatorForQuery(fq, groupsKey, new ArrayList<>(user.getGroups()), true);
-
-      fq.append(")");
-    }
+    StringBuilder fq = getFilterQueryPermissions(user);
 
     if (justActive && SolrCollection.hasStateFilter(classToRetrieve)) {
       appendExactMatch(fq, RodaConstants.INDEX_STATE, SolrUtils.formatEnum(AIPState.ACTIVE), true, true);
     }
 
     return fq.toString();
+  }
+
+  private static StringBuilder getFilterQueryPermissions(User user) {
+    StringBuilder ret = new StringBuilder();
+
+    // TODO find a better way to define admin super powers
+    if (user != null && !RodaConstants.ADMIN.equals(user.getName())) {
+      ret.append("(");
+      String usersKey = RodaConstants.INDEX_PERMISSION_USERS_PREFIX + PermissionType.READ;
+      appendExactMatch(ret, usersKey, user.getId(), true, false);
+
+      String groupsKey = RodaConstants.INDEX_PERMISSION_GROUPS_PREFIX + PermissionType.READ;
+      appendValuesUsingOROperatorForQuery(ret, groupsKey, new ArrayList<>(user.getGroups()), true);
+
+      ret.append(")");
+    }
+    return ret;
   }
 
   private static void appendValuesUsingOROperatorForQuery(StringBuilder ret, String key, List<String> values,
@@ -1247,12 +1427,13 @@ public class SolrUtils {
     boolean waitSearcher = true;
     boolean softCommit = true;
 
-    Fallback<Object> fallback = Fallback.of(e -> {});
+    Fallback<Object> fallback = Fallback.of(e -> {
+    });
 
     for (String collection : collections) {
-      Failsafe.with(fallback, RetryPolicyBuilder.getInstance().getRetryPolicy()).onFailure(e -> {
-        LOGGER.error("Error committing into collection: {}", collection, e.getException());
-      }).run(() -> index.commit(collection, waitFlush, waitSearcher, softCommit));
+      Failsafe.with(fallback, RetryPolicyBuilder.getInstance().getRetryPolicy())
+        .onFailure(e -> LOGGER.error("Error committing into collection: {}", collection, e.getException()))
+        .run(() -> index.commit(collection, waitFlush, waitSearcher, softCommit));
     }
   }
 
@@ -1292,7 +1473,7 @@ public class SolrUtils {
   }
 
   public static <I extends IsIndexed, M extends IsModelObject, S extends Object> ReturnWithExceptions<Void, S> create2(
-    SolrClient index, S source, Class<I> indexClass, M object, IndexingAdditionalInfo utils) {
+    SolrClient index, ModelService model, S source, Class<I> indexClass, M object, IndexingAdditionalInfo utils) {
     ReturnWithExceptions<Void, S> ret = new ReturnWithExceptions<>(source);
 
     Fallback<Object> fallback = Fallback.of(e -> {
@@ -1301,13 +1482,11 @@ public class SolrUtils {
 
     if (object != null) {
       try {
-        SolrInputDocument solrDocument = SolrCollectionRegistry.toSolrDocument(indexClass, object, utils);
+        SolrInputDocument solrDocument = SolrCollectionRegistry.toSolrDocument(indexClass, model, object, utils);
         if (solrDocument != null) {
-          Failsafe.with(fallback, RetryPolicyBuilder.getInstance().getRetryPolicy()).onFailure(e -> {
-            LOGGER.error("Error adding document to index", e.getException());
-          }).run(() -> {
-            index.add(SolrCollectionRegistry.getIndexName(indexClass), solrDocument);
-          });
+          Failsafe.with(fallback, RetryPolicyBuilder.getInstance().getRetryPolicy())
+            .onFailure(e -> LOGGER.error("Error adding document to index", e.getException()))
+            .run(() -> index.add(SolrCollectionRegistry.getIndexName(indexClass), solrDocument));
         }
       } catch (GenericException | NotSupportedException | RequestNotValidException | NotFoundException
         | AuthorizationDeniedException e) {
@@ -1320,21 +1499,21 @@ public class SolrUtils {
   }
 
   public static <I extends IsIndexed, M extends IsModelObject, S extends Object> ReturnWithExceptions<Void, S> create2(
-    SolrClient index, S source, Class<I> indexClass, M object) {
-    return create2(index, source, indexClass, object, IndexingAdditionalInfo.empty());
+    SolrClient index, ModelService model, S source, Class<I> indexClass, M object) {
+    return create2(index, model, source, indexClass, object, IndexingAdditionalInfo.empty());
   }
 
   public static <T extends IsIndexed, M extends IsModelObject, S extends Object> ReturnWithExceptions<Void, S> create(
-    SolrClient index, Class<T> classToCreate, M instance, S source) {
-    return create(index, classToCreate, instance, source, false);
+    SolrClient index, ModelService model, Class<T> classToCreate, M instance, S source) {
+    return create(index, model, classToCreate, instance, source, false);
   }
 
   public static <T extends IsIndexed, M extends IsModelObject, S extends Object> ReturnWithExceptions<Void, S> create(
-    SolrClient index, Class<T> classToCreate, M instance, S source, boolean commit) {
+    SolrClient index, ModelService model, Class<T> classToCreate, M instance, S source, boolean commit) {
     ReturnWithExceptions<Void, S> ret = new ReturnWithExceptions<>();
     try {
       Optional<SolrInputDocument> solrDocument = Optional
-        .of(SolrCollectionRegistry.toSolrDocument(classToCreate, instance));
+        .of(SolrCollectionRegistry.toSolrDocument(classToCreate, model, instance));
       if (solrDocument.isPresent()) {
         create(index, SolrCollectionRegistry.getIndexName(classToCreate), solrDocument.get(), source).addTo(ret);
         if (commit) {
@@ -1355,7 +1534,7 @@ public class SolrUtils {
     ReturnWithExceptions<Void, S> ret = new ReturnWithExceptions<>();
     SolrInputDocument doc = new SolrInputDocument();
     doc.addField(RodaConstants.INDEX_UUID, uuid);
-    fields.entrySet().forEach(e -> doc.addField(e.getKey(), set(e.getValue())));
+    fields.forEach((key, value) -> doc.addField(key, set(value)));
     try {
       create(index, SolrCollectionRegistry.getIndexName(classToCreate), doc, source).addTo(ret);
     } catch (NotSupportedException e) {
@@ -1382,6 +1561,50 @@ public class SolrUtils {
    * ____________________________________________________________________________________________________________________
    */
 
+  public static void indexRepresentationTechnicalMetadata(ModelService model,
+    List<TechnicalMetadata> technicalMetadatum, String fileId, SolrInputDocument doc)
+    throws RequestNotValidException, AuthorizationDeniedException, NotFoundException, GenericException {
+
+    // guarding against repeated fields
+    Set<String> usedNonRepeatableFields = new HashSet<>();
+
+    // technical metadata ids
+    ArrayList<String> techMdIds = new ArrayList<>();
+
+    for (TechnicalMetadata techMd : technicalMetadatum) {
+      techMdIds.add(techMd.getType().toLowerCase());
+
+      String urn = URNUtils.createRodaTechnicalMetadataURN(fileId, RODAInstanceUtils.getLocalInstanceIdentifier(),
+        techMd.getType().toLowerCase());
+
+      StoragePath storagePath = ModelUtils.getTechnicalMetadataStoragePath(techMd.getAipId(),
+        techMd.getRepresentationId(), Collections.singletonList(techMd.getType()),
+        urn + RodaConstants.REPRESENTATION_INFORMATION_FILE_EXTENSION);
+
+      Binary binary = model.getStorage().getBinary(storagePath);
+
+      try {
+        SolrInputDocument technicalMetadataFields = getTechnicalMetadataFields(binary, techMd.getType(), null);
+        for (SolrInputField field : technicalMetadataFields) {
+          if (NON_REPEATABLE_FIELDS.contains(field.getName())) {
+            boolean added = usedNonRepeatableFields.add(field.getName());
+            if (added) {
+              doc.addField(field.getName(), field.getValue());
+            }
+          } else {
+            doc.addField(field.getName(), field.getValue());
+          }
+        }
+      } catch (GenericException e) {
+        LOGGER.warn("Problem processing technical metadata: {}", e.getMessage(), e);
+      } catch (Exception e) {
+        LOGGER.error("Error processing technical metadata: {}", techMd, e);
+      }
+    }
+
+    doc.addField(RodaConstants.FILE_TECHNICAL_METADATA_ID, techMdIds);
+  }
+
   public static void indexDescriptiveMetadataFields(ModelService model, String aipId, String representationId,
     List<DescriptiveMetadata> metadataList, SolrInputDocument doc)
     throws RequestNotValidException, GenericException, NotFoundException, AuthorizationDeniedException {
@@ -1389,8 +1612,7 @@ public class SolrUtils {
     Set<String> usedNonRepeatableFields = new HashSet<>();
 
     for (DescriptiveMetadata metadata : metadataList) {
-      StoragePath storagePath = ModelUtils.getDescriptiveMetadataStoragePath(aipId, representationId, metadata.getId());
-      Binary binary = model.getStorage().getBinary(storagePath);
+      Binary binary = model.getBinary(metadata);
       try {
         SolrInputDocument fields = getDescriptiveMetadataFields(binary, metadata.getType(), metadata.getVersion());
         for (SolrInputField field : fields) {
@@ -1412,10 +1634,9 @@ public class SolrUtils {
   }
 
   public static List<String> getFileAncestorsPath(String aipId, String representationId, List<String> path) {
-    List<String> parentFileDirectoryPath = new ArrayList<>();
     List<String> ancestorsPath = new ArrayList<>();
 
-    parentFileDirectoryPath.addAll(path);
+    List<String> parentFileDirectoryPath = new ArrayList<>(path);
 
     while (!parentFileDirectoryPath.isEmpty()) {
       int lastElementIndex = parentFileDirectoryPath.size() - 1;
@@ -1438,7 +1659,7 @@ public class SolrUtils {
     Binary binary = model.retrieveOtherMetadataBinary(otherMetadataBinary);
     Map<String, List<String>> otherProperties = MetadataFileUtils.parseBinary(binary);
 
-    for (Map.Entry<String, List<String>> entry : otherProperties.entrySet()) {
+    for (Entry<String, List<String>> entry : otherProperties.entrySet()) {
       solrDocument.setField(prefix + entry.getKey(), entry.getValue());
     }
 
@@ -1496,8 +1717,7 @@ public class SolrUtils {
 
     for (PermissionType type : PermissionType.values()) {
       String key = RodaConstants.INDEX_PERMISSION_USERS_PREFIX + type;
-      Set<String> users = new HashSet<>();
-      users.addAll(objectToListString(doc.get(key)));
+      Set<String> users = new HashSet<>(objectToListString(doc.get(key)));
       userPermissions.put(type, users);
     }
 
@@ -1505,8 +1725,7 @@ public class SolrUtils {
 
     for (PermissionType type : PermissionType.values()) {
       String key = RodaConstants.INDEX_PERMISSION_GROUPS_PREFIX + type;
-      Set<String> groups = new HashSet<>();
-      groups.addAll(objectToListString(doc.get(key)));
+      Set<String> groups = new HashSet<>(objectToListString(doc.get(key)));
       groupPermissions.put(type, groups);
     }
 
@@ -1613,12 +1832,10 @@ public class SolrUtils {
 
   public static <T extends IsIndexed> void execute(SolrClient index, Class<T> classToRetrieve, Filter filter,
     List<String> fieldsToReturn, IndexRunnable<T> indexRunnable, final Consumer<RODAException> exceptionHandler)
-    throws GenericException, RequestNotValidException {
-    User user = null;
-    boolean justActive = false;
+    throws GenericException {
 
-    try (IterableIndexResult<T> iterableIndexResult = new IterableIndexResult<>(index, classToRetrieve, filter, user,
-      justActive, fieldsToReturn)) {
+    try (IterableIndexResult<T> iterableIndexResult = new IterableIndexResult<>(index, classToRetrieve, filter, null,
+      false, fieldsToReturn)) {
 
       iterableIndexResult.forEach(target -> {
         try {
@@ -1654,14 +1871,13 @@ public class SolrUtils {
       ret.add(new SolrRetryException(e.getLastException()));
     });
 
-    Failsafe.with(fallback, RetryPolicyBuilder.getInstance().getRetryPolicy()).onFailure(e -> {
-      LOGGER.error("Error deleting document from index");
-    }).run(() -> {
-      index.deleteById(SolrCollectionRegistry.getIndexName(classToDelete), ids);
-      if (commit) {
-        commit(index, classToDelete);
-      }
-    });
+    Failsafe.with(fallback, RetryPolicyBuilder.getInstance().getRetryPolicy())
+      .onFailure(e -> LOGGER.error("Error deleting document from index")).run(() -> {
+        index.deleteById(SolrCollectionRegistry.getIndexName(classToDelete), ids);
+        if (commit) {
+          commit(index, classToDelete);
+        }
+      });
 
     return ret;
   }
@@ -1679,14 +1895,13 @@ public class SolrUtils {
       ret.add(new SolrRetryException(e.getLastException()));
     });
 
-    Failsafe.with(fallback, RetryPolicyBuilder.getInstance().getRetryPolicy()).onFailure(e -> {
-      LOGGER.error("Error deleting documents from index");
-    }).run(() -> {
-      index.deleteByQuery(SolrCollectionRegistry.getIndexName(classToDelete), parseFilter(filter));
-      if (commit) {
-        commit(index, classToDelete);
-      }
-    });
+    Failsafe.with(fallback, RetryPolicyBuilder.getInstance().getRetryPolicy())
+      .onFailure(e -> LOGGER.error("Error deleting documents from index")).run(() -> {
+        index.deleteByQuery(SolrCollectionRegistry.getIndexName(classToDelete), parseFilter(filter));
+        if (commit) {
+          commit(index, classToDelete);
+        }
+      });
 
     return ret;
   }
@@ -1723,8 +1938,7 @@ public class SolrUtils {
       return values;
     }
 
-    if (o instanceof Date) {
-      Date retentionPeriodStartDate = (Date) o;
+    if (o instanceof Date retentionPeriodStartDate) {
       cal.setTime(retentionPeriodStartDate);
     } else {
       values.put(RodaConstants.AIP_DISPOSAL_RETENTION_PERIOD_DETAILS, "Retention period start must be of date type");
@@ -1746,6 +1960,8 @@ public class SolrUtils {
         case DAYS:
           cal.add(Calendar.DATE, retentionPeriodDuration);
           break;
+        default:
+          throw new IllegalStateException("Unexpected value: " + disposalSchedule.getRetentionPeriodIntervalCode());
       }
     }
     overDueDate = cal.getTime();

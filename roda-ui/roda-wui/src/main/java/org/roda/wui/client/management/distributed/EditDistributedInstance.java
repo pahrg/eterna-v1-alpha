@@ -9,13 +9,12 @@ package org.roda.wui.client.management.distributed;
 
 import java.util.List;
 
-import org.roda.core.data.v2.synchronization.SynchronizingStatus;
 import org.roda.core.data.v2.synchronization.central.DistributedInstance;
-import org.roda.wui.client.browse.BrowserService;
+import org.roda.core.data.v2.synchronization.central.UpdateDistributedInstanceRequest;
 import org.roda.wui.client.common.NoAsyncCallback;
 import org.roda.wui.client.common.UserLogin;
 import org.roda.wui.client.common.dialogs.Dialogs;
-import org.roda.wui.client.common.utils.JavascriptUtils;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.HistoryResolver;
 import org.roda.wui.common.client.tools.HistoryUtils;
 import org.roda.wui.common.client.tools.ListUtils;
@@ -42,11 +41,11 @@ public class EditDistributedInstance extends Composite {
     @Override
     public void resolve(List<String> historyTokens, AsyncCallback<Widget> callback) {
       if (historyTokens.size() == 1) {
-        BrowserService.Util.getInstance().retrieveDistributedInstance(historyTokens.get(0),
-          new NoAsyncCallback<DistributedInstance>() {
-            @Override
-            public void onSuccess(DistributedInstance result) {
-              EditDistributedInstance editDistributedInstance = new EditDistributedInstance(result);
+        Services services = new Services("Get distributed instance", "get");
+        services.distributedInstanceResource(s -> s.getDistributedInstance(historyTokens.get(0)))
+          .whenComplete((distributedInstance, error) -> {
+            if (distributedInstance != null) {
+              EditDistributedInstance editDistributedInstance = new EditDistributedInstance(distributedInstance);
               callback.onSuccess(editDistributedInstance);
             }
           });
@@ -101,11 +100,12 @@ public class EditDistributedInstance extends Composite {
         buttonChangeStatus.addClickHandler(new ClickHandler() {
           @Override
           public void onClick(ClickEvent clickEvent) {
-            distributedInstance.setStatus(SynchronizingStatus.INACTIVE);
-            BrowserService.Util.getInstance().updateDistributedInstance(distributedInstance,
-              new NoAsyncCallback<DistributedInstance>() {
-                @Override
-                public void onSuccess(DistributedInstance distributedInstance) {
+            Services services = new Services("Update distributed instance status", "update");
+            services
+              .distributedInstanceResource(
+                s -> s.updateDistributedInstanceSyncStatus(distributedInstance.getId(), false))
+              .whenComplete((updatedDistributedInstance, error) -> {
+                if (updatedDistributedInstance != null) {
                   HistoryUtils.newHistory(DistributedInstancesManagement.RESOLVER);
                 }
               });
@@ -118,11 +118,12 @@ public class EditDistributedInstance extends Composite {
         buttonChangeStatus.addClickHandler(new ClickHandler() {
           @Override
           public void onClick(ClickEvent clickEvent) {
-            distributedInstance.setStatus(SynchronizingStatus.ACTIVE);
-            BrowserService.Util.getInstance().updateDistributedInstance(distributedInstance,
-              new NoAsyncCallback<DistributedInstance>() {
-                @Override
-                public void onSuccess(DistributedInstance distributedInstance) {
+            Services services = new Services("Update distributed instance status", "update");
+            services
+              .distributedInstanceResource(
+                s -> s.updateDistributedInstanceSyncStatus(distributedInstance.getId(), true))
+              .whenComplete((updatedDistributedInstance, error) -> {
+                if (updatedDistributedInstance != null) {
                   HistoryUtils.newHistory(DistributedInstancesManagement.RESOLVER);
                 }
               });
@@ -134,23 +135,18 @@ public class EditDistributedInstance extends Composite {
     }
   }
 
-  @Override
-  protected void onLoad() {
-    super.onLoad();
-    JavascriptUtils.stickSidebar();
-  }
-
   @UiHandler("buttonSave")
   void buttonApplyHandler(ClickEvent e) {
     if (distributedInstanceDataPanel.isValid()) {
       DistributedInstance distributedInstanceUpdated = distributedInstanceDataPanel.getDistributedInstance();
-      distributedInstance.setName(distributedInstanceUpdated.getName());
-      distributedInstance.setDescription(distributedInstanceUpdated.getDescription());
+      UpdateDistributedInstanceRequest request = new UpdateDistributedInstanceRequest(
+        distributedInstanceUpdated.getId(), distributedInstanceUpdated.getName(),
+        distributedInstanceUpdated.getDescription());
       // distributedInstance.setNameIdentifier(distributedInstanceUpdated.getNameIdentifier());
-      BrowserService.Util.getInstance().updateDistributedInstance(this.distributedInstance,
-        new NoAsyncCallback<DistributedInstance>() {
-          @Override
-          public void onSuccess(DistributedInstance distributedInstance) {
+      Services services = new Services("Update distributed instance", "update");
+      services.distributedInstanceResource(s -> s.updateDistributedInstance(request))
+        .whenComplete((updatedDistributedInstance, error) -> {
+          if (updatedDistributedInstance != null) {
             HistoryUtils.newHistory(DistributedInstancesManagement.RESOLVER);
           }
         });
@@ -164,12 +160,10 @@ public class EditDistributedInstance extends Composite {
         @Override
         public void onSuccess(Boolean confirm) {
           if (confirm) {
-            BrowserService.Util.getInstance().deleteDistributedInstance(distributedInstance.getId(),
-              new NoAsyncCallback<Void>() {
-                @Override
-                public void onSuccess(Void result) {
-                  HistoryUtils.newHistory(DistributedInstancesManagement.RESOLVER);
-                }
+            Services services = new Services("Delete distributed instance", "delete");
+            services.distributedInstanceResource(s -> s.deleteDistributedInstance(distributedInstance.getId()))
+              .whenComplete((result, error) -> {
+                HistoryUtils.newHistory(DistributedInstancesManagement.RESOLVER);
               });
           }
         }

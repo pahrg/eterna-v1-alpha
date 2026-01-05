@@ -13,13 +13,12 @@ import java.util.List;
 import java.util.Set;
 
 import org.roda.core.data.common.RodaConstants;
+import org.roda.core.data.utils.SelectedItemsUtils;
 import org.roda.core.data.v2.index.filter.Filter;
 import org.roda.core.data.v2.index.select.SelectedItems;
-import org.roda.core.data.v2.jobs.Job;
 import org.roda.core.data.v2.ri.RepresentationInformation;
-import org.roda.wui.client.browse.BrowserService;
+import org.roda.core.data.v2.ri.RepresentationInformationFilterRequest;
 import org.roda.wui.client.common.LastSelectedItemsSingleton;
-import org.roda.wui.client.common.NoAsyncCallback;
 import org.roda.wui.client.common.actions.callbacks.ActionAsyncCallback;
 import org.roda.wui.client.common.actions.callbacks.ActionNoAsyncCallback;
 import org.roda.wui.client.common.actions.model.ActionableBundle;
@@ -33,6 +32,7 @@ import org.roda.wui.client.planning.EditRepresentationInformation;
 import org.roda.wui.client.planning.RepresentationInformationAssociations;
 import org.roda.wui.client.process.CreateSelectedJob;
 import org.roda.wui.client.process.InternalProcess;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.tools.HistoryUtils;
 import org.roda.wui.common.client.tools.RestUtils;
 import org.roda.wui.common.client.widgets.Toast;
@@ -44,6 +44,8 @@ import com.google.gwt.user.client.Window;
 import com.google.gwt.user.client.rpc.AsyncCallback;
 
 import config.i18n.client.ClientMessages;
+
+import javax.naming.Context;
 
 public class RepresentationInformationActions extends AbstractActionable<RepresentationInformation> {
   private static final RepresentationInformationActions INSTANCE = new RepresentationInformationActions();
@@ -112,23 +114,40 @@ public class RepresentationInformationActions extends AbstractActionable<Represe
   }
 
   @Override
-  public boolean canAct(Action<RepresentationInformation> action) {
-    if (hasPermissions(action)) {
-      return objectsToAssociate == null ? POSSIBLE_ACTIONS_WITHOUT_RI.contains(action)
-        : POSSIBLE_ACTIONS_WITHOUT_RI_ASSOCIATING.contains(action);
-    } else {
-      return false;
-    }
+  public CanActResult userCanAct(Action<RepresentationInformation> action) {
+    return new CanActResult(hasPermissions(action), CanActResult.Reason.USER, messages.reasonUserLacksPermission());
   }
 
   @Override
-  public boolean canAct(Action<RepresentationInformation> action, RepresentationInformation object) {
-    return hasPermissions(action) && POSSIBLE_ACTIONS_ON_SINGLE_RI.contains(action);
+  public CanActResult contextCanAct(Action<RepresentationInformation> action) {
+    return new CanActResult(
+      objectsToAssociate == null ? POSSIBLE_ACTIONS_WITHOUT_RI.contains(action)
+        : POSSIBLE_ACTIONS_WITHOUT_RI_ASSOCIATING.contains(action),
+      CanActResult.Reason.CONTEXT, messages.reasonInvalidContext());
   }
 
   @Override
-  public boolean canAct(Action<RepresentationInformation> action, SelectedItems<RepresentationInformation> objects) {
-    return hasPermissions(action) && POSSIBLE_ACTIONS_ON_MULTIPLE_RI.contains(action);
+  public CanActResult userCanAct(Action<RepresentationInformation> action, RepresentationInformation object) {
+    return new CanActResult(hasPermissions(action), CanActResult.Reason.USER, messages.reasonUserLacksPermission());
+  }
+
+  @Override
+  public CanActResult contextCanAct(Action<RepresentationInformation> action, RepresentationInformation object) {
+    return new CanActResult(POSSIBLE_ACTIONS_ON_SINGLE_RI.contains(action), CanActResult.Reason.CONTEXT,
+      messages.reasonCantActOnSingleObject());
+  }
+
+  @Override
+  public CanActResult userCanAct(Action<RepresentationInformation> action,
+    SelectedItems<RepresentationInformation> objects) {
+    return new CanActResult(hasPermissions(action), CanActResult.Reason.USER, messages.reasonUserLacksPermission());
+  }
+
+  @Override
+  public CanActResult contextCanAct(Action<RepresentationInformation> action,
+    SelectedItems<RepresentationInformation> objects) {
+    return new CanActResult(POSSIBLE_ACTIONS_ON_MULTIPLE_RI.contains(action), CanActResult.Reason.CONTEXT,
+      messages.reasonCantActOnMultipleObjects());
   }
 
   @Override
@@ -152,13 +171,16 @@ public class RepresentationInformationActions extends AbstractActionable<Represe
         @Override
         public void onSuccess(final SelectedItems<RepresentationInformation> selectedItems) {
           if (selectedItems != null) {
-            String filtertoAdd = HistoryUtils.getCurrentHistoryPath()
+            String filterToAdd = HistoryUtils.getCurrentHistoryPath()
               .get(HistoryUtils.getCurrentHistoryPath().size() - 1);
 
-            BrowserService.Util.getInstance().updateRepresentationInformationListWithFilter(selectedItems, filtertoAdd,
-              new NoAsyncCallback<Job>() {
-                @Override
-                public void onSuccess(Job result) {
+            Services services = new Services("Update representation information with filter", "update");
+            RepresentationInformationFilterRequest request = new RepresentationInformationFilterRequest();
+            request.setSelectedItems(selectedItems);
+            request.setFilterToAdd(filterToAdd);
+            services.representationInformationResource(s -> s.addFilterToRepresentationInformation(request))
+              .whenComplete((job, throwable) -> {
+                if (throwable == null) {
                   Toast.showInfo(messages.runningInBackgroundTitle(), messages.runningInBackgroundDescription());
 
                   Dialogs.showJobRedirectDialog(messages.jobCreatedMessage(), new AsyncCallback<Void>() {
@@ -170,7 +192,7 @@ public class RepresentationInformationActions extends AbstractActionable<Represe
 
                     @Override
                     public void onSuccess(final Void nothing) {
-                      HistoryUtils.newHistory(ShowJob.RESOLVER, result.getId());
+                      HistoryUtils.newHistory(ShowJob.RESOLVER, job.getId());
                     }
                   });
                 }
@@ -249,41 +271,39 @@ public class RepresentationInformationActions extends AbstractActionable<Represe
             @Override
             public void onSuccess(Boolean confirmed) {
               if (confirmed) {
-                BrowserService.Util.getInstance().deleteRepresentationInformation(objects, new AsyncCallback<Job>() {
+                Services services = new Services("Delete representation information", "delete");
+                services
+                  .representationInformationResource(
+                    s -> s.deleteMultipleRepresentationInformation(SelectedItemsUtils.convertToRESTRequest(objects)))
+                  .whenComplete((job, throwable) -> {
+                    if (throwable == null) {
+                      Dialogs.showJobRedirectDialog(messages.removeJobCreatedMessage(),
+                        new ActionAsyncCallback<Void>(callback) {
 
-                  @Override
-                  public void onFailure(Throwable caught) {
-                    callback.onFailure(caught);
-                    HistoryUtils.newHistory(InternalProcess.RESOLVER);
-                  }
+                          @Override
+                          public void onFailure(Throwable caught) {
+                            Timer timer = new Timer() {
+                              @Override
+                              public void run() {
+                                Toast.showInfo(messages.representationInformationRemoveSuccessTitle(),
+                                  messages.representationInformationRemoveSuccessMessage(size));
+                                doActionCallbackDestroyed();
+                              }
+                            };
 
-                  @Override
-                  public void onSuccess(Job result) {
-                    Dialogs.showJobRedirectDialog(messages.removeJobCreatedMessage(),
-                      new ActionAsyncCallback<Void>(callback) {
+                            timer.schedule(RodaConstants.ACTION_TIMEOUT);
+                          }
 
-                        @Override
-                        public void onFailure(Throwable caught) {
-                          Timer timer = new Timer() {
-                            @Override
-                            public void run() {
-                              Toast.showInfo(messages.representationInformationRemoveSuccessTitle(),
-                                messages.representationInformationRemoveSuccessMessage(size));
-                              doActionCallbackDestroyed();
-                            }
-                          };
-
-                          timer.schedule(RodaConstants.ACTION_TIMEOUT);
-                        }
-
-                        @Override
-                        public void onSuccess(final Void nothing) {
-                          doActionCallbackNone();
-                          HistoryUtils.newHistory(ShowJob.RESOLVER, result.getId());
-                        }
-                      });
-                  }
-                });
+                          @Override
+                          public void onSuccess(final Void nothing) {
+                            doActionCallbackNone();
+                            HistoryUtils.newHistory(ShowJob.RESOLVER, job.getId());
+                          }
+                        });
+                    } else {
+                      HistoryUtils.newHistory(InternalProcess.RESOLVER);
+                    }
+                  });
               }
             }
           });

@@ -11,18 +11,16 @@
 package org.roda.wui.client.planning;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 import org.roda.core.data.common.RodaConstants;
+import org.roda.core.data.v2.index.IndexedFileRequest;
 import org.roda.core.data.v2.index.filter.Filter;
 import org.roda.core.data.v2.index.filter.SimpleFilterParameter;
+import org.roda.core.data.v2.ip.IndexedAIP;
+import org.roda.core.data.v2.ip.IndexedRepresentation;
 import org.roda.core.data.v2.risks.RiskIncidence;
-import org.roda.wui.client.browse.BrowseTop;
-import org.roda.wui.client.browse.BrowserService;
-import org.roda.wui.client.browse.bundle.BrowseAIPBundle;
-import org.roda.wui.client.browse.bundle.BrowseFileBundle;
-import org.roda.wui.client.browse.bundle.BrowseRepresentationBundle;
 import org.roda.wui.client.common.UserLogin;
 import org.roda.wui.client.common.actions.RiskIncidenceActions;
 import org.roda.wui.client.common.lists.RiskIncidenceList;
@@ -30,10 +28,9 @@ import org.roda.wui.client.common.lists.utils.AsyncTableCellOptions;
 import org.roda.wui.client.common.lists.utils.ListBuilder;
 import org.roda.wui.client.common.search.SearchFilters;
 import org.roda.wui.client.common.search.SearchWrapper;
-import org.roda.wui.client.common.utils.AsyncCallbackUtils;
-import org.roda.wui.client.common.utils.JavascriptUtils;
 import org.roda.wui.client.main.BreadcrumbPanel;
 import org.roda.wui.client.main.BreadcrumbUtils;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.HistoryResolver;
 import org.roda.wui.common.client.tools.HistoryUtils;
 import org.roda.wui.common.client.tools.ListUtils;
@@ -57,8 +54,10 @@ import config.i18n.client.ClientMessages;
  */
 public class RiskIncidenceRegister extends Composite {
 
-  public static final HistoryResolver RESOLVER = new HistoryResolver() {
+  private static final ClientMessages messages = GWT.create(ClientMessages.class);
+  private static final MyUiBinder uiBinder = GWT.create(MyUiBinder.class);
 
+  public static final HistoryResolver RESOLVER = new HistoryResolver() {
     @Override
     public void resolve(List<String> historyTokens, AsyncCallback<Widget> callback) {
       if (historyTokens.isEmpty()) {
@@ -122,25 +121,6 @@ public class RiskIncidenceRegister extends Composite {
       return "riskincidenceregister";
     }
   };
-
-  interface MyUiBinder extends UiBinder<Widget, RiskIncidenceRegister> {
-  }
-
-  private static MyUiBinder uiBinder = GWT.create(MyUiBinder.class);
-  private static final ClientMessages messages = GWT.create(ClientMessages.class);
-
-  private static final List<String> aipFieldsToReturn = new ArrayList<>(
-    Arrays.asList(RodaConstants.INDEX_UUID, RodaConstants.AIP_GHOST, RodaConstants.AIP_TITLE, RodaConstants.AIP_LEVEL));
-
-  private static final List<String> representationFieldsToReturn = new ArrayList<>(
-    Arrays.asList(RodaConstants.INDEX_UUID, RodaConstants.REPRESENTATION_AIP_ID, RodaConstants.REPRESENTATION_ID,
-      RodaConstants.REPRESENTATION_TYPE));
-
-  private static final List<String> fileFieldsToReturn = new ArrayList<>(
-    Arrays.asList(RodaConstants.INDEX_UUID, RodaConstants.FILE_PARENT_UUID, RodaConstants.FILE_PATH,
-      RodaConstants.FILE_ANCESTORS_PATH, RodaConstants.FILE_ORIGINALNAME, RodaConstants.INDEX_ID,
-      RodaConstants.FILE_AIP_ID, RodaConstants.FILE_REPRESENTATION_ID, RodaConstants.FILE_ISDIRECTORY));
-
   @UiField
   BreadcrumbPanel breadcrumb;
 
@@ -178,62 +158,65 @@ public class RiskIncidenceRegister extends Composite {
   }
 
   private void getAIPBreadCrumbs(String aipId) {
-    BrowserService.Util.getInstance().retrieveBrowseAIPBundle(aipId, LocaleInfo.getCurrentLocale().getLocaleName(),
-      aipFieldsToReturn, new AsyncCallback<BrowseAIPBundle>() {
+    Services services = new Services("Build AIP breadcrumb", "get");
+    CompletableFuture<List<IndexedAIP>> ancestorsCompletableFuture = services.aipResource(s -> s.getAncestors(aipId));
+    CompletableFuture<IndexedAIP> indexedAIPCompletableFuture = services
+      .aipResource(s -> s.findByUuid(aipId, LocaleInfo.getCurrentLocale().getLocaleName()));
+    CompletableFuture<Void> allFutures = CompletableFuture.allOf(ancestorsCompletableFuture,
+      indexedAIPCompletableFuture);
 
-        @Override
-        public void onFailure(Throwable caught) {
-          AsyncCallbackUtils.defaultFailureTreatment(caught);
-          HistoryUtils.newHistory(BrowseTop.RESOLVER);
-        }
-
-        @Override
-        public void onSuccess(BrowseAIPBundle itemBundle) {
-          breadcrumb
-            .updatePath(BreadcrumbUtils.getAipBreadcrumbs(itemBundle.getAIPAncestors(), itemBundle.getAip(), true));
-          breadcrumb.setVisible(true);
-        }
-      });
+    allFutures.thenRun(() -> {
+      breadcrumb.updatePath(
+        BreadcrumbUtils.getAipBreadcrumbs(ancestorsCompletableFuture.join(), indexedAIPCompletableFuture.join(), true));
+      breadcrumb.setVisible(true);
+    });
   }
 
   private void getRepresentationBreadCrumbs(String aipId, String representationId) {
-    BrowserService.Util.getInstance().retrieveBrowseRepresentationBundle(aipId, representationId,
-      LocaleInfo.getCurrentLocale().getLocaleName(), representationFieldsToReturn,
-      new AsyncCallback<BrowseRepresentationBundle>() {
+    Services services = new Services("Build Representation breadcrumb", "get");
 
-        @Override
-        public void onFailure(Throwable caught) {
-          AsyncCallbackUtils.defaultFailureTreatment(caught);
-        }
+    CompletableFuture<List<IndexedAIP>> ancestorsCompletableFuture = services.aipResource(s -> s.getAncestors(aipId));
+    CompletableFuture<IndexedAIP> indexedAIPCompletableFuture = services
+      .aipResource(s -> s.findByUuid(aipId, LocaleInfo.getCurrentLocale().getLocaleName()));
+    CompletableFuture<IndexedRepresentation> indexedRepresentationCompletableFuture = services
+      .representationResource(s -> s.findByUuid(representationId, LocaleInfo.getCurrentLocale().getLocaleName()));
 
-        @Override
-        public void onSuccess(BrowseRepresentationBundle repBundle) {
-          breadcrumb.updatePath(BreadcrumbUtils.getRepresentationBreadcrumbs(repBundle));
-          breadcrumb.setVisible(true);
-        }
-      });
+    CompletableFuture<Void> allFutures = CompletableFuture.allOf(ancestorsCompletableFuture,
+      indexedAIPCompletableFuture, indexedRepresentationCompletableFuture);
+
+    allFutures.thenRun(() -> {
+      breadcrumb.updatePath(BreadcrumbUtils.getRepresentationBreadcrumbs(ancestorsCompletableFuture.join(),
+        indexedAIPCompletableFuture.join(), indexedRepresentationCompletableFuture.join()));
+      breadcrumb.setVisible(true);
+    });
   }
 
   private void getFileBreadCrumbs(String aipId, String representationId, List<String> filePath, String fileId) {
-    BrowserService.Util.getInstance().retrieveBrowseFileBundle(aipId, representationId, filePath, fileId,
-      fileFieldsToReturn, new AsyncCallback<BrowseFileBundle>() {
+    Services services = new Services("Build File breadcrumb", "get");
+    IndexedFileRequest request = new IndexedFileRequest();
+    request.setFileId(fileId);
+    request.setRepresentationId(representationId);
+    request.setAipId(aipId);
+    request.setDirectoryPaths(filePath);
 
-        @Override
-        public void onFailure(Throwable caught) {
-          AsyncCallbackUtils.defaultFailureTreatment(caught);
-        }
+    services.fileResource(s -> s.retrieveIndexedFileViaRequest(request)).whenComplete((indexedFile, throwable) -> {
 
-        @Override
-        public void onSuccess(BrowseFileBundle fileBundle) {
-          breadcrumb.updatePath(BreadcrumbUtils.getFileBreadcrumbs(fileBundle));
-          breadcrumb.setVisible(true);
-        }
+      CompletableFuture<IndexedAIP> indexedAIPCompletableFuture = services
+        .aipResource(s -> s.findByUuid(indexedFile.getAipId(), LocaleInfo.getCurrentLocale().getLocaleName()));
+      CompletableFuture<IndexedRepresentation> indexedRepresentationCompletableFuture = services.representationResource(
+        s -> s.findByUuid(indexedFile.getRepresentationUUID(), LocaleInfo.getCurrentLocale().getLocaleName()));
+
+      CompletableFuture<Void> allFutures = CompletableFuture.allOf(indexedAIPCompletableFuture,
+        indexedRepresentationCompletableFuture);
+
+      allFutures.thenRun(() -> {
+        breadcrumb.updatePath(BreadcrumbUtils.getFileBreadcrumbs(indexedAIPCompletableFuture.join(),
+          indexedRepresentationCompletableFuture.join(), indexedFile));
+        breadcrumb.setVisible(true);
       });
+    });
   }
 
-  @Override
-  protected void onLoad() {
-    super.onLoad();
-    JavascriptUtils.stickSidebar();
+  interface MyUiBinder extends UiBinder<Widget, RiskIncidenceRegister> {
   }
 }

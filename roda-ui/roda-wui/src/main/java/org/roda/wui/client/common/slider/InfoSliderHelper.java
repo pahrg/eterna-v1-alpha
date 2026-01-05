@@ -11,9 +11,12 @@ import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 import org.roda.core.data.common.RodaConstants;
 import org.roda.core.data.utils.RepresentationInformationUtils;
@@ -23,22 +26,25 @@ import org.roda.core.data.v2.ip.IndexedFile;
 import org.roda.core.data.v2.ip.IndexedRepresentation;
 import org.roda.core.data.v2.ip.Permissions;
 import org.roda.core.data.v2.ip.metadata.FileFormat;
+import org.roda.core.data.v2.jobs.Job;
 import org.roda.wui.client.browse.PreservationEvents;
 import org.roda.wui.client.browse.RepresentationInformationHelper;
-import org.roda.wui.client.browse.bundle.BrowseAIPBundle;
-import org.roda.wui.client.browse.bundle.BrowseFileBundle;
-import org.roda.wui.client.browse.bundle.BrowseRepresentationBundle;
 import org.roda.wui.client.common.actions.AipActions;
 import org.roda.wui.client.common.dialogs.Dialogs;
+import org.roda.wui.client.common.model.BrowseAIPResponse;
+import org.roda.wui.client.common.model.BrowseFileResponse;
+import org.roda.wui.client.common.model.BrowseRepresentationResponse;
 import org.roda.wui.client.ingest.process.ShowJob;
 import org.roda.wui.client.management.distributed.ShowDistributedInstance;
 import org.roda.wui.client.planning.RiskIncidenceRegister;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.tools.ConfigurationManager;
 import org.roda.wui.common.client.tools.DescriptionLevelUtils;
 import org.roda.wui.common.client.tools.HistoryUtils;
 import org.roda.wui.common.client.tools.Humanize;
 import org.roda.wui.common.client.tools.RestUtils;
 import org.roda.wui.common.client.tools.StringUtils;
+import org.roda.wui.common.client.widgets.Toast;
 
 import com.google.gwt.cell.client.SafeHtmlCell;
 import com.google.gwt.core.client.GWT;
@@ -136,14 +142,11 @@ public class InfoSliderHelper {
     populate(infoSliderPanel, values);
   }
 
-  public static void updateInfoSliderPanel(BrowseRepresentationBundle bundle, SliderPanel infoSliderPanel) {
-    IndexedRepresentation representation = bundle.getRepresentation();
-
+  public static HashMap<String, Widget> getRepresentationInfoDetailsMap(BrowseRepresentationResponse response) {
     HashMap<String, Widget> values = new HashMap<>();
-    infoSliderPanel.clear();
-    infoSliderPanel.addTitle(new Label(messages.oneOfAObject(IndexedRepresentation.class.getName())));
+    IndexedRepresentation representation = response.getIndexedRepresentation();
 
-    values.put(messages.representationId(), createIdHTML(bundle));
+    values.put(messages.representationId(), createIdHTML(response));
 
     if (representation.getCreatedOn() != null && StringUtils.isNotBlank(representation.getCreatedBy())) {
       values.put(messages.aipCreated(), new InlineHTML(messages
@@ -156,23 +159,30 @@ public class InfoSliderHelper {
     }
 
     if (StringUtils.isNotBlank(representation.getType())) {
-      values.put(messages.representationType(), createRepresentationTypeHTML(bundle));
+      values.put(messages.representationType(), createRepresentationTypeHTML(response));
     }
 
-    addLinkIfCentralInstance(values, bundle.getInstanceName(), bundle.isLocalToInstance(),
+    return values;
+  }
+
+  public static void updateInfoSliderPanel(BrowseRepresentationResponse response, SliderPanel infoSliderPanel) {
+    IndexedRepresentation representation = response.getIndexedRepresentation();
+
+    HashMap<String, Widget> values = getRepresentationInfoDetailsMap(response);
+    infoSliderPanel.clear();
+    infoSliderPanel.addTitle(new Label(messages.oneOfAObject(IndexedRepresentation.class.getName())));
+
+    addLinkIfCentralInstance(values, representation.getInstanceName(), representation.isLocalInstance(),
       representation.getInstanceId());
 
     populate(infoSliderPanel, values);
   }
 
-  public static void updateInfoSliderPanel(BrowseAIPBundle bundle, SliderPanel infoSliderPanel) {
-    IndexedAIP aip = bundle.getAip();
-
+  public static HashMap<String, Widget> getAipInfoDetailsMap(BrowseAIPResponse response) {
     HashMap<String, Widget> values = new HashMap<>();
-    infoSliderPanel.clear();
-    infoSliderPanel.addTitle(new Label(messages.oneOfAObject(IndexedAIP.class.getName())));
+    IndexedAIP aip = response.getIndexedAIP();
 
-    values.put(messages.itemId(), createIdHTML(bundle));
+    values.put(messages.itemId(), createIdHTML(response));
 
     if (aip.getCreatedOn() != null && StringUtils.isNotBlank(aip.getCreatedBy())) {
       values.put(messages.aipCreated(),
@@ -185,14 +195,12 @@ public class InfoSliderHelper {
     }
 
     if (StringUtils.isNotBlank(aip.getLevel())) {
-      values.put(messages.aipLevel(), createAipLevelHTML(bundle));
+      values.put(messages.aipLevel(), createAipLevelHTML(response));
     }
 
     if (StringUtils.isNotBlank(aip.getType())) {
-      values.put(messages.aipType(), createAipTypeHTML(bundle));
+      values.put(messages.aipType(), createAipTypeHTML(response));
     }
-
-    addLinkIfCentralInstance(values, bundle.getInstanceName(), bundle.isLocalToInstance(), aip.getInstanceId());
 
     if (!aip.getIngestSIPIds().isEmpty()) {
       FlowPanel sipIds = new FlowPanel();
@@ -202,39 +210,84 @@ public class InfoSliderHelper {
       values.put(messages.sipId(), sipIds);
     }
 
-    if (StringUtils.isNotBlank(aip.getIngestJobId())) {
-      Anchor anchor = new Anchor();
-      anchor.setText(aip.getIngestJobId());
-      anchor.setHref(HistoryUtils.createHistoryHashLink(ShowJob.RESOLVER, aip.getIngestJobId(),
-        RodaConstants.JOB_REPORT_OUTCOME_OBJECT_ID, aip.getId()));
 
-      values.put(messages.processIdTitle(), anchor);
-    }
-
-    if (!aip.getIngestUpdateJobIds().isEmpty()) {
+    if (response.getIndexedAIP().getIngestJobId() != null && !response.getIndexedAIP().getIngestJobId().isEmpty()) {
       FlowPanel jobIdsList = new FlowPanel();
       jobIdsList.addStyleName("slider-info-entry-value-aip-ingest-jobs");
 
-      for (String updateJobId : aip.getIngestUpdateJobIds()) {
-        Anchor anchor = new Anchor();
-        anchor.setText(updateJobId);
-        anchor.setHref(HistoryUtils.createHistoryHashLink(ShowJob.RESOLVER, updateJobId,
-          RodaConstants.JOB_REPORT_OUTCOME_OBJECT_ID, aip.getId()));
-        jobIdsList.add(anchor);
-      }
+      jobIdsList.add(new HTMLPanel("p", response.getIndexedAIP().getIngestJobId()));
 
-      values.put(messages.updateProcessIdTitle(), jobIdsList);
+      // If some error occures during the retrieval of the job information, we still
+      // want to show the job id
+      values.put(messages.processIdTitle(), jobIdsList);
+
+      Services service = new Services("Retrieve AIP jobs information", "get");
+
+      List<String> jobIds = new ArrayList<>();
+
+      jobIds.add(response.getIndexedAIP().getIngestJobId());
+      jobIds.addAll(response.getIndexedAIP().getIngestUpdateJobIds());
+
+      List<CompletableFuture<Job>> futures = jobIds.stream()
+        .map(jobId -> service.jobsResource(s -> s.getJobFromModel(jobId))).collect(Collectors.toList());
+
+      CompletableFuture<List<Job>> futureIngestJobs = CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+        .thenApply(v -> futures.stream().map(CompletableFuture::join) // join each individual Job future here
+          .collect(Collectors.toList()));
+
+      CompletableFuture.allOf(futureIngestJobs).thenApply(v -> {
+        List<Job> jobs = futureIngestJobs.join();
+        FlowPanel tempJobIdsList = new FlowPanel();
+        if (jobs != null && !jobs.isEmpty()) {
+          jobs.forEach(job -> {
+            Anchor jobIdentifier = new Anchor();
+            SafeHtmlBuilder b = new SafeHtmlBuilder();
+            jobIdentifier.setHTML(b.appendEscaped(job.getName()).appendHtmlConstant(" <span class='details-date'>")
+              .appendHtmlConstant(Humanize.formatDateTime(job.getStartDate())).appendHtmlConstant("</span>")
+              .toSafeHtml());
+            jobIdentifier.setHref(HistoryUtils.createHistoryHashLink(ShowJob.RESOLVER, job.getId(),
+              RodaConstants.JOB_REPORT_OUTCOME_OBJECT_ID, aip.getId()));
+            jobIdentifier.setStyleName("value");
+            jobIdentifier.addStyleName("details-anchor");
+            tempJobIdsList.add(jobIdentifier);
+          });
+        }
+        return tempJobIdsList;
+      }).whenComplete((value, throwable) -> {
+
+        if (throwable != null) {
+          Toast.showError("Error fetching AIP jobs information");
+        }
+        else {
+          jobIdsList.clear();
+          jobIdsList.add(value);
+        }
+      });
+
     }
 
-    if (!bundle.getAip().getPermissions().getUsers().equals(new Permissions().getUsers())
-      || !bundle.getAip().getPermissions().getGroups().equals(new Permissions().getGroups())) {
-      values.put(messages.aipPermissionDetails(), createAipPermissionDetailsHTML(bundle));
+    return values;
+  }
+
+  public static void updateInfoSliderPanel(BrowseAIPResponse response, SliderPanel infoSliderPanel) {
+    IndexedAIP aip = response.getIndexedAIP();
+
+    HashMap<String, Widget> values = getAipInfoDetailsMap(response);
+    infoSliderPanel.clear();
+    infoSliderPanel.addTitle(new Label(messages.oneOfAObject(IndexedAIP.class.getName())));
+
+    addLinkIfCentralInstance(values, response.getIndexedAIP().getInstanceName(),
+      response.getIndexedAIP().isLocalInstance(), aip.getInstanceId());
+
+    if (!response.getIndexedAIP().getPermissions().getUsers().equals(new Permissions().getUsers())
+      || !response.getIndexedAIP().getPermissions().getGroups().equals(new Permissions().getGroups())) {
+      values.put(messages.aipPermissionDetails(), createAipPermissionDetailsHTML(response.getIndexedAIP()));
     }
     populate(infoSliderPanel, values);
   }
 
-  private static Widget createAipPermissionDetailsHTML(BrowseAIPBundle bundle) {
-    Permissions permissions = bundle.getAip().getPermissions();
+  private static Widget createAipPermissionDetailsHTML(IndexedAIP aip) {
+    Permissions permissions = aip.getPermissions();
 
     final String CSS_HAS_PERMISSION = "";
     final String CSS_NO_PERMISSION = " slider-aip-permissions-table-icon-fade";
@@ -350,12 +403,11 @@ public class InfoSliderHelper {
     nameColumn.setCellStyleNames("nowrap slider-aip-permissions-table-name");
 
     AipActions aipActions = AipActions.get();
-    if (aipActions.canAct(AipActions.AipAction.UPDATE_PERMISSIONS, bundle.getAip())) {
+    if (aipActions.canAct(AipActions.AipAction.UPDATE_PERMISSIONS, aip).canAct()) {
       table.addStyleName("slider-aip-permissions-table-with-grant");
       SingleSelectionModel<Entry<String, Set<Permissions.PermissionType>>> selectionModel = new SingleSelectionModel<>(
         item -> item.getKey().substring(2));
-      selectionModel
-        .addSelectionChangeHandler(event -> aipActions.act(AipActions.AipAction.UPDATE_PERMISSIONS, bundle.getAip()));
+      selectionModel.addSelectionChangeHandler(event -> aipActions.act(AipActions.AipAction.UPDATE_PERMISSIONS, aip));
       table.setSelectionModel(selectionModel);
     }
 
@@ -365,15 +417,12 @@ public class InfoSliderHelper {
     return table;
   }
 
-  public static void updateInfoSliderPanel(BrowseFileBundle bundle, SliderPanel infoSliderPanel) {
+  public static HashMap<String, Widget> getFileInfoDetailsMap(IndexedFile file, List<String> riRules) {
     HashMap<String, Widget> values = new HashMap<>();
-    infoSliderPanel.clear();
-    infoSliderPanel.addTitle(new Label(messages.oneOfAObject(IndexedFile.class.getName())));
-    IndexedFile file = bundle.getFile();
 
     if (file != null) {
       String fileName = file.getOriginalName() != null ? file.getOriginalName() : file.getId();
-      values.put(messages.viewRepresentationInfoFilename(), createIdHTML(bundle, fileName, file.getUUID()));
+      values.put(messages.viewRepresentationInfoFilename(), createIdHTML(riRules, fileName, file.getUUID()));
 
       if (file.getSize() > 0) {
         values.put(messages.viewRepresentationInfoSize(),
@@ -385,31 +434,31 @@ public class InfoSliderHelper {
 
         if (StringUtils.isNotBlank(fileFormat.getExtension())) {
           values.put(messages.viewRepresentationInfoExtension(),
-            createExtensionHTML(bundle, fileFormat.getExtension()));
+            createExtensionHTML(riRules, fileFormat.getExtension()));
         }
 
         if (StringUtils.isNotBlank(fileFormat.getMimeType())) {
-          values.put(messages.viewRepresentationInfoMimetype(), createMimetypeHTML(bundle, fileFormat.getMimeType()));
+          values.put(messages.viewRepresentationInfoMimetype(), createMimetypeHTML(riRules, fileFormat.getMimeType()));
         }
 
         if (StringUtils.isNotBlank(fileFormat.getFormatDesignationName())) {
           values.put(messages.viewRepresentationInfoFormat(),
-            createFormatDesignationHTML(bundle, fileFormat.getFormatDesignation()));
+            createFormatDesignationHTML(riRules, fileFormat.getFormatDesignation()));
         }
 
         if (StringUtils.isNotBlank(fileFormat.getPronom())) {
-          values.put(messages.viewRepresentationInfoPronom(), createPronomHTML(bundle, fileFormat.getPronom()));
+          values.put(messages.viewRepresentationInfoPronom(), createPronomHTML(riRules, fileFormat.getPronom()));
         }
       }
 
       if (StringUtils.isNotBlank(file.getCreatingApplicationName())) {
         values.put(messages.viewRepresentationInfoCreatingApplicationName(),
-          createCreatingApplicationNameHTML(bundle, file.getCreatingApplicationName()));
+          createCreatingApplicationNameHTML(riRules, file.getCreatingApplicationName()));
       }
 
       if (StringUtils.isNotBlank(file.getCreatingApplicationVersion())) {
         values.put(messages.viewRepresentationInfoCreatingApplicationVersion(),
-          createCreatingApplicationVersionHTML(bundle, file.getCreatingApplicationVersion()));
+          createCreatingApplicationVersionHTML(riRules, file.getCreatingApplicationVersion()));
       }
 
       if (StringUtils.isNotBlank(file.getDateCreatedByApplication())) {
@@ -449,70 +498,77 @@ public class InfoSliderHelper {
         }
       }
     }
+    return values;
+  }
 
-    addLinkIfCentralInstance(values, bundle.getInstanceName(), bundle.isLocalToInstance(), file.getInstanceId());
+  public static void createFileInfoSliderPanel(IndexedFile file, BrowseFileResponse response,
+    SliderPanel infoSliderPanel) {
+    HashMap<String, Widget> values = getFileInfoDetailsMap(file, response.getRepresentationInformationFields());
+    infoSliderPanel.clear();
+    infoSliderPanel.addTitle(new Label(messages.oneOfAObject(IndexedFile.class.getName())));
 
-    List<String> history = new ArrayList<>();
-    history.add(file.getAipId());
-    history.add(file.getRepresentationId());
-    history.addAll(file.getPath());
-    history.add(file.getId());
+    Long risksCounter = response.getRiskCounterResponse().getResult();
+    Long preservationEventsCounter = response.getPreservationCounterResponse().getResult();
 
-    Long preservationEventCount = bundle.getPreservationEventCount();
-    Long riskIncidenceCount = bundle.getRiskIncidenceCount();
+    if (file != null) {
+      addLinkIfCentralInstance(values, file.getInstanceName(), file.isLocalInstance(), file.getInstanceId());
 
-    if (riskIncidenceCount >= 0) {
-      Anchor risksLink = new Anchor(messages.aipRiskIncidences(bundle.getRiskIncidenceCount()),
-        HistoryUtils.createHistoryHashLink(RiskIncidenceRegister.RESOLVER, history));
-      values.put(messages.preservationRisks(), risksLink);
-    }
+      List<String> history = new ArrayList<>();
+      history.add(file.getAipId());
+      history.add(file.getRepresentationId());
+      history.addAll(file.getPath());
+      history.add(file.getId());
 
-    if (preservationEventCount >= 0) {
-      Anchor eventsLink = new Anchor(messages.aipEvents(bundle.getPreservationEventCount()),
-        HistoryUtils.createHistoryHashLink(PreservationEvents.BROWSE_RESOLVER, file.getAipId(),
-          file.getRepresentationUUID(), file.getUUID()));
-      values.put(messages.preservationEvents(), eventsLink);
-    }
+      if (risksCounter >= 0) {
+        Anchor risksLink = new Anchor(messages.aipRiskIncidences(risksCounter),
+          HistoryUtils.createHistoryHashLink(RiskIncidenceRegister.RESOLVER, history));
+        values.put(messages.preservationRisks(), risksLink);
+      }
 
-    SafeUri uri = RestUtils.createTechnicalMetadataHTMLUri(file.getAipId(), file.getUUID(), "html", null);
-    RequestBuilder requestBuilder = new RequestBuilder(RequestBuilder.GET, uri.asString());
+      if (preservationEventsCounter >= 0) {
+        Anchor eventsLink = new Anchor(messages.aipEvents(preservationEventsCounter),
+          HistoryUtils.createHistoryHashLink(PreservationEvents.BROWSE_RESOLVER, file.getAipId(),
+            file.getRepresentationUUID(), file.getUUID()));
+        values.put(messages.preservationEvents(), eventsLink);
+      }
 
-    Anchor technicalInformationAnchor = new Anchor();
-    technicalInformationAnchor.setStyleName("clickable");
-    technicalInformationAnchor.setText(messages.showTechnicalMetadata());
+      SafeUri uri = RestUtils.createTechnicalMetadataHTMLUri(file.getUUID());
+      RequestBuilder requestBuilder = new RequestBuilder(RequestBuilder.GET, uri.asString());
 
-    // technicalInformation
-    try {
-      requestBuilder.sendRequest(null, new RequestCallback() {
-        @Override
-        public void onResponseReceived(Request request, Response response) {
-          if (response.getStatusCode() == 200) {
-            if (!response.getText().isEmpty()) {
+      Anchor technicalInformationAnchor = new Anchor();
+      technicalInformationAnchor.setStyleName("clickable");
+      technicalInformationAnchor.setText(messages.showTechnicalMetadata());
+
+      // technicalInformation
+      try {
+        requestBuilder.sendRequest(null, new RequestCallback() {
+          @Override
+          public void onResponseReceived(Request request, Response response) {
+            if (response.getStatusCode() == 200) {
+              if (!response.getText().isEmpty()) {
+                values.put(messages.viewTechnicalInformation(), technicalInformationAnchor);
+                technicalInformationAnchor
+                  .addClickHandler(e -> Dialogs.showTechnicalMetadataInformation(messages.viewTechnicalMetadata(),
+                    messages.downloadButton(), messages.closeButton(), file, response.getText()));
+              }
+            } else {
               values.put(messages.viewTechnicalInformation(), technicalInformationAnchor);
               technicalInformationAnchor
                 .addClickHandler(e -> Dialogs.showTechnicalMetadataInformation(messages.viewTechnicalMetadata(),
-                  messages.downloadButton(), messages.closeButton(), file, response.getText()));
+                  messages.downloadButton(), messages.closeButton(), file, null));
             }
-
+            populate(infoSliderPanel, values);
           }
-          else {
-            values.put(messages.viewTechnicalInformation(), technicalInformationAnchor);
-            technicalInformationAnchor
-              .addClickHandler(e -> Dialogs.showTechnicalMetadataInformation(messages.viewTechnicalMetadata(),
-                messages.downloadButton(), messages.closeButton(), file, null));
-          }
-          populate(infoSliderPanel, values);
-        }
 
-        @Override
-        public void onError(Request request, Throwable throwable) {
-          populate(infoSliderPanel, values);
-        }
-      });
-    } catch (RequestException e) {
-      throw new RuntimeException(e);
+          @Override
+          public void onError(Request request, Throwable throwable) {
+            populate(infoSliderPanel, values);
+          }
+        });
+      } catch (RequestException e) {
+        throw new RuntimeException(e);
+      }
     }
-
   }
 
   private static void populate(SliderPanel infoSliderPanel, HashMap<String, Widget> values) {
@@ -532,142 +588,143 @@ public class InfoSliderHelper {
     }
   }
 
-  private static FlowPanel createExtensionHTML(BrowseFileBundle bundle, String extension) {
+  private static FlowPanel createExtensionHTML(List<String> representationInformationFields, String extension) {
     FlowPanel panel = new FlowPanel();
     final String riFilter = RepresentationInformationUtils
       .createRepresentationInformationFilter(RodaConstants.INDEX_FILE, RodaConstants.FILE_EXTENSION, extension);
     RepresentationInformationHelper.addFieldWithRepresentationInformationIcon(SafeHtmlUtils.fromString(extension),
-      riFilter, panel, bundle.getRepresentationInformationFields().contains(RodaConstants.FILE_EXTENSION),
+      riFilter, panel, representationInformationFields.contains(RodaConstants.FILE_EXTENSION),
       "browseFileInformationIcon");
     return panel;
   }
 
-  private static FlowPanel createMimetypeHTML(BrowseFileBundle bundle, String mimetype) {
+  private static FlowPanel createMimetypeHTML(List<String> representationInformationFields, String mimetype) {
     FlowPanel panel = new FlowPanel();
     final String riFilter = RepresentationInformationUtils
       .createRepresentationInformationFilter(RodaConstants.INDEX_FILE, RodaConstants.FILE_FORMAT_MIMETYPE, mimetype);
     RepresentationInformationHelper.addFieldWithRepresentationInformationIcon(SafeHtmlUtils.fromString(mimetype),
-      riFilter, panel, bundle.getRepresentationInformationFields().contains(RodaConstants.FILE_FORMAT_MIMETYPE),
+      riFilter, panel, representationInformationFields.contains(RodaConstants.FILE_FORMAT_MIMETYPE),
       "browseFileInformationIcon");
     return panel;
   }
 
-  private static FlowPanel createPronomHTML(BrowseFileBundle bundle, String pronom) {
+  private static FlowPanel createPronomHTML(List<String> representationInformationFields, String pronom) {
     FlowPanel panel = new FlowPanel();
     final String riFilter = RepresentationInformationUtils
       .createRepresentationInformationFilter(RodaConstants.INDEX_FILE, RodaConstants.FILE_PRONOM, pronom);
     RepresentationInformationHelper.addFieldWithRepresentationInformationIcon(SafeHtmlUtils.fromString(pronom),
-      riFilter, panel, bundle.getRepresentationInformationFields().contains(RodaConstants.FILE_PRONOM),
+      riFilter, panel, representationInformationFields.contains(RodaConstants.FILE_PRONOM),
       "browseFileInformationIcon");
     return panel;
   }
 
-  private static FlowPanel createFormatDesignationHTML(BrowseFileBundle bundle, String designation) {
+  private static FlowPanel createFormatDesignationHTML(List<String> representationInformationFields,
+    String designation) {
     FlowPanel panel = new FlowPanel();
     final String riFilter = RepresentationInformationUtils.createRepresentationInformationFilter(
       RodaConstants.INDEX_FILE, RodaConstants.FILE_FORMAT_DESIGNATION, designation);
     RepresentationInformationHelper.addFieldWithRepresentationInformationIcon(SafeHtmlUtils.fromString(designation),
-      riFilter, panel, bundle.getRepresentationInformationFields().contains(RodaConstants.FILE_FORMAT_DESIGNATION),
+      riFilter, panel, representationInformationFields.contains(RodaConstants.FILE_FORMAT_DESIGNATION),
       "browseFileInformationIcon");
     return panel;
   }
 
-  private static FlowPanel createCreatingApplicationNameHTML(BrowseFileBundle bundle, String createApplicationName) {
+  private static FlowPanel createCreatingApplicationNameHTML(List<String> representationInformationFields,
+    String createApplicationName) {
     FlowPanel panel = new FlowPanel();
     final String riFilter = RepresentationInformationUtils.createRepresentationInformationFilter(
       RodaConstants.INDEX_FILE, RodaConstants.FILE_CREATING_APPLICATION_NAME, createApplicationName);
     RepresentationInformationHelper.addFieldWithRepresentationInformationIcon(
       SafeHtmlUtils.fromString(createApplicationName), riFilter, panel,
-      bundle.getRepresentationInformationFields().contains(RodaConstants.FILE_CREATING_APPLICATION_NAME),
+      representationInformationFields.contains(RodaConstants.FILE_CREATING_APPLICATION_NAME),
       "browseFileInformationIcon");
     return panel;
   }
 
-  private static FlowPanel createCreatingApplicationVersionHTML(BrowseFileBundle bundle,
+  private static FlowPanel createCreatingApplicationVersionHTML(List<String> representationInformationFields,
     String createApplicationVersion) {
     FlowPanel panel = new FlowPanel();
     final String riFilter = RepresentationInformationUtils.createRepresentationInformationFilter(
       RodaConstants.INDEX_FILE, RodaConstants.FILE_CREATING_APPLICATION_VERSION, createApplicationVersion);
     RepresentationInformationHelper.addFieldWithRepresentationInformationIcon(
       SafeHtmlUtils.fromString(createApplicationVersion), riFilter, panel,
-      bundle.getRepresentationInformationFields().contains(RodaConstants.FILE_CREATING_APPLICATION_VERSION),
+      representationInformationFields.contains(RodaConstants.FILE_CREATING_APPLICATION_VERSION),
       "browseFileInformationIcon");
     return panel;
   }
 
-  private static FlowPanel createIdHTML(BrowseFileBundle bundle, String filename, String uuid) {
+  private static FlowPanel createIdHTML(List<String> representationInformationFields, String filename, String uuid) {
     FlowPanel panel = new FlowPanel();
     final String riFilter = RepresentationInformationUtils
       .createRepresentationInformationFilter(RodaConstants.INDEX_FILE, RodaConstants.INDEX_UUID, uuid);
     RepresentationInformationHelper.addFieldWithRepresentationInformationIcon(SafeHtmlUtils.fromString(filename),
-      riFilter, panel, bundle.getRepresentationInformationFields().contains(RodaConstants.INDEX_UUID),
-      "browseFileInformationIcon");
+      riFilter, panel, representationInformationFields.contains(RodaConstants.INDEX_UUID), "browseFileInformationIcon");
     return panel;
   }
 
-  private static FlowPanel createIdHTML(BrowseAIPBundle bundle) {
-    IndexedAIP aip = bundle.getAip();
+  private static FlowPanel createIdHTML(BrowseAIPResponse response) {
+    IndexedAIP aip = response.getIndexedAIP();
     FlowPanel panel = new FlowPanel();
     final String riFilter = RepresentationInformationUtils
       .createRepresentationInformationFilter(RodaConstants.INDEX_AIP, RodaConstants.INDEX_UUID, aip.getId());
 
     RepresentationInformationHelper.addFieldWithRepresentationInformationIcon(SafeHtmlUtils.fromString(aip.getId()),
-      riFilter, panel, bundle.getRepresentationInformationFields().contains(RodaConstants.INDEX_UUID),
+      riFilter, panel, response.getRepresentationInformationFields().contains(RodaConstants.INDEX_UUID),
       "browseFileInformationIcon");
     return panel;
   }
 
-  private static FlowPanel createIdHTML(BrowseRepresentationBundle bundle) {
-    IndexedRepresentation representation = bundle.getRepresentation();
+  private static FlowPanel createIdHTML(BrowseRepresentationResponse response) {
+    IndexedRepresentation representation = response.getIndexedRepresentation();
     FlowPanel panel = new FlowPanel();
 
     final String riFilter = RepresentationInformationUtils.createRepresentationInformationFilter(
       RodaConstants.INDEX_REPRESENTATION, RodaConstants.INDEX_UUID, representation.getUUID());
     RepresentationInformationHelper.addFieldWithRepresentationInformationIcon(
       SafeHtmlUtils.fromString(representation.getId()), riFilter, panel,
-      bundle.getRepresentationInformationFields().contains(RodaConstants.INDEX_UUID));
+      response.getRiRules().contains(RodaConstants.INDEX_UUID));
 
     return panel;
   }
 
-  private static FlowPanel createAipTypeHTML(BrowseAIPBundle bundle) {
-    IndexedAIP aip = bundle.getAip();
+  private static FlowPanel createAipTypeHTML(BrowseAIPResponse response) {
+    IndexedAIP aip = response.getIndexedAIP();
     FlowPanel panel = new FlowPanel();
     final String riFilter = RepresentationInformationUtils
       .createRepresentationInformationFilter(RodaConstants.INDEX_AIP, RodaConstants.AIP_TYPE, aip.getType());
     RepresentationInformationHelper.addFieldWithRepresentationInformationIcon(SafeHtmlUtils.fromString(aip.getType()),
-      riFilter, panel, bundle.getRepresentationInformationFields().contains(RodaConstants.AIP_TYPE));
+      riFilter, panel, response.getRepresentationInformationFields().contains(RodaConstants.AIP_TYPE));
     return panel;
   }
 
-  private static FlowPanel createAipLevelHTML(BrowseAIPBundle bundle) {
-    IndexedAIP aip = bundle.getAip();
+  private static FlowPanel createAipLevelHTML(BrowseAIPResponse response) {
+    IndexedAIP aip = response.getIndexedAIP();
     FlowPanel panel = new FlowPanel();
 
     final String riFilter = RepresentationInformationUtils
       .createRepresentationInformationFilter(RodaConstants.INDEX_AIP, RodaConstants.AIP_LEVEL, aip.getLevel());
     RepresentationInformationHelper.addFieldWithRepresentationInformationIcon(
       SafeHtmlUtils.fromString(DescriptionLevelUtils.getElementLevelLabel(aip.getLevel())), riFilter, panel,
-      bundle.getRepresentationInformationFields().contains(RodaConstants.AIP_LEVEL));
+      response.getRepresentationInformationFields().contains(RodaConstants.AIP_LEVEL));
 
     return panel;
   }
 
-  private static FlowPanel createRepresentationTypeHTML(BrowseRepresentationBundle bundle) {
-    IndexedRepresentation representation = bundle.getRepresentation();
+  private static FlowPanel createRepresentationTypeHTML(BrowseRepresentationResponse response) {
+    IndexedRepresentation representation = response.getIndexedRepresentation();
     FlowPanel panel = new FlowPanel();
 
     final String riFilter = RepresentationInformationUtils.createRepresentationInformationFilter(
       RodaConstants.INDEX_REPRESENTATION, RodaConstants.REPRESENTATION_TYPE, representation.getType());
     RepresentationInformationHelper.addFieldWithRepresentationInformationIcon(
       SafeHtmlUtils.fromString(representation.getType()), riFilter, panel,
-      bundle.getRepresentationInformationFields().contains(RodaConstants.REPRESENTATION_TYPE));
+      response.getRiRules().contains(RodaConstants.REPRESENTATION_TYPE));
 
     return panel;
   }
 
-  public static void addLinkIfCentralInstance(HashMap<String, Widget> values, String instanceName,
-    boolean localToInstance, String instanceId) {
+  public static void addLinkIfCentralInstance(Map<String, Widget> values, String instanceName, boolean localToInstance,
+    String instanceId) {
     if (StringUtils.isNotBlank(instanceId)) {
       String distributedMode = ConfigurationManager.getStringWithDefault(
         RodaConstants.DEFAULT_DISTRIBUTED_MODE_TYPE.name(), RodaConstants.DISTRIBUTED_MODE_TYPE_PROPERTY);

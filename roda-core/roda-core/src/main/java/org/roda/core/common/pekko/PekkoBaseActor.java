@@ -7,16 +7,16 @@
  */
 package org.roda.core.common.pekko;
 
+import org.apache.pekko.actor.UntypedAbstractActor;
 import org.roda.core.RodaCoreFactory;
+import org.roda.core.data.exceptions.GenericException;
 import org.roda.core.index.IndexService;
 import org.roda.core.model.ModelService;
 import org.roda.core.plugins.PluginManager;
 import org.roda.core.plugins.PluginOrchestrator;
-import org.roda.core.storage.StorageService;
+import org.roda.core.transaction.RODATransactionManager;
 
 import com.codahale.metrics.MetricRegistry;
-
-import org.apache.pekko.actor.UntypedAbstractActor;
 
 public abstract class PekkoBaseActor extends UntypedAbstractActor {
 
@@ -37,10 +37,6 @@ public abstract class PekkoBaseActor extends UntypedAbstractActor {
     org.slf4j.MDC.put("pekkoSourceThread", Thread.currentThread().getName());
   }
 
-  public StorageService getStorage() {
-    return RodaCoreFactory.getStorageService();
-  }
-
   public ModelService getModel() {
     return RodaCoreFactory.getModelService();
   }
@@ -59,6 +55,10 @@ public abstract class PekkoBaseActor extends UntypedAbstractActor {
 
   public MetricRegistry getMetricRegistry() {
     return RodaCoreFactory.getMetrics();
+  }
+
+  public RODATransactionManager getStorageTransactionManager() throws GenericException {
+    return RodaCoreFactory.getTransactionManager();
   }
 
 }

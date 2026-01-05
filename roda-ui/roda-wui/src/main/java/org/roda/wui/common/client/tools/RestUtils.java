@@ -7,7 +7,6 @@
  */
 package org.roda.wui.common.client.tools;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.roda.core.data.common.RodaConstants;
@@ -27,78 +26,60 @@ import com.google.gwt.safehtml.shared.UriUtils;
 import com.google.gwt.user.client.Timer;
 import com.google.gwt.user.client.ui.FlowPanel;
 import com.google.gwt.user.client.ui.FormPanel;
-import com.google.gwt.user.client.ui.FormPanel.SubmitEvent;
-import com.google.gwt.user.client.ui.FormPanel.SubmitHandler;
 import com.google.gwt.user.client.ui.Hidden;
 import com.google.gwt.user.client.ui.RootPanel;
 
 public class RestUtils {
+
+  private static final FindRequestMapper FIND_REQUEST_MAPPER = GWT.create(FindRequestMapper.class);
 
   private RestUtils() {
     // do nothing
   }
 
   public static SafeUri createAIPDownloadUri(String aipId) {
+    // api/v2/aips/{id}/download
 
-    // api/v1/aips/{aip_id}/?acceptFormat=zip
-    StringBuilder b = new StringBuilder();
-    // base uri
-    b.append(RodaConstants.API_REST_V1_AIPS).append(URL.encodeQueryString(aipId)).append(RodaConstants.API_SEP);
-    // accept format attribute
-    b.append(RodaConstants.API_QUERY_START).append(RodaConstants.API_QUERY_KEY_ACCEPT_FORMAT)
-      .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(RodaConstants.API_QUERY_VALUE_ACCEPT_FORMAT_ZIP);
+    String b = RodaConstants.API_REST_V2_AIPS + URL.encodeQueryString(aipId)
+      + RodaConstants.API_REST_V2_DOWNLOAD_HANDLER;
 
-    return UriUtils.fromSafeConstant(b.toString());
+    return UriUtils.fromSafeConstant(b);
   }
 
   public static SafeUri createAIPPartDownloadUri(String aipId, String part) {
+    // api/v2/aips/{aip_id}/download/{part}
 
-    // api/v1/aips/{aip_id}/{part}
-    StringBuilder b = new StringBuilder();
-    // base uri
-    b.append(RodaConstants.API_REST_V1_AIPS).append(URL.encodeQueryString(aipId)).append(RodaConstants.API_SEP)
-      .append(URL.encodeQueryString(part));
+    String b = RodaConstants.API_REST_V2_AIPS + URL.encodeQueryString(aipId)
+      + RodaConstants.API_REST_V2_DOWNLOAD_HANDLER + RodaConstants.API_SEP + URL.encodeQueryString(part);
 
-    return UriUtils.fromSafeConstant(b.toString());
+    return UriUtils.fromSafeConstant(b);
   }
 
   public static SafeUri createRepresentationDownloadUri(String aipId, String representationId) {
 
-    // api/v1/representations/{aip_id}/{representation_id}/?acceptFormat=zip
+    // api/v2/{aip_id}/representations/{representation_id}/binary
     StringBuilder b = new StringBuilder();
     // base uri
-    b.append(RodaConstants.API_REST_V1_REPRESENTATIONS).append(URL.encodeQueryString(aipId))
-      .append(RodaConstants.API_SEP).append(URL.encodeQueryString(representationId)).append(RodaConstants.API_SEP);
-    // accept format attribute
-    b.append(RodaConstants.API_QUERY_START).append(RodaConstants.API_QUERY_KEY_ACCEPT_FORMAT)
-      .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(RodaConstants.API_QUERY_VALUE_ACCEPT_FORMAT_ZIP);
+    b.append(RodaConstants.API_REST_V2_AIPS).append(URL.encodeQueryString(aipId))
+      .append(RodaConstants.API_SEP).append(RodaConstants.AIP_REPRESENTATIONS).append(RodaConstants.API_SEP)
+      .append(URL.encodeQueryString(representationId)).append(RodaConstants.API_REST_V2_DOWNLOAD_HANDLER);
 
     return UriUtils.fromSafeConstant(b.toString());
   }
 
   public static SafeUri createRepresentationOtherMetadataDownloadUri(String aipId, String representationId) {
 
-    // api/v1/representations/{aip_id}/{representation_id}/otherMetadata/?acceptFormat=zip
+    // api/v2/aip/{aip_id}/representations/{representation_id}/other-metadata/binary
     StringBuilder b = new StringBuilder();
     // base uri
-    b.append(RodaConstants.API_REST_V1_REPRESENTATIONS).append(URL.encodeQueryString(aipId))
-      .append(RodaConstants.API_SEP).append(URL.encodeQueryString(representationId)).append(RodaConstants.API_SEP)
-      .append(RodaConstants.API_REST_V1_REPRESENTATION_OTHER_METADATA).append(RodaConstants.API_SEP);
-    // accept format attribute
-    b.append(RodaConstants.API_QUERY_START).append(RodaConstants.API_QUERY_KEY_ACCEPT_FORMAT)
-      .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(RodaConstants.API_QUERY_VALUE_ACCEPT_FORMAT_ZIP);
+    b.append(RodaConstants.API_REST_V2_AIPS).append(URL.encodeQueryString(aipId))
+      .append(RodaConstants.API_SEP).append(RodaConstants.AIP_REPRESENTATIONS).append(RodaConstants.API_SEP)
+      .append(URL.encodeQueryString(representationId)).append(RodaConstants.API_REST_V2_REPRESENTATION_OTHER_METADATA)
+      .append(RodaConstants.API_REST_V2_REPRESENTATION_BINARY);
 
-    return UriUtils.fromSafeConstant(b.toString());
-  }
-
-  public static SafeUri createRepresentationPartDownloadUri(String aipId, String representationId, String part) {
-
-    // api/v1/representations/{aip_id}/{representation_id}/{part}
-    StringBuilder b = new StringBuilder();
-    // base uri
-    b.append(RodaConstants.API_REST_V1_REPRESENTATIONS).append(URL.encodeQueryString(aipId))
-      .append(RodaConstants.API_SEP).append(URL.encodeQueryString(representationId)).append(RodaConstants.API_SEP)
-      .append(URL.encodeQueryString(part));
+    // locale
+    b.append(RodaConstants.API_QUERY_START).append(RodaConstants.API_QUERY_KEY_LANG)
+      .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(LocaleInfo.getCurrentLocale().getLocaleName());
 
     return UriUtils.fromSafeConstant(b.toString());
   }
@@ -108,30 +89,18 @@ public class RestUtils {
   }
 
   public static SafeUri createRepresentationFileDownloadUri(String fileUuid, boolean contentDispositionInline) {
+    // api/v2/files/{file_uuid}/preview
+    String b = RodaConstants.API_REST_V2_FILES + URL.encodeQueryString(fileUuid)
+      + RodaConstants.API_REST_V2_PREVIEW_HANDLER;
 
-    // api/v1/files/{file_uuid}?acceptFormat=bin&inline={inline}
-    StringBuilder b = new StringBuilder();
-    // base uri
-    b.append(RodaConstants.API_REST_V1_FILES).append(URL.encodeQueryString(fileUuid));
-    // accept format attribute
-    b.append(RodaConstants.API_QUERY_START).append(RodaConstants.API_QUERY_KEY_ACCEPT_FORMAT)
-      .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(RodaConstants.API_QUERY_VALUE_ACCEPT_FORMAT_BIN);
-
-    b.append(RodaConstants.API_QUERY_SEP).append(RodaConstants.API_QUERY_KEY_INLINE)
-      .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(contentDispositionInline);
-
-    return UriUtils.fromSafeConstant(b.toString());
+    return UriUtils.fromSafeConstant(b);
   }
 
   public static SafeUri createDipDownloadUri(String dipUUID) {
-
-    // api/v1/dips/{dip_uuid}?acceptFormat=zip
+    // api/v2/dips/{uuid}/download
     StringBuilder b = new StringBuilder();
-    // base uri
-    b.append(RodaConstants.API_REST_V1_DIPS).append(URL.encodeQueryString(dipUUID));
-    // accept format attribute
-    b.append(RodaConstants.API_QUERY_START).append(RodaConstants.API_QUERY_KEY_ACCEPT_FORMAT)
-      .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(RodaConstants.API_QUERY_VALUE_ACCEPT_FORMAT_ZIP);
+    b.append(RodaConstants.API_REST_V2_DIPS).append(URL.encodeQueryString(dipUUID))
+      .append(RodaConstants.API_REST_V2_DOWNLOAD_HANDLER);
 
     return UriUtils.fromSafeConstant(b.toString());
   }
@@ -156,38 +125,23 @@ public class RestUtils {
     return UriUtils.fromSafeConstant(b.toString());
   }
 
-  public static SafeUri createDescriptiveMetadataDownloadUri(String aipId) {
-
-    // api/v1/aips/{aip_id}/descriptive_metadata/?acceptFormat=zip
-    StringBuilder b = new StringBuilder();
-    // base uri
-    b.append(RodaConstants.API_REST_V1_AIPS).append(URL.encodeQueryString(aipId)).append(RodaConstants.API_SEP)
-      .append(RodaConstants.API_DESCRIPTIVE_METADATA).append(RodaConstants.API_SEP);
-    // accept format attribute
-    b.append(RodaConstants.API_QUERY_START).append(RodaConstants.API_QUERY_KEY_ACCEPT_FORMAT)
-      .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(RodaConstants.API_QUERY_VALUE_ACCEPT_FORMAT_ZIP);
-
-    return UriUtils.fromSafeConstant(b.toString());
-  }
-
   public static SafeUri createDescriptiveMetadataDownloadUri(String aipId, String descId) {
     return createDescriptiveMetadataDownloadUri(aipId, descId, null);
   }
 
   public static SafeUri createDescriptiveMetadataDownloadUri(String aipId, String descId, String versionId) {
+    // api/v2/aips/{id}/metadata/descriptive/{descriptive-metadata-id}/download?version-id={versionId}
 
-    // api/v1/aips/{aip_id}/descriptive_metadata/{descId}?acceptFormat=xml&version_id={versionId}
     StringBuilder b = new StringBuilder();
     // base uri
-    b.append(RodaConstants.API_REST_V1_AIPS).append(URL.encodeQueryString(aipId)).append(RodaConstants.API_SEP)
-      .append(RodaConstants.API_DESCRIPTIVE_METADATA).append(RodaConstants.API_SEP).append(descId);
-    // accept format attribute
-    b.append(RodaConstants.API_QUERY_START).append(RodaConstants.API_QUERY_KEY_ACCEPT_FORMAT)
-      .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(RodaConstants.API_QUERY_VALUE_ACCEPT_FORMAT_BIN);
+    b.append(RodaConstants.API_REST_V2_AIPS).append(URL.encodeQueryString(aipId)).append(RodaConstants.API_SEP)
+      .append("metadata").append(RodaConstants.API_SEP).append("descriptive").append(RodaConstants.API_SEP)
+      .append(URL.encodeQueryString(descId)).append(RodaConstants.API_SEP).append("download");
 
+    // version
     if (versionId != null) {
-      b.append(RodaConstants.API_QUERY_SEP).append(RodaConstants.API_QUERY_PARAM_VERSION_ID)
-        .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(versionId);
+      b.append(RodaConstants.API_QUERY_START).append("version-id").append(RodaConstants.API_QUERY_ASSIGN_SYMBOL)
+        .append(URL.encodeQueryString(versionId));
     }
 
     return UriUtils.fromSafeConstant(b.toString());
@@ -198,104 +152,102 @@ public class RestUtils {
   }
 
   public static SafeUri createDescriptiveMetadataHTMLUri(String aipId, String descId, String versionId) {
-    // api/v1/aips/{aip_id}/descriptive_metadata/{descId}?acceptFormat=html&version_id={versionId}
+    // api/v2/aips/{id}/metadata/descriptive/{descriptive-metadata-id}/html?lang=en&version-id={versionId}
     StringBuilder b = new StringBuilder();
     // base uri
-    b.append(RodaConstants.API_REST_V1_AIPS).append(URL.encodeQueryString(aipId)).append(RodaConstants.API_SEP)
-      .append(RodaConstants.API_DESCRIPTIVE_METADATA);
+    b.append(RodaConstants.API_REST_V2_AIPS).append(URL.encodeQueryString(aipId)).append(RodaConstants.API_SEP)
+      .append("metadata").append(RodaConstants.API_SEP).append("descriptive").append(RodaConstants.API_SEP)
+      .append(URL.encodeQueryString(descId)).append(RodaConstants.API_SEP).append("html");
 
-    if (descId != null) {
-      b.append(RodaConstants.API_SEP).append(descId);
-    }
-
-    // accept format attribute
-    b.append(RodaConstants.API_QUERY_START).append(RodaConstants.API_QUERY_KEY_ACCEPT_FORMAT)
-      .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(RodaConstants.API_QUERY_VALUE_ACCEPT_FORMAT_HTML);
+    // locale
+    b.append(RodaConstants.API_QUERY_START).append(RodaConstants.API_QUERY_KEY_LANG)
+      .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(LocaleInfo.getCurrentLocale().getLocaleName());
 
     if (versionId != null) {
-      b.append(RodaConstants.API_QUERY_SEP).append(RodaConstants.API_QUERY_PARAM_VERSION_ID)
+      b.append(RodaConstants.API_QUERY_SEP).append("version-id").append(RodaConstants.API_QUERY_ASSIGN_SYMBOL)
+        .append(URL.encodeQueryString(versionId));
+    }
+
+    return UriUtils.fromSafeConstant(b.toString());
+  }
+
+  public static SafeUri createTechnicalMetadataHTMLUri(String fileId, String typeId) {
+    return createTechnicalMetadataHTMLUri(fileId, typeId, null);
+  }
+
+  public static SafeUri createTechnicalMetadataHTMLUri(String fileId, String typeId, String versionId) {
+    // /api/v2/files/{fileId}/metadata/technical/{typeId}/html?lang={lang}&versionId={versionId}
+    StringBuilder b = new StringBuilder();
+    // base uri
+    b.append(RodaConstants.API_REST_V2_FILES).append(URL.encodeQueryString(fileId)).append(RodaConstants.API_SEP)
+      .append(RodaConstants.API_REST_V2_FILES_TECHNICAL_METADATA_TYPE_HTML).append(RodaConstants.API_SEP);
+
+    // type id
+    b.append(typeId);
+
+    // html suffix
+    b.append(RodaConstants.API_REST_V2_FILES_TECHNICAL_METADATA_TYPE_HTML_SUFFIX);
+
+    // locale
+    b.append(RodaConstants.API_QUERY_START).append(RodaConstants.API_QUERY_KEY_LANG)
+      .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(LocaleInfo.getCurrentLocale().getLocaleName());
+
+    // version id
+    if (versionId != null) {
+      b.append(RodaConstants.API_QUERY_SEP).append(RodaConstants.API_QUERY_KEY_VERSION_ID)
         .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(versionId);
     }
 
+    return UriUtils.fromSafeConstant(b.toString());
+  }
+
+  public static SafeUri createTechnicalMetadataHTMLUri(String fileId) {
+    // /api/v2/files/{fileId}/metadata/preservation/html?lang={lang}
+    StringBuilder b = new StringBuilder();
+    // base uri
+    b.append(RodaConstants.API_REST_V2_FILES).append(URL.encodeQueryString(fileId)).append(RodaConstants.API_SEP)
+      .append(RodaConstants.API_REST_V2_FILES_TECHNICAL_METADATA_HTML);
+
     // locale
-    b.append(RodaConstants.API_QUERY_SEP).append(RodaConstants.API_QUERY_KEY_LANG)
+    b.append(RodaConstants.API_QUERY_START).append(RodaConstants.API_QUERY_KEY_LANG)
       .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(LocaleInfo.getCurrentLocale().getLocaleName());
 
     return UriUtils.fromSafeConstant(b.toString());
   }
 
-  public static SafeUri createTechnicalMetadataHTMLUri(String aipId, String fileId, String acceptFormat,
-    String versionId) {
-    // api/v1/aips/{aip_id}/preservation_metadata/{file_id}?acceptFormat={acceptFormat}&version_id={versionId}
+  public static SafeUri createTechnicalMetadataDownloadUri(String fileId) {
+    // /api/v2/files/{fileId}/metadata/preservation/download
     StringBuilder b = new StringBuilder();
     // base uri
-    b.append(RodaConstants.API_REST_V1_AIPS).append(URL.encodeQueryString(aipId)).append(RodaConstants.API_SEP)
-      .append(RodaConstants.API_PRESERVATION_METADATA);
+    b.append(RodaConstants.API_REST_V2_FILES).append(URL.encodeQueryString(fileId)).append(RodaConstants.API_SEP)
+      .append(RodaConstants.API_REST_V2_FILES_TECHNICAL_METADATA_DOWNLOAD);
 
-    if (fileId != null) {
-      b.append(RodaConstants.API_SEP).append(fileId);
-    }
+    return UriUtils.fromSafeConstant(b.toString());
+  }
 
-    // accept format attribute
-    b.append(RodaConstants.API_QUERY_START).append(RodaConstants.API_QUERY_KEY_ACCEPT_FORMAT)
-      .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(acceptFormat);
-
+  public static SafeUri createTechnicalMetadataDownloadUri(String fileUUID, String metadataType, String versionId) {
+    // /api/v2/files/{fileUUID}/metadata/technical/{typeId}/download?versionId={versionId}
+    StringBuilder b = new StringBuilder();
+    // base uri
+    b.append(RodaConstants.API_REST_V2_FILES).append(URL.encodeQueryString(fileUUID)).append(RodaConstants.API_SEP)
+      .append(RodaConstants.API_REST_V2_FILES_TECHNICAL_METADATA_TYPE_HTML).append(RodaConstants.API_SEP)
+      .append((URL.encodeQueryString(metadataType))).append(RodaConstants.API_REST_V2_DOWNLOAD_HANDLER);
     if (versionId != null) {
-      b.append(RodaConstants.API_QUERY_SEP).append(RodaConstants.API_QUERY_PARAM_VERSION_ID)
-        .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(versionId);
+      b.append(RodaConstants.API_QUERY_START).append(RodaConstants.API_QUERY_KEY_VERSION_ID)
+        .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(URL.encodeQueryString(versionId));
     }
-
-    // locale
-    b.append(RodaConstants.API_QUERY_SEP).append(RodaConstants.API_QUERY_KEY_LANG)
-      .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(LocaleInfo.getCurrentLocale().getLocaleName());
 
     return UriUtils.fromSafeConstant(b.toString());
   }
 
   public static SafeUri createPreservationMetadataDownloadUri(String aipId) {
-    // api/v1/aips/{aip_id}/preservation_metadata/?acceptFormat=zip
+    // api/v2/aips/{id}/download/preservation
     StringBuilder b = new StringBuilder();
     // base uri
-    b.append(RodaConstants.API_REST_V1_AIPS).append(URL.encodeQueryString(aipId)).append(RodaConstants.API_SEP)
-      .append(RodaConstants.API_PRESERVATION_METADATA).append(RodaConstants.API_SEP);
-    // accept format attribute
-    b.append(RodaConstants.API_QUERY_START).append(RodaConstants.API_QUERY_KEY_ACCEPT_FORMAT)
-      .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(RodaConstants.API_QUERY_VALUE_ACCEPT_FORMAT_ZIP);
+    b.append(RodaConstants.API_REST_V2_AIPS).append(URL.encodeQueryString(aipId))
+      .append(RodaConstants.API_REST_V2_DOWNLOAD_HANDLER).append(RodaConstants.API_SEP).append("preservation");
 
     return UriUtils.fromSafeConstant(b.toString());
-  }
-
-  public static String createRepresentationPreservationMetadataUri(String aipId, String representationId,
-    int startAgent, int limitAgent, int startEvent, int limitEvent, int startFile, int limitFile) {
-    // api/v1/representations/{aip_id}/{representation_id}/preservation_metadata/?acceptFormat=zip
-    StringBuilder b = new StringBuilder();
-    // base uri
-    b.append(RodaConstants.API_REST_V1_REPRESENTATIONS).append(URL.encodeQueryString(aipId))
-      .append(RodaConstants.API_SEP).append(URL.encodeQueryString(representationId)).append(RodaConstants.API_SEP)
-      .append(RodaConstants.API_PRESERVATION_METADATA).append(RodaConstants.API_SEP);
-    // accept format attribute
-    b.append(RodaConstants.API_QUERY_START).append(RodaConstants.API_QUERY_KEY_ACCEPT_FORMAT)
-      .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(RodaConstants.API_QUERY_VALUE_ACCEPT_FORMAT_ZIP);
-
-    // start and limits
-    b.append(RodaConstants.API_QUERY_SEP).append("startAgent").append(RodaConstants.API_QUERY_ASSIGN_SYMBOL)
-      .append(startAgent);
-    b.append(RodaConstants.API_QUERY_SEP).append("limitAgent").append(RodaConstants.API_QUERY_ASSIGN_SYMBOL)
-      .append(limitAgent);
-    b.append(RodaConstants.API_QUERY_SEP).append("startEvent").append(RodaConstants.API_QUERY_ASSIGN_SYMBOL)
-      .append(startEvent);
-    b.append(RodaConstants.API_QUERY_SEP).append("limitEvent").append(RodaConstants.API_QUERY_ASSIGN_SYMBOL)
-      .append(limitEvent);
-    b.append(RodaConstants.API_QUERY_SEP).append("startFile").append(RodaConstants.API_QUERY_ASSIGN_SYMBOL)
-      .append(startFile);
-    b.append(RodaConstants.API_QUERY_SEP).append("limitFile").append(RodaConstants.API_QUERY_ASSIGN_SYMBOL)
-      .append(limitFile);
-
-    // locale
-    b.append(RodaConstants.API_QUERY_SEP).append(RodaConstants.API_QUERY_KEY_LANG)
-      .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(LocaleInfo.getCurrentLocale().getLocaleName());
-
-    return b.toString();
   }
 
   public static SafeUri createRepresentationDescriptiveMetadataDownloadUri(String aipId, String representationId,
@@ -305,20 +257,17 @@ public class RestUtils {
 
   public static SafeUri createRepresentationDescriptiveMetadataDownloadUri(String aipId, String representationId,
     String descId, String versionId) {
-    // api/v1/representations/{aip_id}/{representation_id}/descriptive_metadata/{descId}?acceptFormat=xml&version_id={versionId}
+    // api/v2/aips/{aip_id}/representations/{representation_id}/metadata/descriptive/{descriptive_metadata_id}/download
+
     StringBuilder b = new StringBuilder();
     // base uri
-    b.append(RodaConstants.API_REST_V1_REPRESENTATIONS).append(URL.encodeQueryString(aipId))
-      .append(RodaConstants.API_SEP).append(URL.encodeQueryString(representationId)).append(RodaConstants.API_SEP)
-      .append(RodaConstants.API_DESCRIPTIVE_METADATA).append(RodaConstants.API_SEP).append(descId);
-    // accept format attribute
-    b.append(RodaConstants.API_QUERY_START).append(RodaConstants.API_QUERY_KEY_ACCEPT_FORMAT)
-      .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(RodaConstants.API_QUERY_VALUE_ACCEPT_FORMAT_BIN);
+    b.append(RodaConstants.API_REST_V2_AIPS).append(UriUtils.encode(aipId)).append(RodaConstants.API_SEP)
+      .append(RodaConstants.API_REST_V2_SUB_RESOURCE_REPRESENTATIONS).append(RodaConstants.API_SEP)
 
-    if (versionId != null) {
-      b.append(RodaConstants.API_QUERY_SEP).append(RodaConstants.API_QUERY_PARAM_VERSION_ID)
-        .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(versionId);
-    }
+      .append(UriUtils.encode(representationId)).append(RodaConstants.API_SEP)
+      .append(RodaConstants.API_REST_V2_SUB_RESOURCE_METADATA).append(RodaConstants.API_SEP)
+      .append(RodaConstants.API_REST_V2_SUB_RESOURCE_DESCRIPTIVE).append(RodaConstants.API_SEP).append(descId)
+      .append(RodaConstants.API_SEP).append(RodaConstants.API_REST_V2_SUB_RESOURCE_DOWNLOAD);
 
     return UriUtils.fromSafeConstant(b.toString());
   }
@@ -330,93 +279,68 @@ public class RestUtils {
 
   public static SafeUri createRepresentationDescriptiveMetadataHTMLUri(String aipId, String representationId,
     String descId, String versionId) {
-    // api/v1/representations/{aip_id}/{representation_id}/descriptive_metadata/{descId}?acceptFormat=html&version_id={versionId}
+    // api/v2/aips/{id}/representations/{representation-id}/metadata/descriptive/{descriptive-metadata-id}/html?lang=en&version-id={versionId}
+
     StringBuilder b = new StringBuilder();
     // base uri
-    b.append(RodaConstants.API_REST_V1_REPRESENTATIONS).append(URL.encodeQueryString(aipId))
-      .append(RodaConstants.API_SEP).append(URL.encodeQueryString(representationId)).append(RodaConstants.API_SEP)
-      .append(RodaConstants.API_DESCRIPTIVE_METADATA).append(RodaConstants.API_SEP).append(descId);
-
-    // accept format attribute
-    b.append(RodaConstants.API_QUERY_START).append(RodaConstants.API_QUERY_KEY_ACCEPT_FORMAT)
-      .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(RodaConstants.API_QUERY_VALUE_ACCEPT_FORMAT_HTML);
-
-    if (versionId != null) {
-      b.append(RodaConstants.API_QUERY_SEP).append(RodaConstants.API_QUERY_PARAM_VERSION_ID)
-        .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(versionId);
-    }
+    b.append(RodaConstants.API_REST_V2_AIPS).append(URL.encodeQueryString(aipId)).append(RodaConstants.API_SEP)
+      .append("representations").append(RodaConstants.API_SEP).append(URL.encodeQueryString(representationId))
+      .append(RodaConstants.API_SEP).append("metadata").append(RodaConstants.API_SEP).append("descriptive")
+      .append(RodaConstants.API_SEP).append(URL.encodeQueryString(descId)).append(RodaConstants.API_SEP).append("html");
 
     // locale
-    b.append(RodaConstants.API_QUERY_SEP).append(RodaConstants.API_QUERY_KEY_LANG)
+    b.append(RodaConstants.API_QUERY_START).append(RodaConstants.API_QUERY_KEY_LANG)
       .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(LocaleInfo.getCurrentLocale().getLocaleName());
+
+    // version
+    if (versionId != null) {
+      b.append(RodaConstants.API_QUERY_SEP).append("version-id").append(RodaConstants.API_QUERY_ASSIGN_SYMBOL)
+        .append(URL.encodeQueryString(versionId));
+    }
 
     return UriUtils.fromSafeConstant(b.toString());
   }
 
-  public static SafeUri createPreservationEventDetailsUri(String eventId, String aipId, String representationUUID,
-    String fileUUID, boolean onlyDetails, String acceptFormat) {
-    // api/v1/events?id={event_id}&aipId={aip_id}&representationUUID={representationUUID}&
-    // fileUUID={fileUUID}&onlyDetails={onlyDetails}&acceptFormat={format}&lang={lang}
-    StringBuilder b = new StringBuilder();
+  public static SafeUri createPreservationEventDownloadUri(String eventId) {
+    // api/v2/preservation/events/{id}/binary
+    String b = RodaConstants.API_REST_V2_PRESERVATION_EVENTS + URL.encodeQueryString(eventId)
+      + RodaConstants.API_REST_V2_DOWNLOAD_HANDLER;
 
-    b.append(RodaConstants.API_REST_V1_EVENTS).append(RodaConstants.API_QUERY_START)
-      .append(RodaConstants.API_QUERY_PARAM_ID).append(RodaConstants.API_QUERY_ASSIGN_SYMBOL)
-      .append(URL.encodeQueryString(eventId));
-
-    if (aipId != null) {
-      b.append(RodaConstants.API_QUERY_SEP).append(RodaConstants.API_PATH_PARAM_AIP_ID)
-        .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(URL.encodeQueryString(aipId));
-    }
-
-    if (representationUUID != null) {
-      b.append(RodaConstants.API_QUERY_SEP).append(RodaConstants.API_PATH_PARAM_REPRESENTATION_UUID)
-        .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(URL.encodeQueryString(representationUUID));
-    }
-
-    if (fileUUID != null) {
-      b.append(RodaConstants.API_QUERY_SEP).append(RodaConstants.API_PATH_PARAM_FILE_UUID)
-        .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(URL.encodeQueryString(fileUUID));
-    }
-
-    b.append(RodaConstants.API_QUERY_SEP).append(RodaConstants.API_QUERY_PARAM_ONLY_DETAILS)
-      .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(URL.encodeQueryString(Boolean.toString(onlyDetails)));
-
-    b.append(RodaConstants.API_QUERY_SEP).append(RodaConstants.API_QUERY_KEY_ACCEPT_FORMAT)
-      .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(URL.encodeQueryString(acceptFormat));
-
-    b.append(RodaConstants.API_QUERY_SEP).append(RodaConstants.API_QUERY_KEY_LANG)
-      .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(LocaleInfo.getCurrentLocale().getLocaleName());
-
-    return UriUtils.fromSafeConstant(b.toString());
+    return UriUtils.fromSafeConstant(b);
   }
 
-  public static SafeUri createPreservationAgentUri(String agentId, String acceptFormat) {
-    // api/v1/agents?id={agent_id}&acceptFormat={format}
-    StringBuilder b = new StringBuilder();
+  public static SafeUri createPreservationEventDetailsUri(String eventId) {
+    // api/v2/preservation/events/{id}/details/html?lang={lang}
+    String b = RodaConstants.API_REST_V2_PRESERVATION_EVENTS + URL.encodeQueryString(eventId)
+      + RodaConstants.API_REST_V2_PRESERVATION_EVENTS_DETAILS_HTML + RodaConstants.API_QUERY_START
+      + RodaConstants.API_QUERY_KEY_LANG + RodaConstants.API_QUERY_ASSIGN_SYMBOL
+      + LocaleInfo.getCurrentLocale().getLocaleName();
 
-    b.append(RodaConstants.API_REST_V1_AGENTS).append(RodaConstants.API_QUERY_START)
-      .append(RodaConstants.API_QUERY_PARAM_ID).append(RodaConstants.API_QUERY_ASSIGN_SYMBOL)
-      .append(URL.encodeQueryString(agentId));
+    return UriUtils.fromSafeConstant(b);
+  }
 
-    b.append(RodaConstants.API_QUERY_SEP).append(RodaConstants.API_QUERY_KEY_ACCEPT_FORMAT)
-      .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(URL.encodeQueryString(acceptFormat));
+  public static SafeUri createPreservationAgentDownloadUri(String agentId) {
+    // api/v2/preservation/agents/{id}/binary
+    String b = RodaConstants.API_REST_V2_PRESERVATION_AGENTS + URL.encodeQueryString(agentId)
+      + RodaConstants.API_REST_V2_DOWNLOAD_HANDLER;
 
-    return UriUtils.fromSafeConstant(b.toString());
+    return UriUtils.fromSafeConstant(b);
   }
 
   public static String createTransferredResourceUploadUri(String parentUUID, String locale) {
-    // api/v1/transfers/?parentUUID={parentUUID}&locale={locale}&commit=true
+    // api/v2/transfers/create/resource?parent-uuid={parentUUID}&locale={locale}&commit=true
     StringBuilder b = new StringBuilder();
     // base uri
-    b.append(RodaConstants.API_REST_V1_RESOURCES);
+    b.append(RodaConstants.API_REST_V2_TRANSFERRED_RESOURCES);
+
+    b.append(RodaConstants.API_REST_V2_TRANSFERRED_RESOURCE_CREATE_RESOURCE);
 
     if (parentUUID != null || locale != null) {
       b.append(RodaConstants.API_QUERY_START);
     }
 
     if (parentUUID != null) {
-      b.append(RodaConstants.TRANSFERRED_RESOURCE_PARENT_UUID).append(RodaConstants.API_QUERY_ASSIGN_SYMBOL)
-        .append(parentUUID);
+      b.append("parent-uuid").append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(parentUUID);
     }
 
     if (parentUUID != null && locale != null) {
@@ -434,16 +358,16 @@ public class RestUtils {
 
   public static String createFileUploadUri(String aipId, String representationId, List<String> directory,
     String details) {
-    // api/v1/files?aipId={aipId}&representationId={representationdId}&folder={folder[0]}&folder={folder[1]}&details={details}
+
+    // api/v2/files?aip-id={aipId}&representation-id={representationdId}&folder={folder[0]}&folder={folder[1]}&details={details}
 
     StringBuilder b = new StringBuilder();
 
     // base uri
-    b.append(RodaConstants.API_REST_V1_FILES).append(RodaConstants.API_QUERY_START);
-    b.append(RodaConstants.API_PATH_PARAM_AIP_ID).append(RodaConstants.API_QUERY_ASSIGN_SYMBOL)
-      .append(URL.encodeQueryString(aipId));
+    b.append(RodaConstants.API_REST_V2_FILES).append("upload").append(RodaConstants.API_QUERY_START);
+    b.append("aip-id").append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(URL.encodeQueryString(aipId));
     b.append(RodaConstants.API_QUERY_SEP);
-    b.append(RodaConstants.API_PATH_PARAM_REPRESENTATION_ID).append(RodaConstants.API_QUERY_ASSIGN_SYMBOL)
+    b.append("representation-id").append(RodaConstants.API_QUERY_ASSIGN_SYMBOL)
       .append(URL.encodeQueryString(representationId));
     b.append(RodaConstants.API_QUERY_SEP);
 
@@ -458,25 +382,18 @@ public class RestUtils {
   }
 
   public static SafeUri createTransferredResourceDownloadUri(String resourceId) {
-    // api/v1/transferred/{transferred_resource_uuid}?acceptFormat=bin
-    StringBuilder b = new StringBuilder();
-    // base uri
-    b.append(RodaConstants.API_REST_V1_RESOURCES).append(resourceId).append(RodaConstants.API_QUERY_START)
-      .append(RodaConstants.API_QUERY_KEY_ACCEPT_FORMAT).append(RodaConstants.API_QUERY_ASSIGN_SYMBOL)
-      .append(RodaConstants.API_QUERY_VALUE_ACCEPT_FORMAT_BIN);
+    // api/v2/transfers/{transferred_resource_uuid}/binary
 
-    return UriUtils.fromSafeConstant(b.toString());
+    return UriUtils.fromSafeConstant(
+      RodaConstants.API_REST_V2_TRANSFERRED_RESOURCES + resourceId + RodaConstants.API_REST_V2_DOWNLOAD_HANDLER);
   }
 
   public static SafeUri createRepresentationInformationDownloadUri(String riId) {
-    // api/v1/representation_information/{representation_information_id}?acceptFormat=xml
-    StringBuilder b = new StringBuilder();
-    // base uri
-    b.append(RodaConstants.API_REST_V1_REPRESENTATION_INFORMATION).append(riId).append(RodaConstants.API_QUERY_START)
-      .append(RodaConstants.API_QUERY_KEY_ACCEPT_FORMAT).append(RodaConstants.API_QUERY_ASSIGN_SYMBOL)
-      .append(RodaConstants.API_QUERY_VALUE_ACCEPT_FORMAT_BIN);
+    // api/v2/representation-information/{id}/binary
 
-    return UriUtils.fromSafeConstant(b.toString());
+    String b = RodaConstants.API_REST_V2_REPRESENTATION_INFORMATION + riId + RodaConstants.API_REST_V2_DOWNLOAD_HANDLER;
+
+    return UriUtils.fromSafeConstant(b);
   }
 
   /**
@@ -507,55 +424,49 @@ public class RestUtils {
 
   public static SafeUri createThemeResourceUri(String resourceId, String defaultResourceId, String resourceType,
     boolean inline) {
-    // api/v1/theme/?resource_id={resourceId}&default_resource_od={defaultResourceId}&resource_type={resourceType}
+    // api/v2/themes/?resource-id={resourceId}&default-resource-id={defaultResourceId}&resource-type={resourceType}
     StringBuilder b = new StringBuilder();
 
-    b.append(RodaConstants.API_REST_V1_THEME).append(RodaConstants.API_QUERY_START)
-      .append(RodaConstants.API_QUERY_PARAM_RESOURCE_ID).append(RodaConstants.API_QUERY_ASSIGN_SYMBOL)
+    b.append(RodaConstants.API_REST_V2_THEME).append(RodaConstants.API_QUERY_START)
+      .append(RodaConstants.API_V2_QUERY_PARAM_RESOURCE_ID).append(RodaConstants.API_QUERY_ASSIGN_SYMBOL)
       .append(URL.encode(resourceId));
 
     if (defaultResourceId != null) {
-      b.append(RodaConstants.API_QUERY_SEP).append(RodaConstants.API_QUERY_PARAM_DEFAULT_RESOURCE_ID)
+      b.append(RodaConstants.API_QUERY_SEP).append(RodaConstants.API_V2_QUERY_PARAM_DEFAULT_RESOURCE_ID)
         .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(defaultResourceId);
     }
 
     if (resourceType != null) {
-      b.append(RodaConstants.API_QUERY_SEP).append(RodaConstants.API_QUERY_PARAM_RESOURCE_TYPE)
+      b.append(RodaConstants.API_QUERY_SEP).append(RodaConstants.API_V2_QUERY_PARAM_RESOURCE_TYPE)
         .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(resourceType);
     }
 
     if (inline) {
       b.append(RodaConstants.API_QUERY_SEP).append(RodaConstants.API_QUERY_PARAM_INLINE)
-        .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(inline);
+        .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(true);
     }
 
     return UriUtils.fromSafeConstant(b.toString());
   }
 
   public static SafeUri createJobAttachmentDownloadUri(String jobId, String attachmentId) {
-    StringBuilder b = new StringBuilder();
-    // api/v1/jobs/{jobId}/attachment/{attachmentId}
-    b.append(RodaConstants.API_REST_V1_JOBS).append(jobId).append("/attachment/").append(attachmentId);
-    return UriUtils.fromSafeConstant(b.toString());
+    // api/v2/jobs/{id}/attachment/{attachment-id}
+    return UriUtils.fromSafeConstant(RodaConstants.API_REST_V2_JOBS + jobId + "/attachment/" + attachmentId);
   }
 
-  public static interface FindRequestMapper extends ObjectMapper<FindRequest> {
+  public static SafeUri createJobReportsHTMLUri(String jobId) {
+    // api/v2/jobs/{id}/reports
+    return UriUtils.fromSafeConstant(RodaConstants.API_REST_V2_JOBS + jobId + "/reports");
   }
 
-  private static FindRequestMapper FIND_REQUEST_MAPPER = GWT.create(FindRequestMapper.class);
-
-  public static <T extends IsIndexed> void requestCSVExport(Class<T> classToReturnName, Filter filter, Sorter sorter,
+  public static <T extends IsIndexed> void requestCSVExport(Class<T> classToReturn, Filter filter, Sorter sorter,
     Sublist sublist, Facets facets, boolean onlyActive, boolean exportFacets, String filename) {
-    requestCSVExport(classToReturnName.getName(), filter, sorter, sublist, facets, onlyActive, exportFacets, filename);
-  }
+    // api/v2/<resource>/export/csv?findRequest={findRequest}
 
-  public static <T extends IsIndexed> void requestCSVExport(String classToReturnName, Filter filter, Sorter sorter,
-    Sublist sublist, Facets facets, boolean onlyActive, boolean exportFacets, String filename) {
-    // api/v1/index/findFORM?type=csv
+    String url = retrieveRestAPIBase(classToReturn) + "export/csv";
 
-    String url = RodaConstants.API_REST_V1_INDEX + "findFORM";
-    FindRequest request = new FindRequest(classToReturnName, filter, sorter, sublist, facets, onlyActive, exportFacets,
-      filename, new ArrayList<>());
+    FindRequest request = FindRequest.getBuilder(filter, onlyActive).withSorter(sorter).withSublist(sublist)
+      .withFacets(facets).withExportFacets(exportFacets).withFilename(filename).build();
 
     final FormPanel form = new FormPanel();
     form.setAction(URL.encode(url));
@@ -564,32 +475,82 @@ public class RestUtils {
     FlowPanel layout = new FlowPanel();
     form.setWidget(layout);
     layout.add(new Hidden("findRequest", FIND_REQUEST_MAPPER.write(request)));
-    layout.add(new Hidden("type", "csv"));
 
     form.setVisible(false);
     RootPanel.get().add(form);
 
-    // using submit instead of submit completed because Chrome doesn't created
+    // using submit instead of submit completed because Chrome doesn't create
     // the other event
-    form.addSubmitHandler(new SubmitHandler() {
+    form.addSubmitHandler(event -> {
 
-      @Override
-      public void onSubmit(SubmitEvent event) {
+      Timer timer = new Timer() {
 
-        Timer timer = new Timer() {
+        @Override
+        public void run() {
+          RootPanel.get().remove(form);
+        }
+      };
 
-          @Override
-          public void run() {
-            RootPanel.get().remove(form);
-          }
-        };
-
-        // remove form 10 seconds in the future
-        timer.schedule(10000);
-      }
+      // remove form 10 seconds in the future
+      timer.schedule(10000);
     });
 
     form.submit();
   }
 
+  public static SafeUri createDisposalConfirmationHTMLUri(String disposalConfirmationId, boolean toPrint) {
+    // api/v2/disposal/confirmations/{id}/report/html?to-print=<true|false>
+
+    final StringBuilder b = new StringBuilder();
+    // base uri
+    b.append(RodaConstants.API_REST_V2_DISPOSAL_CONFIRMATION).append(disposalConfirmationId)
+      .append(RodaConstants.API_SEP).append(RodaConstants.API_REST_V2_DISPOSAL_CONFIRMATION_REPORT)
+      .append(RodaConstants.API_SEP).append(RodaConstants.API_REST_V2_DISPOSAL_CONFIRMATION_REPORT_HTML);
+
+    if (toPrint) {
+      b.append(RodaConstants.API_QUERY_START)
+        .append(RodaConstants.API_REST_V2_DISPOSAL_CONFIRMATION_QUERY_PARAM_TO_PRINT)
+        .append(RodaConstants.API_QUERY_ASSIGN_SYMBOL).append(true);
+    }
+
+    return UriUtils.fromSafeConstant(b.toString());
+  }
+
+  public static interface FindRequestMapper extends ObjectMapper<FindRequest> {
+  }
+
+  private static <T extends IsIndexed> String retrieveRestAPIBase(Class<T> classToReturn) {
+    switch (classToReturn.getName()) {
+      case "org.roda.core.data.v2.ip.IndexedAIP":
+        return RodaConstants.API_REST_V2_AIPS;
+      case "org.roda.core.data.v2.ip.IndexedRepresentation":
+        return RodaConstants.API_REST_V2_REPRESENTATIONS_ENDPOINT;
+      case "org.roda.core.data.v2.jobs.IndexedJob":
+        return RodaConstants.API_REST_V2_JOBS;
+      case "org.roda.core.data.v2.ip.TransferredResource":
+        return RodaConstants.API_REST_V2_TRANSFERRED_RESOURCES;
+      case "org.roda.core.data.v2.ip.IndexedFile":
+        return RodaConstants.API_REST_V2_FILES;
+      case "org.roda.core.data.v2.jobs.IndexedReport":
+        return RodaConstants.API_REST_V2_JOB_REPORT;
+      case "org.roda.core.data.v2.log.LogEntry":
+        return RodaConstants.API_REST_V2_AUDIT_LOGS;
+      case "org.roda.core.data.v2.notifications":
+        return RodaConstants.API_REST_V2_NOTIFICATIONS;
+      case "org.roda.core.data.v2.user.RODAMember":
+        return RodaConstants.API_REST_V2_MEMBERS;
+      case "org.roda.core.data.v2.disposal.confirmation.DisposalConfirmation":
+        return RodaConstants.API_REST_V2_DISPOSAL_CONFIRMATION;
+      case "org.roda.core.data.v2.ri.RepresentationInformation":
+        return RodaConstants.API_REST_V2_REPRESENTATION_INFORMATION;
+      case "org.roda.core.data.v2.risks.IndexedRisk":
+        return RodaConstants.API_REST_V2_RISKS;
+      case "org.roda.core.data.v2.ip.metadata.IndexedPreservationEvent":
+        return RodaConstants.API_REST_V2_PRESERVATION_EVENTS;
+      case "org.roda.core.data.v2.ip.metadata.IndexedPreservationAgent":
+        return RodaConstants.API_REST_V2_PRESERVATION_AGENTS;
+      default:
+        return null;
+    }
+  }
 }

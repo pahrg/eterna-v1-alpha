@@ -25,10 +25,9 @@ import org.roda.core.data.exceptions.NotFoundException;
 import org.roda.core.data.exceptions.RequestNotValidException;
 import org.roda.core.data.utils.JsonUtils;
 import org.roda.core.data.v2.LiteOptionalWithCause;
+import org.roda.core.data.v2.disposal.confirmation.DisposalConfirmation;
+import org.roda.core.data.v2.disposal.confirmation.DisposalConfirmationAIPEntry;
 import org.roda.core.data.v2.ip.AIP;
-import org.roda.core.data.v2.ip.StoragePath;
-import org.roda.core.data.v2.ip.disposal.DisposalConfirmation;
-import org.roda.core.data.v2.ip.disposal.DisposalConfirmationAIPEntry;
 import org.roda.core.data.v2.jobs.Job;
 import org.roda.core.data.v2.jobs.PluginParameter;
 import org.roda.core.data.v2.jobs.PluginState;
@@ -36,15 +35,13 @@ import org.roda.core.data.v2.jobs.PluginType;
 import org.roda.core.data.v2.jobs.Report;
 import org.roda.core.index.IndexService;
 import org.roda.core.model.ModelService;
-import org.roda.core.model.utils.ModelUtils;
 import org.roda.core.plugins.AbstractPlugin;
 import org.roda.core.plugins.Plugin;
 import org.roda.core.plugins.PluginException;
+import org.roda.core.plugins.PluginHelper;
 import org.roda.core.plugins.RODAObjectProcessingLogic;
 import org.roda.core.plugins.orchestrate.JobPluginInfo;
-import org.roda.core.plugins.PluginHelper;
 import org.roda.core.storage.Binary;
-import org.roda.core.storage.StorageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,14 +51,24 @@ import org.slf4j.LoggerFactory;
 public class DeleteDisposalConfirmationPlugin extends AbstractPlugin<DisposalConfirmation> {
   private static final Logger LOGGER = LoggerFactory.getLogger(DeleteDisposalConfirmationPlugin.class);
   private static final String EVENT_DESCRIPTION = "Disposal confirmation withdraw";
+  private static final Map<String, PluginParameter> pluginParameters = new HashMap<>();
+
+  static {
+    pluginParameters.put(RodaConstants.PLUGIN_PARAMS_DETAILS,
+      PluginParameter
+        .getBuilder(RodaConstants.PLUGIN_PARAMS_DETAILS, "Event details", PluginParameter.PluginParameterType.STRING)
+        .withDefaultValue("").isMandatory(false).isReadOnly(false)
+        .withDescription("Details that will be used when creating event").build());
+  }
 
   private String details;
 
-  private static final Map<String, PluginParameter> pluginParameters = new HashMap<>();
-  static {
-    pluginParameters.put(RodaConstants.PLUGIN_PARAMS_DETAILS,
-      new PluginParameter(RodaConstants.PLUGIN_PARAMS_DETAILS, "Event details",
-        PluginParameter.PluginParameterType.STRING, "", false, false, "Details that will be used when creating event"));
+  public static String getStaticName() {
+    return "Delete disposal confirmation report";
+  }
+
+  public static String getStaticDescription() {
+    return "";
   }
 
   @Override
@@ -85,17 +92,9 @@ public class DeleteDisposalConfirmationPlugin extends AbstractPlugin<DisposalCon
     return "1.0";
   }
 
-  public static String getStaticName() {
-    return "Delete disposal confirmation report";
-  }
-
   @Override
   public String getName() {
     return getStaticName();
-  }
-
-  public static String getStaticDescription() {
-    return "";
   }
 
   @Override
@@ -134,24 +133,22 @@ public class DeleteDisposalConfirmationPlugin extends AbstractPlugin<DisposalCon
   }
 
   @Override
-  public Report beforeAllExecute(IndexService index, ModelService model, StorageService storage)
-    throws PluginException {
+  public Report beforeAllExecute(IndexService index, ModelService model) throws PluginException {
     // do nothing
     return null;
   }
 
   @Override
-  public Report execute(IndexService index, ModelService model, StorageService storage,
-    List<LiteOptionalWithCause> liteList) throws PluginException {
+  public Report execute(IndexService index, ModelService model, List<LiteOptionalWithCause> liteList)
+    throws PluginException {
     return PluginHelper.processObjects(this,
-      (RODAObjectProcessingLogic<DisposalConfirmation>) (indexService, modelService, storageService, report, cachedJob,
-        jobPluginInfo, plugin,
-        object) -> processDisposalConfirmation(modelService, storageService, report, jobPluginInfo, cachedJob, object),
-      index, model, storage, liteList);
+      (RODAObjectProcessingLogic<DisposalConfirmation>) (indexService, modelService, report, cachedJob, jobPluginInfo,
+        plugin, object) -> processDisposalConfirmation(modelService, report, jobPluginInfo, cachedJob, object),
+      index, model, liteList);
   }
 
-  private void processDisposalConfirmation(ModelService model, StorageService storage, Report report,
-    JobPluginInfo jobPluginInfo, Job cachedJob, DisposalConfirmation confirmation) {
+  private void processDisposalConfirmation(ModelService model, Report report, JobPluginInfo jobPluginInfo,
+    Job cachedJob, DisposalConfirmation confirmation) {
     String disposalConfirmationId = confirmation.getId();
 
     LOGGER.debug("Processing disposal confirmation {}", confirmation.getId());
@@ -159,8 +156,8 @@ public class DeleteDisposalConfirmationPlugin extends AbstractPlugin<DisposalCon
 
     String outcomeText;
     try {
-      StoragePath disposalConfirmationAIPsPath = ModelUtils.getDisposalConfirmationAIPsPath(disposalConfirmationId);
-      Binary binary = storage.getBinary(disposalConfirmationAIPsPath);
+      Binary binary = model.getBinary(confirmation,
+        RodaConstants.STORAGE_DIRECTORY_DISPOSAL_CONFIRMATION_AIPS_FILENAME);
 
       try (BufferedReader reader = new BufferedReader(new InputStreamReader(binary.getContent().createInputStream()))) {
         while (reader.ready()) {
@@ -191,7 +188,7 @@ public class DeleteDisposalConfirmationPlugin extends AbstractPlugin<DisposalCon
     }
 
     model.createRepositoryEvent(RodaConstants.PreservationEventType.DELETION, getPreservationEventDescription(),
-      report.getPluginState(), outcomeText, details, cachedJob.getUsername(), true);
+      report.getPluginState(), outcomeText, details, cachedJob.getUsername(), true, null);
   }
 
   private void processAIP(AIP aip, ModelService model, Report report, JobPluginInfo jobPluginInfo, Job cachedJob,
@@ -229,11 +226,11 @@ public class DeleteDisposalConfirmationPlugin extends AbstractPlugin<DisposalCon
     PluginHelper.updatePartialJobReport(this, model, reportItem, true, cachedJob);
 
     model.createUpdateAIPEvent(aip.getId(), null, null, null, RodaConstants.PreservationEventType.UPDATE,
-      EVENT_DESCRIPTION, state, outcomeText, details, cachedJob.getUsername(), true);
+      EVENT_DESCRIPTION, state, outcomeText, details, cachedJob.getUsername(), true, null);
   }
 
   @Override
-  public Report afterAllExecute(IndexService index, ModelService model, StorageService storage) throws PluginException {
+  public Report afterAllExecute(IndexService index, ModelService model) throws PluginException {
     // do nothing
     return null;
   }

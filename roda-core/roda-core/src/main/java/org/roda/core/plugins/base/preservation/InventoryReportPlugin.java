@@ -50,7 +50,6 @@ import org.roda.core.plugins.PluginHelper;
 import org.roda.core.plugins.RODAObjectProcessingLogic;
 import org.roda.core.plugins.orchestrate.JobPluginInfo;
 import org.roda.core.plugins.orchestrate.JobsHelper;
-import org.roda.core.storage.StorageService;
 import org.roda.core.storage.fs.FSUtils;
 import org.roda.core.util.IdUtils;
 import org.slf4j.Logger;
@@ -103,28 +102,40 @@ public class InventoryReportPlugin extends AbstractPlugin<AIP> {
   private List<String> otherMetadataTypes;
   private static Map<String, PluginParameter> pluginParameters = new HashMap<>();
 
-  // TODO -> add plugin parameter type "LIST"...
   static {
-    pluginParameters.put(CSV_FILE_FIELDS, new PluginParameter(CSV_FILE_FIELDS, "Attributes to include in the report",
-      PluginParameterType.STRING, CSV_DEFAULT_FIELDS, true, false,
-      "List of file attributes to include in the inventory export. The example includes all the possible options. Remove attributes as necessary."));
+    pluginParameters.put(CSV_FILE_FIELDS, PluginParameter
+      .getBuilder(CSV_FILE_FIELDS, "Attributes to include in the report", PluginParameterType.STRING)
+      .withDefaultValue(CSV_DEFAULT_FIELDS)
+      .withDescription(
+        "List of file attributes to include in the inventory export. The example includes all the possible options. Remove attributes as necessary.")
+      .build());
     pluginParameters.put(CSV_FILE_OUTPUT,
-      new PluginParameter(CSV_FILE_OUTPUT, "Report file path", PluginParameterType.STRING, CSV_DEFAULT_OUTPUT, true,
-        false, "The full path and file name on the server where the inventory report file should be created."));
+      PluginParameter.getBuilder(CSV_FILE_OUTPUT, "Report file path", PluginParameterType.STRING)
+        .withDefaultValue(CSV_DEFAULT_OUTPUT)
+        .withDescription("The full path and file name on the server where the inventory report file should be created.")
+        .build());
     pluginParameters.put(CSV_FILE_HEADERS,
-      new PluginParameter(CSV_FILE_HEADERS, "Include header line", PluginParameterType.BOOLEAN, CSV_DEFAULT_HEADERS,
-        true, false, "Include a header line in the CSV inventory report."));
+      PluginParameter.getBuilder(CSV_FILE_HEADERS, "Include header line", PluginParameterType.BOOLEAN)
+        .withDefaultValue(CSV_DEFAULT_HEADERS).withDescription("Include a header line in the CSV inventory report.")
+        .build());
     pluginParameters.put(CSV_FILE_OUTPUT_DATA,
-      new PluginParameter(CSV_FILE_OUTPUT_DATA, "Include data files", PluginParameterType.BOOLEAN, CSV_DEFAULT_HEADERS,
-        true, false, "Include in the inventory report information about data files that exist inside AIPs."));
+      PluginParameter.getBuilder(CSV_FILE_OUTPUT_DATA, "Include data files", PluginParameterType.BOOLEAN)
+        .withDefaultValue(CSV_DEFAULT_HEADERS)
+        .withDescription("Include in the inventory report information about data files that exist inside AIPs.")
+        .build());
     pluginParameters.put(CSV_FILE_OUTPUT_DESCRIPTIVE,
-      new PluginParameter(CSV_FILE_OUTPUT_DESCRIPTIVE, "Include descriptive metadata files",
-        PluginParameterType.BOOLEAN, CSV_DEFAULT_HEADERS, true, false,
-        "Include in the inventory report information about descriptive metadata files that exist inside AIPs."));
+      PluginParameter
+        .getBuilder(CSV_FILE_OUTPUT_DESCRIPTIVE, "Include descriptive metadata files", PluginParameterType.BOOLEAN)
+        .withDefaultValue(CSV_DEFAULT_HEADERS)
+        .withDescription(
+          "Include in the inventory report information about descriptive metadata files that exist inside AIPs.")
+        .build());
     pluginParameters.put(CSV_FILE_OTHER_METADATA_TYPES,
-      new PluginParameter(CSV_FILE_OTHER_METADATA_TYPES, "Include other metadata files", PluginParameterType.STRING,
-        CSV_DEFAULT_OTHER_METADATA, true, false,
-        "Include in the inventory report information about other metadata files that exist inside AIPs."));
+      PluginParameter
+        .getBuilder(CSV_FILE_OTHER_METADATA_TYPES, "Include other metadata files", PluginParameterType.STRING)
+        .withDefaultValue(CSV_DEFAULT_OTHER_METADATA).withDescription(
+          "Include in the inventory report information about other metadata files that exist inside AIPs.")
+        .build());
   }
 
   @Override
@@ -211,7 +222,7 @@ public class InventoryReportPlugin extends AbstractPlugin<AIP> {
   }
 
   @Override
-  public Report execute(IndexService index, ModelService model, StorageService storage,
+  public Report execute(IndexService index, ModelService model,
     List<LiteOptionalWithCause> liteList) throws PluginException {
 
     Path jobCSVTempFolder = getJobCSVTempFolder();
@@ -223,17 +234,17 @@ public class InventoryReportPlugin extends AbstractPlugin<AIP> {
       return PluginHelper.processObjects(this, new RODAObjectProcessingLogic<AIP>() {
         @Override
 
-        public void process(IndexService index, ModelService model, StorageService storage, Report report,
+        public void process(IndexService index, ModelService model, Report report,
           Job cachedJob, JobPluginInfo jobPluginInfo, Plugin<AIP> plugin, AIP object) {
-          processAIP(model, storage, jobPluginInfo, csvFilePrinter, object);
+          processAIP(model, jobPluginInfo, csvFilePrinter, object);
         }
-      }, index, model, storage, liteList);
+      }, index, model, liteList);
     } catch (IOException e) {
       throw new PluginException("Unable to create/write to CSVPrinter", e);
     }
   }
 
-  private void processAIP(ModelService model, StorageService storage, JobPluginInfo jobPluginInfo,
+  private void processAIP(ModelService model, JobPluginInfo jobPluginInfo,
     CSVPrinter csvFilePrinter, AIP aip) {
     if (csvFilePrinter == null) {
       LOGGER.warn("CSVPrinter is NULL! Skipping...");
@@ -242,18 +253,18 @@ public class InventoryReportPlugin extends AbstractPlugin<AIP> {
 
     try {
       if (outputDataInformation && aip.getRepresentations() != null) {
-        List<List<String>> dataInformation = InventoryReportPluginUtils.getDataInformation(fields, aip, model, storage);
+        List<List<String>> dataInformation = InventoryReportPluginUtils.getDataInformation(fields, aip, model);
         csvFilePrinter.printRecords(dataInformation);
       }
       if (outputDescriptiveMetadataInformation && aip.getDescriptiveMetadata() != null) {
         List<List<String>> dataInformation = InventoryReportPluginUtils.getDescriptiveMetadataInformation(fields, aip,
-          model, storage);
+          model);
         csvFilePrinter.printRecords(dataInformation);
       }
       if (otherMetadataTypes != null && !otherMetadataTypes.isEmpty()) {
         for (String otherMetadataType : otherMetadataTypes) {
           List<List<String>> otherMetadataInformation = InventoryReportPluginUtils.getOtherMetadataInformation(fields,
-            otherMetadataType, aip, model, storage);
+            otherMetadataType, aip, model);
           csvFilePrinter.printRecords(otherMetadataInformation);
         }
       }
@@ -265,7 +276,7 @@ public class InventoryReportPlugin extends AbstractPlugin<AIP> {
   }
 
   @Override
-  public Report beforeAllExecute(IndexService index, ModelService model, StorageService storage)
+  public Report beforeAllExecute(IndexService index, ModelService model)
     throws PluginException {
     try {
       Path jobCSVTempFolder = getJobCSVTempFolder();
@@ -291,7 +302,7 @@ public class InventoryReportPlugin extends AbstractPlugin<AIP> {
   }
 
   @Override
-  public Report afterAllExecute(IndexService index, ModelService model, StorageService storage) throws PluginException {
+  public Report afterAllExecute(IndexService index, ModelService model) throws PluginException {
     CSVFormat csvFileFormat = CSVFormat.DEFAULT.withRecordSeparator("\n");
     Path csvTempFolder = getJobCSVTempFolder();
 

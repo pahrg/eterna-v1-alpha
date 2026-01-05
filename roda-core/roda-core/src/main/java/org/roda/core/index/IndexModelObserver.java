@@ -9,14 +9,9 @@ package org.roda.core.index;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +35,8 @@ import org.roda.core.data.exceptions.ReturnWithExceptions;
 import org.roda.core.data.utils.JsonUtils;
 import org.roda.core.data.v2.IsModelObject;
 import org.roda.core.data.v2.common.OptionalWithCause;
+import org.roda.core.data.v2.disposal.confirmation.DisposalConfirmation;
+import org.roda.core.data.v2.disposal.schedule.DisposalSchedule;
 import org.roda.core.data.v2.index.IsIndexed;
 import org.roda.core.data.v2.index.filter.Filter;
 import org.roda.core.data.v2.index.filter.SimpleFilterParameter;
@@ -54,17 +51,14 @@ import org.roda.core.data.v2.ip.IndexedFile;
 import org.roda.core.data.v2.ip.IndexedRepresentation;
 import org.roda.core.data.v2.ip.Permissions;
 import org.roda.core.data.v2.ip.Representation;
-import org.roda.core.data.v2.ip.ShallowFile;
-import org.roda.core.data.v2.ip.StoragePath;
 import org.roda.core.data.v2.ip.TransferredResource;
-import org.roda.core.data.v2.ip.disposal.DisposalConfirmation;
-import org.roda.core.data.v2.ip.disposal.DisposalSchedule;
 import org.roda.core.data.v2.ip.metadata.DescriptiveMetadata;
 import org.roda.core.data.v2.ip.metadata.IndexedPreservationAgent;
 import org.roda.core.data.v2.ip.metadata.IndexedPreservationEvent;
 import org.roda.core.data.v2.ip.metadata.OtherMetadata;
 import org.roda.core.data.v2.ip.metadata.PreservationMetadata;
 import org.roda.core.data.v2.ip.metadata.PreservationMetadata.PreservationMetadataType;
+import org.roda.core.data.v2.jobs.IndexedJob;
 import org.roda.core.data.v2.jobs.IndexedReport;
 import org.roda.core.data.v2.jobs.Job;
 import org.roda.core.data.v2.jobs.Report;
@@ -88,12 +82,7 @@ import org.roda.core.index.utils.IterableIndexResult;
 import org.roda.core.index.utils.SolrUtils;
 import org.roda.core.model.ModelObserver;
 import org.roda.core.model.ModelService;
-import org.roda.core.model.utils.ModelUtils;
-import org.roda.core.storage.ContentPayload;
-import org.roda.core.storage.DefaultBinary;
-import org.roda.core.storage.JsonContentPayload;
-import org.roda.core.storage.Resource;
-import org.roda.core.storage.StorageService;
+import org.roda.core.storage.Binary;
 import org.roda.core.storage.fs.FSUtils;
 import org.roda.core.util.IdUtils;
 import org.slf4j.Logger;
@@ -169,17 +158,17 @@ public class IndexModelObserver implements ModelObserver {
     ReturnWithExceptions<Void, ModelObserver> ret = new ReturnWithExceptions<>(this);
 
     SolrUtils
-      .create2(index, (ModelObserver) this, IndexedAIP.class, aip,
+      .create2(index, model, (ModelObserver) this, IndexedAIP.class, aip,
         new AIPCollection.Info(ancestors, safemode, disposalSchedule, retentionPeriodCalculation, disposalHoldStatus))
       .addTo(ret);
 
     // if there was an error indexing, try in safe mode
     if (!ret.isEmpty()) {
       if (!safemode) {
-        LOGGER.error("Error indexing AIP, trying safe mode", ret.getExceptions().get(0));
+        LOGGER.error("Error indexing AIP, trying safe mode", ret.getExceptions().getFirst());
         indexAIP(aip, ancestors, true).addTo(ret);
       } else {
-        LOGGER.error("Cannot index created AIP", ret.getExceptions().get(0));
+        LOGGER.error("Cannot index created AIP", ret.getExceptions().getFirst());
       }
     }
 
@@ -235,7 +224,7 @@ public class IndexModelObserver implements ModelObserver {
       ret.add(e);
     }
 
-    SolrUtils.create2(index, (ModelObserver) this, IndexedPreservationEvent.class, pm,
+    SolrUtils.create2(index, model, (ModelObserver) this, IndexedPreservationEvent.class, pm,
       new PreservationEventCollection.Info(aip)).addTo(ret);
 
     return ret;
@@ -318,7 +307,8 @@ public class IndexModelObserver implements ModelObserver {
 
       RepresentationCollection.Info info = new RepresentationCollection.Info(aip, ancestors, sizeInBytes,
         numberOfDataFiles, numberOfDataFolders, safemode);
-      SolrUtils.create2(index, (ModelObserver) this, IndexedRepresentation.class, representation, info).addTo(ret);
+      SolrUtils.create2(index, model, (ModelObserver) this, IndexedRepresentation.class, representation, info)
+        .addTo(ret);
     } catch (IOException | RequestNotValidException | GenericException | NotFoundException
       | AuthorizationDeniedException e) {
       LOGGER.error("Cannot index representation", e);
@@ -326,23 +316,6 @@ public class IndexModelObserver implements ModelObserver {
     }
 
     return ret;
-  }
-
-  private Long getExternalFilesTotalSize(File file)
-    throws RequestNotValidException, GenericException, NotFoundException, AuthorizationDeniedException, IOException {
-    Long sizeInBytes = 0L;
-    StoragePath storagePath = ModelUtils.getFileStoragePath(file);
-    CloseableIterable<Resource> resources = model.getStorage().listResourcesUnderFile(storagePath, false);
-    for (Resource resource : resources) {
-      if (resource instanceof DefaultBinary) {
-        ContentPayload content = ((DefaultBinary) resource).getContent();
-        if (content instanceof JsonContentPayload) {
-          ShallowFile shallowFile = JsonUtils.getObjectFromJson(content.createInputStream(), ShallowFile.class);
-          sizeInBytes += shallowFile.getSize();
-        }
-      }
-    }
-    return sizeInBytes;
   }
 
   private ReturnWithExceptions<Void, ModelObserver> indexRetentionPeriod(final AIP aip, final List<String> ancestors) {
@@ -383,28 +356,27 @@ public class IndexModelObserver implements ModelObserver {
 
     FileCollection.Info info = new FileCollection.Info(aip, ancestors);
     try {
-      final StoragePath storagePath = ModelUtils.getFileStoragePath(file);
-      file.setCreatedOn(getDateFromStoragePath(storagePath));
-    } catch (RequestNotValidException | AuthorizationDeniedException | NotFoundException | GenericException
-      | IOException e) {
-      LOGGER.error("Could not set the creation date of File");
+      file.setCreatedOn(model.retrieveFileCreationDate(file));
+    } catch (RequestNotValidException | GenericException e) {
+      LOGGER.error("Could not set the creation date of File", e);
     }
     if (FSUtils.isManifestOfExternalFiles(file.getId())) {
       try (CloseableIterable<OptionalWithCause<File>> allExternalFiles = model.listExternalFilesUnder(file)) {
         for (OptionalWithCause<File> shallowFile : allExternalFiles) {
           if (shallowFile.isPresent()) {
             shallowFile.get().setInstanceId(aip.getInstanceId());
-            SolrUtils.create2(index, (ModelObserver) this, IndexedFile.class, shallowFile.get(), info).addTo(ret);
+            SolrUtils.create2(index, model, (ModelObserver) this, IndexedFile.class, shallowFile.get(), info)
+              .addTo(ret);
           }
         }
-        sizeInBytes = getExternalFilesTotalSize(file);
+        sizeInBytes = model.getExternalFilesTotalSize(file);
       } catch (IOException | RequestNotValidException | GenericException | AuthorizationDeniedException
         | NotFoundException e) {
         e.printStackTrace();
       }
 
     } else {
-      SolrUtils.create2(index, (ModelObserver) this, IndexedFile.class, file, info).addTo(ret);
+      SolrUtils.create2(index, model, (ModelObserver) this, IndexedFile.class, file, info).addTo(ret);
       sizeInBytes = (Long) info.getAccumulators().get(RodaConstants.FILE_SIZE);
     }
 
@@ -1033,7 +1005,7 @@ public class IndexModelObserver implements ModelObserver {
 
   @Override
   public ReturnWithExceptions<Void, ModelObserver> logEntryCreated(LogEntry entry) {
-    return SolrUtils.create2(index, this, LogEntry.class, entry);
+    return SolrUtils.create2(index, model, this, LogEntry.class, entry);
   }
 
   @Override
@@ -1079,24 +1051,14 @@ public class IndexModelObserver implements ModelObserver {
       indexPreservationEvent(pm).addTo(ret);
     } else if (PreservationMetadataType.AGENT.equals(type)) {
       try {
-        final StoragePath storagePath = ModelUtils.getPreservationMetadataStoragePath(pm);
-        pm.setCreatedOn(getDateFromStoragePath(storagePath));
-      } catch (RequestNotValidException | AuthorizationDeniedException | NotFoundException | GenericException
-        | IOException e) {
-        LOGGER.error("Could not set the creation date of Preservation Agent");
+        pm.setCreatedOn(model.retrievePreservationMetadataCreationDate(pm));
+      } catch (RequestNotValidException | GenericException e) {
+        LOGGER.error("Could not set the creation date of Preservation Agent", e);
       }
-      SolrUtils.create2(index, (ModelObserver) this, IndexedPreservationAgent.class, pm).addTo(ret);
+      SolrUtils.create2(index, model, (ModelObserver) this, IndexedPreservationAgent.class, pm).addTo(ret);
     }
 
     return ret;
-  }
-
-  private Date getDateFromStoragePath(StoragePath storagePath)
-    throws IOException, AuthorizationDeniedException, RequestNotValidException, NotFoundException, GenericException {
-    Path path = model.getStorage().getDirectAccess(storagePath).getPath();
-    BasicFileAttributes attr = Files.readAttributes(path, BasicFileAttributes.class);
-    FileTime fileTime = attr.creationTime();
-    return new Date(fileTime.toMillis());
   }
 
   @Override
@@ -1145,7 +1107,7 @@ public class IndexModelObserver implements ModelObserver {
   public ReturnWithExceptions<Void, ModelObserver> jobCreatedOrUpdated(Job job, boolean reindexJobReports) {
     ReturnWithExceptions<Void, ModelObserver> ret = new ReturnWithExceptions<>(this);
 
-    SolrUtils.create2(index, (ModelObserver) this, Job.class, job).addTo(ret);
+    SolrUtils.create2(index, model, (ModelObserver) this, IndexedJob.class, job).addTo(ret);
 
     if (ret.isEmpty() && reindexJobReports) {
       indexJobReports(job).addTo(ret);
@@ -1156,23 +1118,22 @@ public class IndexModelObserver implements ModelObserver {
 
   private ReturnWithExceptions<Void, ModelObserver> indexJobReports(Job job) {
     ReturnWithExceptions<Void, ModelObserver> ret = new ReturnWithExceptions<>(this);
-    StorageService storage = model.getStorage();
-    try (CloseableIterable<Resource> listResourcesUnderDirectory = storage
-      .listResourcesUnderDirectory(ModelUtils.getJobReportsStoragePath(job.getId()), true)) {
-
-      if (listResourcesUnderDirectory != null) {
-        for (Resource resource : listResourcesUnderDirectory) {
-          if (!resource.isDirectory()) {
-            try (
-              InputStream inputStream = storage.getBinary(resource.getStoragePath()).getContent().createInputStream()) {
+    try (CloseableIterable<OptionalWithCause<Report>> jobReports = model.listJobReports(job.getId())) {
+      for (OptionalWithCause<Report> report : jobReports) {
+        if (report.isPresent()) {
+          if (!model.hasDirectory(report.get())) {
+            Binary reportBinary = model.getBinary(report.get());
+            try (InputStream inputStream = reportBinary.getContent().createInputStream()) {
               Report objectFromJson = JsonUtils.getObjectFromJson(inputStream, Report.class);
               jobReportCreatedOrUpdated(objectFromJson, job).addTo(ret);
-            } catch (NotFoundException | GenericException | AuthorizationDeniedException | RequestNotValidException
-              | IOException e) {
+            } catch (GenericException | IOException e) {
               LOGGER.error("Error getting report json from binary", e);
               ret.add(e);
             }
           }
+        } else {
+          LOGGER.error("Cannot index job report", report.getCause());
+          ret.add(report.getCause());
         }
       }
     } catch (NotFoundException | GenericException | AuthorizationDeniedException | RequestNotValidException
@@ -1186,7 +1147,7 @@ public class IndexModelObserver implements ModelObserver {
 
   @Override
   public ReturnWithExceptions<Void, ModelObserver> jobDeleted(String jobId) {
-    return deleteDocumentFromIndex(Job.class, jobId);
+    return deleteDocumentFromIndex(IndexedJob.class, jobId);
   }
 
   private <T extends IsIndexed, M extends IsModelObject> ReturnWithExceptions<Void, ModelObserver> addDocumentToIndex(
@@ -1196,7 +1157,7 @@ public class IndexModelObserver implements ModelObserver {
 
   private <T extends IsIndexed, M extends IsModelObject> ReturnWithExceptions<Void, ModelObserver> addDocumentToIndex(
     Class<T> classToAdd, M instance, boolean commit) {
-    return SolrUtils.create(index, classToAdd, instance, this, commit);
+    return SolrUtils.create(index, model, classToAdd, instance, this, commit);
   }
 
   private <T extends IsIndexed> ReturnWithExceptions<Void, ModelObserver> deleteDocumentFromIndex(
@@ -1222,8 +1183,14 @@ public class IndexModelObserver implements ModelObserver {
 
   @Override
   public ReturnWithExceptions<Void, ModelObserver> jobReportCreatedOrUpdated(Report jobReport, Job cachedJob) {
-    return SolrUtils.create2(index, this, IndexedReport.class, jobReport,
+    return SolrUtils.create2(index, model, this, IndexedReport.class, jobReport,
       new JobReportCollection.Info(jobReport, cachedJob));
+  }
+
+  @Override
+  public ReturnWithExceptions<Void, ModelObserver> jobReportCreatedOrUpdated(Report jobReport, IndexedJob indexedJob) {
+    return SolrUtils.create2(index, model, this, IndexedReport.class, jobReport,
+      new JobReportCollection.Info(jobReport, indexedJob));
   }
 
   @Override
@@ -1366,7 +1333,7 @@ public class IndexModelObserver implements ModelObserver {
 
   @Override
   public ReturnWithExceptions<Void, ModelObserver> riskCreatedOrUpdated(Risk risk, int incidences, boolean commit) {
-    return SolrUtils.create2(index, (ModelObserver) this, IndexedRisk.class, risk,
+    return SolrUtils.create2(index, model, (ModelObserver) this, IndexedRisk.class, risk,
       new RiskCollection.Info(risk, incidences));
   }
 
@@ -1378,7 +1345,7 @@ public class IndexModelObserver implements ModelObserver {
   @Override
   public ReturnWithExceptions<Void, ModelObserver> riskIncidenceCreatedOrUpdated(RiskIncidence riskIncidence,
     boolean commit) {
-    return SolrUtils.create(index, RiskIncidence.class, riskIncidence, this, commit);
+    return SolrUtils.create(index, model, RiskIncidence.class, riskIncidence, this, commit);
   }
 
   @Override
@@ -1389,7 +1356,7 @@ public class IndexModelObserver implements ModelObserver {
   @Override
   public ReturnWithExceptions<Void, ModelObserver> representationInformationCreatedOrUpdated(
     RepresentationInformation ri, boolean commit) {
-    return SolrUtils.create(index, RepresentationInformation.class, ri, this, commit);
+    return SolrUtils.create2(index, model, this, RepresentationInformation.class, ri);
   }
 
   @Override
@@ -1418,7 +1385,7 @@ public class IndexModelObserver implements ModelObserver {
   public ReturnWithExceptions<Void, ModelObserver> dipCreated(DIP dip, boolean commit) {
     ReturnWithExceptions<Void, ModelObserver> ret = new ReturnWithExceptions<>(this);
 
-    SolrUtils.create2(index, (ModelObserver) this, IndexedDIP.class, dip).addTo(ret);
+    SolrUtils.create2(index, model, (ModelObserver) this, IndexedDIP.class, dip).addTo(ret);
 
     if (ret.isEmpty()) {
       // index DIP Files
@@ -1470,7 +1437,8 @@ public class IndexModelObserver implements ModelObserver {
   private ReturnWithExceptions<Void, ModelObserver> indexDIPFile(DIP dip, DIPFile file, boolean recursive) {
     ReturnWithExceptions<Void, ModelObserver> ret = new ReturnWithExceptions<>(this);
 
-    SolrUtils.create2(index, (ModelObserver) this, DIPFile.class, file, new DIPFileCollection.Info(dip)).addTo(ret);
+    SolrUtils.create2(index, model, (ModelObserver) this, DIPFile.class, file, new DIPFileCollection.Info(dip))
+      .addTo(ret);
 
     if (recursive && file.isDirectory() && ret.isEmpty()) {
       try (CloseableIterable<OptionalWithCause<DIPFile>> allFiles = model.listDIPFilesUnder(file, true)) {
@@ -1521,7 +1489,7 @@ public class IndexModelObserver implements ModelObserver {
   @Override
   public ReturnWithExceptions<Void, ModelObserver> disposalConfirmationCreateOrUpdate(
     DisposalConfirmation confirmation) {
-    return SolrUtils.create2(index, this, DisposalConfirmation.class, confirmation);
+    return SolrUtils.create2(index, model, this, DisposalConfirmation.class, confirmation);
   }
 
   @Override

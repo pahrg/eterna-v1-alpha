@@ -9,6 +9,7 @@ package org.roda.core.plugins.orchestrate.pekko;
 
 import java.util.List;
 
+import org.roda.core.RodaCoreFactory;
 import org.roda.core.common.pekko.Messages;
 import org.roda.core.common.pekko.PekkoBaseActor;
 import org.roda.core.common.pekko.messages.plugins.PluginAfterAllExecuteIsReady;
@@ -26,7 +27,7 @@ import org.roda.core.index.IndexService;
 import org.roda.core.model.ModelService;
 import org.roda.core.plugins.Plugin;
 import org.roda.core.plugins.PluginHelper;
-import org.roda.core.storage.StorageService;
+import org.roda.core.transaction.RODATransactionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,13 +36,18 @@ public class PekkoWorkerActor extends PekkoBaseActor {
 
   private final IndexService index;
   private final ModelService model;
-  private final StorageService storage;
+  private RODATransactionManager RODATransactionManager;
 
   public PekkoWorkerActor() {
     super();
-    this.storage = getStorage();
     this.model = getModel();
     this.index = getIndex();
+    try {
+      this.RODATransactionManager = getStorageTransactionManager();
+    } catch (GenericException e) {
+      LOGGER.error("Error initializing RODATransactionManager", e);
+      this.RODATransactionManager = null;
+    }
   }
 
   @Override
@@ -61,19 +67,27 @@ public class PekkoWorkerActor extends PekkoBaseActor {
     PluginExecuteIsReady message = (PluginExecuteIsReady) msg;
     List<LiteOptionalWithCause> objectsToBeProcessed = message.getList();
     message.logProcessingStarted();
-    Plugin<IsRODAObject> messagePlugin = message.getPlugin();
+    Plugin<IsRODAObject> plugin = message.getPlugin();
+
+    boolean writeIsAllowed = RodaCoreFactory.checkIfWriteIsAllowed(RodaCoreFactory.getNodeType());
+
     try {
-      messagePlugin.execute(index, model, storage, objectsToBeProcessed);
-      getSender().tell(Messages.newPluginExecuteIsDone(messagePlugin, false).withParallelism(message.getParallelism())
+      if (writeIsAllowed && RODATransactionManager != null && RODATransactionManager.isInitialized()) {
+        RODATransactionManager.runPluginInTransaction(plugin, objectsToBeProcessed);
+      } else {
+        plugin.execute(index, model, objectsToBeProcessed);
+      }
+      getSender().tell(Messages.newPluginExecuteIsDone(plugin, false).withParallelism(message.getParallelism())
         .withJobPriority(message.getJobPriority()), getSelf());
     } catch (Throwable e) {
       // 20170120 hsilva: it is required to catch Throwable as there are some
       // linking errors that only will happen during the execution (e.g.
       // java.lang.NoSuchMethodError)
       LOGGER.error("Error executing plugin.execute()", e);
-      getSender().tell(Messages.newPluginExecuteIsDone(messagePlugin, true, getErrorMessage(e))
+      getSender().tell(Messages.newPluginExecuteIsDone(plugin, true, getErrorMessage(e))
         .withParallelism(message.getParallelism()).withJobPriority(message.getJobPriority()), getSelf());
     }
+
     message.logProcessingEnded();
   }
 
@@ -97,7 +111,7 @@ public class PekkoWorkerActor extends PekkoBaseActor {
       JobParallelism parallelism = job.getParallelism();
       JobPriority priority = job.getPriority();
       try {
-        plugin.afterAllExecute(index, model, storage);
+        plugin.afterAllExecute(index, model);
         getSender().tell(
           Messages.newPluginAfterAllExecuteIsDone(plugin, false).withJobPriority(priority).withParallelism(parallelism),
           getSelf());

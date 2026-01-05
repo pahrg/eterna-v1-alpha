@@ -19,14 +19,14 @@ import org.roda.core.data.v2.index.filter.Filter;
 import org.roda.wui.client.common.actions.Actionable;
 import org.roda.wui.client.common.search.SearchFilters;
 import org.roda.wui.common.client.tools.ConfigurationManager;
+import org.roda.wui.common.client.tools.ConfigurationManager.ColumnOptionsFactory;
+import org.roda.wui.common.client.tools.ConfigurationManager.FacetFactory;
 
 import com.google.gwt.event.logical.shared.ValueChangeHandler;
 import com.google.gwt.user.cellview.client.AbstractHasData.RedrawEvent;
 import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.google.gwt.user.client.ui.DialogBox;
 import com.google.gwt.view.client.SelectionChangeEvent;
-import org.roda.wui.common.client.tools.ConfigurationManager.ColumnOptionsFactory;
-import org.roda.wui.common.client.tools.ConfigurationManager.FacetFactory;
 
 public class AsyncTableCellOptions<T extends IsIndexed> {
   private final Class<T> classToReturn;
@@ -40,6 +40,8 @@ public class AsyncTableCellOptions<T extends IsIndexed> {
   private int pageSizeIncrement;
   private Actionable<T> actionable;
   private AsyncCallback<Actionable.ActionImpact> actionableCallback;
+  private List<Actionable.Action<T>> actionWhitelist;
+  private List<Actionable.Action<T>> actionBlacklist;
   private boolean bindOpener;
   private List<AsyncTableCell.CheckboxSelectionListener<T>> checkboxSelectionListeners;
   private List<ValueChangeHandler<IndexResult<T>>> indexResultValueChangeHandlers;
@@ -64,6 +66,8 @@ public class AsyncTableCellOptions<T extends IsIndexed> {
     // set defaults
     actionable = null;
     actionableCallback = null;
+    actionWhitelist = new ArrayList<>();
+    actionBlacklist = new ArrayList<>();
     filter = SearchFilters.allFilter();
     justActive = false;
     facets = FacetFactory.getFacets(listId);
@@ -96,6 +100,16 @@ public class AsyncTableCellOptions<T extends IsIndexed> {
 
   public AsyncTableCellOptions<T> withActionable(Actionable<T> actionable) {
     this.actionable = actionable;
+    return this;
+  }
+
+  public AsyncTableCellOptions<T> withActionWhitelist(List<Actionable.Action<T>> actionWhitelist) {
+    this.actionWhitelist = actionWhitelist;
+    return this;
+  }
+
+  public AsyncTableCellOptions<T> withActionBlacklist(List<Actionable.Action<T>> actionBlacklist) {
+    this.actionBlacklist = actionBlacklist;
     return this;
   }
 
@@ -221,6 +235,14 @@ public class AsyncTableCellOptions<T extends IsIndexed> {
 
   public Actionable<T> getActionable() {
     return actionable;
+  }
+
+  public List<Actionable.Action<T>> getActionWhitelist() {
+    return actionWhitelist;
+  }
+
+  public List<Actionable.Action<T>> getActionBlacklist() {
+    return actionBlacklist;
   }
 
   public boolean isBindOpener() {

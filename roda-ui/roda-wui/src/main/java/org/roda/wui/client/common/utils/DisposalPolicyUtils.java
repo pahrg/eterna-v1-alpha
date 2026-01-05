@@ -8,11 +8,13 @@
 package org.roda.wui.client.common.utils;
 
 import java.util.Date;
+import java.util.List;
 
+import org.roda.core.data.v2.disposal.schedule.DisposalActionCode;
+import org.roda.core.data.v2.disposal.schedule.RetentionPeriodCalculation;
 import org.roda.core.data.v2.ip.AIPState;
 import org.roda.core.data.v2.ip.IndexedAIP;
-import org.roda.core.data.v2.ip.disposal.DisposalActionCode;
-import org.roda.core.data.v2.ip.disposal.RetentionPeriodCalculation;
+import org.roda.wui.client.common.labels.Tag;
 import org.roda.wui.common.client.tools.Humanize;
 
 import com.google.gwt.core.client.GWT;
@@ -49,6 +51,33 @@ public class DisposalPolicyUtils {
     return SafeHtmlUtils.EMPTY_SAFE_HTML;
   }
 
+  public static Tag getDisposalPolicySummaryTag(IndexedAIP aip) {
+    if (AIPState.ACTIVE.equals(aip.getState())) {
+      DisposalPolicySummary summary = getDisposalPolicySummaryForActiveAIP(aip);
+      switch (summary.getPolicyStatus()) {
+        case DESTROY:
+        case CONFIRMATION:
+        case OVERDUE:
+        case ERROR:
+          return Tag.fromText(summary.getMessage(), List.of(Tag.TagStyle.DANGER_LIGHT, Tag.TagStyle.MONO));
+        case REVIEW:
+          return Tag.fromText(summary.getMessage(), List.of(Tag.TagStyle.MONO, Tag.TagStyle.WARNING_LIGHT));
+        case HOLD:
+          return Tag.fromText(summary.getMessage(), List.of(Tag.TagStyle.MONO, Tag.TagStyle.NEUTRAL));
+        case RETAIN:
+          return Tag.fromText(summary.getMessage(), List.of(Tag.TagStyle.MONO, Tag.TagStyle.SUCCESS));
+        case NONE:
+        default:
+          return null;
+      }
+    } else if (AIPState.DESTROYED.equals(aip.getState())) {
+      String message = messages.disposalPolicyDestroyedAIPSummary(Humanize.formatDate(aip.getDestroyedOn()));
+      return Tag.fromText(message, List.of(Tag.TagStyle.DANGER_LIGHT, Tag.TagStyle.MONO));
+    }
+
+    return null;
+  }
+
   public static String getDisposalPolicySummaryText(IndexedAIP aip) {
     if (AIPState.ACTIVE.equals(aip.getState())) {
       return getDisposalPolicySummaryForActiveAIP(aip).getMessage();
@@ -79,9 +108,10 @@ public class DisposalPolicyUtils {
       } else if (aip.getDisposalScheduleId() != null) {
         return onSchedule(aip);
       }
+      else {
+        return new DisposalPolicySummary(DisposalPolicySummary.PolicyStatus.NONE, messages.disposalPolicyNoneSummary());
+      }
     }
-
-    return new DisposalPolicySummary();
   }
 
   private static DisposalPolicySummary onSchedule(IndexedAIP aip) {

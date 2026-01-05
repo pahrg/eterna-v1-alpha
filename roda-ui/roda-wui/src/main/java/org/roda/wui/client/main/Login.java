@@ -18,7 +18,6 @@ import org.roda.core.data.exceptions.AuthenticationDeniedException;
 import org.roda.core.data.exceptions.EmailUnverifiedException;
 import org.roda.core.data.exceptions.InactiveUserException;
 import org.roda.core.data.v2.notifications.NotificationState;
-import org.roda.core.data.v2.notifications.Notification;
 import org.roda.core.data.v2.user.User;
 import org.roda.wui.client.common.NoAsyncCallback;
 import org.roda.wui.client.common.UserLogin;
@@ -26,7 +25,7 @@ import org.roda.wui.client.common.dialogs.Dialogs;
 import org.roda.wui.client.common.utils.JavascriptUtils;
 import org.roda.wui.client.management.RecoverLogin;
 import org.roda.wui.client.management.Register;
-import org.roda.wui.client.management.UserManagementService;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.client.welcome.Welcome;
 import org.roda.wui.common.client.ClientLogger;
 import org.roda.wui.common.client.HistoryResolver;
@@ -43,6 +42,7 @@ import com.google.gwt.i18n.client.LocaleInfo;
 import com.google.gwt.uibinder.client.UiBinder;
 import com.google.gwt.uibinder.client.UiField;
 import com.google.gwt.uibinder.client.UiHandler;
+import com.google.gwt.user.client.Window;
 import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.google.gwt.user.client.ui.Button;
 import com.google.gwt.user.client.ui.Composite;
@@ -97,6 +97,8 @@ public class Login extends Composite {
   private static final ClientMessages messages = GWT.create(ClientMessages.class);
   private boolean registerDisabled = ConfigurationManager.getBoolean(false, RodaConstants.USER_REGISTRATION_DISABLED);
   private Boolean casActive = ConfigurationManager.getBoolean(false, RodaConstants.UI_SERVICE_CAS_ACTIVE);
+  private Boolean multiMethodAuthenticationActive = ConfigurationManager.getBoolean(false,
+    RodaConstants.UI_SERVICE_MULTI_METHOD_AUTHENTICATION_ACTIVE);
   @SuppressWarnings("unused")
   private ClientLogger logger = new ClientLogger(getClass().getName());
 
@@ -124,6 +126,12 @@ public class Login extends Composite {
   @UiField
   FlowPanel loggedInPanel;
 
+  @UiField(provided = true)
+  UpSalePanel casMessagePanel;
+
+  @UiField
+  FlowPanel mmaPanel;
+
   @UiField
   InlineHTML loggedInMessage;
   @UiField
@@ -137,6 +145,26 @@ public class Login extends Composite {
   private Login() {
     initWidget(uiBinder.createAndBindUi(this));
 
+    if (casActive) {
+      casMessagePanel.setVisible(false);
+    }
+
+    if (multiMethodAuthenticationActive) {
+      mmaPanel.setVisible(true);
+      List<String> methods = ConfigurationManager
+        .getStringList(RodaConstants.UI_SERVICE_MULTI_METHOD_AUTHENTICATION_LIST);
+      for (String method : methods) {
+        String label = ConfigurationManager.getString(RodaConstants.UI_SERVICE_MULTI_METHOD_AUTHENTICATION_LIST, method,
+          "label");
+        String path = ConfigurationManager.getString(RodaConstants.UI_SERVICE_MULTI_METHOD_AUTHENTICATION_LIST, method,
+          "path");
+        Button authMethodBtn = new Button(label);
+        authMethodBtn.addStyleName("btn btn-block btn-play");
+        authMethodBtn.addClickHandler(clickEvent -> Window.Location.assign(path));
+        mmaPanel.add(authMethodBtn);
+      }
+    }
+
     addAttachHandler(new AttachEvent.Handler() {
       @Override
       public void onAttachOrDetach(AttachEvent event) {
@@ -145,7 +173,6 @@ public class Login extends Composite {
         }
       }
     });
-
   }
 
   public void resolve(List<String> historyTokens, AsyncCallback<Widget> callback) {
@@ -213,12 +240,12 @@ public class Login extends Composite {
 
   @UiHandler("resendEmail")
   void handleResendEmail(final ClickEvent e) {
-
-    UserManagementService.Util.getInstance().sendEmailVerification(username.getText(), true,
-      LocaleInfo.getCurrentLocale().getLocaleName(), new AsyncCallback<Notification>() {
-
-        @Override
-        public void onSuccess(final Notification result) {
+    Services services = new Services("Resend email", "resend");
+    services
+      .membersResource(
+        s -> s.sendEmailVerification(username.getText(), LocaleInfo.getCurrentLocale().getLocaleName()))
+      .whenComplete((result, error) -> {
+        if (result != null) {
           if (result.getState() == NotificationState.COMPLETED) {
             Dialogs.showInformationDialog(messages.loginResendEmailSuccessDialogTitle(),
               messages.loginResendEmailSuccessDialogMessage(), messages.loginResendEmailSuccessDialogButton(), false,
@@ -250,10 +277,7 @@ public class Login extends Composite {
                 }
               });
           }
-        }
-
-        @Override
-        public void onFailure(final Throwable caught) {
+        } else if (error != null) {
           Toast.showError(messages.loginResendEmailVerificationFailure());
         }
       });

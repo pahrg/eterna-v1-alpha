@@ -1,6 +1,5 @@
 package org.roda.wui.client.redact;
 
-import com.google.gwt.core.client.GWT;
 import com.google.gwt.dom.client.Element;
 import elemental2.dom.Blob;
 import jsinterop.annotations.JsFunction;

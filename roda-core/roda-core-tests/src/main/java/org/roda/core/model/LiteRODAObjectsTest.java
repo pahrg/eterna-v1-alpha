@@ -7,9 +7,9 @@
  */
 package org.roda.core.model;
 
-import static org.testng.AssertJUnit.fail;
 import static org.testng.AssertJUnit.assertEquals;
 import static org.testng.AssertJUnit.assertTrue;
+import static org.testng.AssertJUnit.fail;
 
 import java.net.URL;
 import java.nio.file.Path;
@@ -55,9 +55,9 @@ import org.roda.core.data.v2.user.User;
 import org.roda.core.data.v2.validation.ValidationException;
 import org.roda.core.index.IndexService;
 import org.roda.core.index.IndexTestUtils;
-import org.roda.core.model.utils.ModelUtils;
 import org.roda.core.plugins.EARKSIPPluginsTest;
 import org.roda.core.plugins.base.characterization.PremisSkeletonPlugin;
+import org.roda.core.security.LdapUtilityTestHelper;
 import org.roda.core.storage.DefaultStoragePath;
 import org.roda.core.storage.StorageService;
 import org.roda.core.storage.StringContentPayload;
@@ -78,11 +78,13 @@ public class LiteRODAObjectsTest {
   private static Path basePath;
   private static ModelService model;
   private static IndexService index;
+  private static LdapUtilityTestHelper ldapUtilityTestHelper;
   private static StorageService corporaService;
 
   @BeforeClass
   public void setUp() throws Exception {
     basePath = TestsHelper.createBaseTempDir(getClass(), true);
+    ldapUtilityTestHelper = new LdapUtilityTestHelper();
 
     boolean deploySolr = true;
     boolean deployLdap = true;
@@ -91,7 +93,7 @@ public class LiteRODAObjectsTest {
     boolean deployPluginManager = true;
     boolean deployDefaultResources = false;
     RodaCoreFactory.instantiateTest(deploySolr, deployLdap, deployFolderMonitor, deployOrchestrator,
-      deployPluginManager, deployDefaultResources, false);
+      deployPluginManager, deployDefaultResources, false, ldapUtilityTestHelper.getLdapUtility());
     model = RodaCoreFactory.getModelService();
     index = RodaCoreFactory.getIndexService();
 
@@ -105,6 +107,7 @@ public class LiteRODAObjectsTest {
   @AfterClass
   public void tearDown() throws Exception {
     IndexTestUtils.resetIndex();
+    ldapUtilityTestHelper.shutdown();
     RodaCoreFactory.shutdown();
     FSUtils.deletePath(basePath);
   }
@@ -135,7 +138,7 @@ public class LiteRODAObjectsTest {
       new StringContentPayload(""), RodaConstants.ADMIN, true);
     index.commit(IndexedFile.class);
 
-    RodaCoreFactory.getStorageService().deleteResource(ModelUtils.getFileStoragePath(file));
+    model.deleteFile(file, "", true);
     Filter filter = new Filter(new EmptyKeyFilterParameter(RodaConstants.FILE_HASH));
 
     try {

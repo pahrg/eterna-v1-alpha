@@ -14,8 +14,8 @@ import org.apache.pekko.actor.ActorRef;
 import org.apache.pekko.actor.Props;
 import org.apache.pekko.actor.Terminated;
 import org.apache.pekko.routing.RoundRobinPool;
-import org.roda.core.common.pekko.PekkoBaseActor;
 import org.roda.core.common.pekko.Messages;
+import org.roda.core.common.pekko.PekkoBaseActor;
 import org.roda.core.common.pekko.messages.AbstractMessage;
 import org.roda.core.common.pekko.messages.jobs.JobCleanup;
 import org.roda.core.common.pekko.messages.jobs.JobInfoUpdated;
@@ -36,6 +36,7 @@ import org.roda.core.data.exceptions.RequestNotValidException;
 import org.roda.core.data.v2.IsRODAObject;
 import org.roda.core.data.v2.index.select.SelectedItems;
 import org.roda.core.data.v2.index.select.SelectedItemsList;
+import org.roda.core.data.v2.jobs.IndexedJob;
 import org.roda.core.data.v2.jobs.Job;
 import org.roda.core.data.v2.jobs.Job.JOB_STATE;
 import org.roda.core.data.v2.jobs.JobParallelism;
@@ -58,22 +59,22 @@ import com.google.common.collect.Iterables;
 public class PekkoJobStateInfoActor extends PekkoBaseActor {
   private static final Logger LOGGER = LoggerFactory.getLogger(PekkoJobStateInfoActor.class);
 
-  private JobInfo jobInfo;
-  private Plugin<?> plugin;
-  private ActorRef jobCreator;
-  private ActorRef jobsManager;
-  private ActorRef workersRouter;
-  private ActorRef backgroundWorkersRouter;
+  private final JobInfo jobInfo;
+  private final Plugin<?> plugin;
+  private final ActorRef jobCreator;
+  private final ActorRef jobsManager;
+  private final ActorRef workersRouter;
+  private final ActorRef backgroundWorkersRouter;
   boolean stopping = false;
   boolean errorDuringBeforeAll = false;
-  private String jobId;
+  private final String jobId;
 
   // metrics
   // private Map<String, Histogram> stateMessagesMetrics;
-  private Histogram stateMessagesMetricsHistogram;
+  private final Histogram stateMessagesMetricsHistogram;
 
   public PekkoJobStateInfoActor(Plugin<?> plugin, ActorRef jobCreator, ActorRef jobsManager, String jobId,
-                                int numberOfJobsWorkers, int numberOfLimitedJobsWorkers) {
+    int numberOfJobsWorkers, int numberOfLimitedJobsWorkers) {
     super();
     jobInfo = new JobInfo();
     this.plugin = plugin;
@@ -138,7 +139,7 @@ public class PekkoJobStateInfoActor extends PekkoBaseActor {
     Plugin<?> p = message.getPlugin() == null ? this.plugin : message.getPlugin();
     JobParallelism parallelism = null;
     try {
-      Job job = PluginHelper.getJob(p, getIndex());
+      IndexedJob job = PluginHelper.getIndexedJob(p, getIndex());
       parallelism = job.getParallelism();
       LOGGER.info("Setting job '{}' ({}) state to {}. Details: {}", job.getName(), job.getId(), message.getState(),
         message.getStateDetails().orElse("NO DETAILS"));
@@ -275,7 +276,7 @@ public class PekkoJobStateInfoActor extends PekkoBaseActor {
     PluginBeforeAllExecuteIsReady message = (PluginBeforeAllExecuteIsReady) msg;
     markMessageProcessingAsStarted(message);
     try {
-      message.getPlugin().beforeAllExecute(getIndex(), getModel(), getStorage());
+      message.getPlugin().beforeAllExecute(getIndex(), getModel());
       // do nothing because if all goes good, the next messages are of type
       // PluginExecuteIsReady
     } catch (Throwable e) {
@@ -339,8 +340,8 @@ public class PekkoJobStateInfoActor extends PekkoBaseActor {
     try {
       LOGGER.info("Doing job cleanup");
       IndexService indexService = getIndex();
-      Job job = PluginHelper.getJob(plugin, indexService);
-      JobsHelper.cleanJobObjects(job, super.getModel(), indexService);
+      IndexedJob job = PluginHelper.getIndexedJob(plugin, indexService);
+      JobsHelper.cleanJobObjects(job.getId(), super.getModel(), indexService);
       LOGGER.info("Ended doing job cleanup");
     } catch (NotFoundException | GenericException | RequestNotValidException e) {
       LOGGER.error("Unable to get Job for doing cleanup", e);
@@ -359,7 +360,7 @@ public class PekkoJobStateInfoActor extends PekkoBaseActor {
 
   private long calculateJobDuration(Plugin<?> p) {
     try {
-      Job job = PluginHelper.getJob(p, getIndex());
+      IndexedJob job = PluginHelper.getIndexedJob(p, getIndex());
       return job.getEndDate().getTime() - job.getStartDate().getTime();
     } catch (NotFoundException | GenericException | RequestNotValidException e) {
       return 0;
@@ -368,7 +369,7 @@ public class PekkoJobStateInfoActor extends PekkoBaseActor {
 
   private JobStats getJobStatsFromPlugin(Plugin<?> p) {
     try {
-      Job job = PluginHelper.getJob(p, getIndex());
+      IndexedJob job = PluginHelper.getIndexedJob(p, getIndex());
       return job.getJobStats();
     } catch (NotFoundException | GenericException | RequestNotValidException e) {
       LOGGER.warn("Failed to obtain JobStats to update the metrics: {}", e.getMessage(), e);

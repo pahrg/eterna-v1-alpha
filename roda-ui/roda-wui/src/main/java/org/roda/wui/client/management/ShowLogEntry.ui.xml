@@ -19,6 +19,12 @@
 								<g:Label styleName="value" ui:field="logIdValue" />
 							</g:FlowPanel>
 							<g:FlowPanel styleName="field">
+								<g:Label styleName="label" ui:field="logReasonLabel">
+									<ui:text from='{messages.logEntryReason}' />
+								</g:Label>
+								<g:Label styleName="value" ui:field="logReasonValue" />
+							</g:FlowPanel>
+							<g:FlowPanel styleName="field">
 								<g:Label styleName="label" ui:field="logInstanceIdLabel">
 									<ui:text from='{messages.logEntryInstanceId}' />
 								</g:Label>
@@ -77,6 +83,10 @@
 									<ui:text from='{messages.logEntryState}' />
 								</g:Label>
 								<g:HTML styleName="value" ui:field="logStateValue" />
+							</g:FlowPanel>
+							<g:FlowPanel>
+								<g:SimplePanel ui:field="expandedAuditLogs" />
+								<g:SimplePanel ui:field="expandedAuditLogsList" />
 							</g:FlowPanel>
 						</g:FlowPanel>
 					</g:FlowPanel>

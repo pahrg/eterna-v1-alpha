@@ -11,39 +11,55 @@
 package org.roda.wui.client.browse;
 
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 import org.roda.core.data.common.RodaConstants;
+import org.roda.core.data.v2.generics.LongResponse;
+import org.roda.core.data.v2.index.CountRequest;
+import org.roda.core.data.v2.index.IndexedFileRequest;
 import org.roda.core.data.v2.index.filter.Filter;
 import org.roda.core.data.v2.index.filter.SimpleFilterParameter;
 import org.roda.core.data.v2.ip.AIPState;
+import org.roda.core.data.v2.ip.IndexedAIP;
 import org.roda.core.data.v2.ip.IndexedDIP;
 import org.roda.core.data.v2.ip.IndexedFile;
-import org.roda.wui.client.browse.bundle.BrowseFileBundle;
+import org.roda.core.data.v2.ip.IndexedRepresentation;
+import org.roda.core.data.v2.ip.metadata.IndexedPreservationEvent;
+import org.roda.core.data.v2.ip.metadata.TechnicalMetadataInfos;
+import org.roda.core.data.v2.risks.RiskIncidence;
+import org.roda.wui.client.browse.tabs.BrowseFileTabs;
+import org.roda.wui.client.common.BrowseFileActionsToolbar;
 import org.roda.wui.client.common.NavigationToolbar;
+import org.roda.wui.client.common.NoAsyncCallback;
+import org.roda.wui.client.common.TitlePanel;
 import org.roda.wui.client.common.UserLogin;
 import org.roda.wui.client.common.actions.Actionable;
-import org.roda.wui.client.common.slider.SliderPanel;
-import org.roda.wui.client.common.slider.Sliders;
+import org.roda.wui.client.common.cards.FileDisseminationCardList;
+import org.roda.wui.client.common.model.BrowseFileResponse;
 import org.roda.wui.client.common.utils.AsyncCallbackUtils;
+import org.roda.wui.client.services.ConfigurationRestService;
+import org.roda.wui.client.services.FileRestService;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.ClientLogger;
 import org.roda.wui.common.client.HistoryResolver;
+import org.roda.wui.common.client.tools.DescriptionLevelUtils;
 import org.roda.wui.common.client.tools.HistoryUtils;
 import org.roda.wui.common.client.tools.ListUtils;
 import org.roda.wui.common.client.widgets.Toast;
 import org.roda.wui.common.client.widgets.wcag.AccessibleFocusPanel;
-import org.roda.wui.common.client.widgets.wcag.WCAGUtilities;
 
 import com.google.gwt.core.client.GWT;
-import com.google.gwt.core.client.Scheduler;
 import com.google.gwt.dom.client.Element;
+import com.google.gwt.i18n.client.LocaleInfo;
 import com.google.gwt.uibinder.client.UiBinder;
 import com.google.gwt.uibinder.client.UiField;
-import com.google.gwt.user.client.Command;
 import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.google.gwt.user.client.ui.Composite;
 import com.google.gwt.user.client.ui.FlowPanel;
+import com.google.gwt.user.client.ui.FocusPanel;
 import com.google.gwt.user.client.ui.Widget;
 
 import config.i18n.client.ClientMessages;
@@ -58,19 +74,16 @@ public class BrowseFile extends Composite {
 
     @Override
     public void resolve(final List<String> historyTokens, final AsyncCallback<Widget> callback) {
-      BrowserService.Util.getInstance().retrieveViewersProperties(new AsyncCallback<Viewers>() {
-
-        @Override
-        public void onSuccess(Viewers viewers) {
-          load(viewers, historyTokens, callback);
-        }
-
-        @Override
-        public void onFailure(Throwable caught) {
-          Toast.showError(caught);
-          errorRedirect(callback);
-        }
-      });
+      Services services = new Services("Retrieve viewers configuration", "get");
+      services.configurationsResource(ConfigurationRestService::retrieveViewersProperties)
+        .whenComplete((viewers, throwable) -> {
+          if (throwable != null) {
+            Toast.showError(throwable);
+            errorRedirect(callback);
+          } else {
+            load(viewers, historyTokens, callback);
+          }
+        });
     }
 
     @Override
@@ -95,20 +108,87 @@ public class BrowseFile extends Composite {
         final List<String> historyFilePath = new ArrayList<>(historyTokens.subList(2, historyTokens.size() - 1));
         final String historyFileId = historyTokens.get(historyTokens.size() - 1);
 
-        BrowserService.Util.getInstance().retrieveBrowseFileBundle(historyAipId, historyRepresentationId,
-          historyFilePath, historyFileId, Collections.emptyList(), new AsyncCallback<BrowseFileBundle>() {
+        Services services = new Services("Retrieve File", "get");
+        IndexedFileRequest request = new IndexedFileRequest();
+        request.setAipId(historyAipId);
+        request.setRepresentationId(historyRepresentationId);
+        request.setDirectoryPaths(historyFilePath);
+        request.setFileId(historyFileId);
+        services.fileResource(s -> s.retrieveIndexedFileViaRequest(request)).whenComplete((indexedFile, throwable) -> {
+          if (throwable != null) {
+            AsyncCallbackUtils.defaultFailureTreatment(throwable);
+          } else {
+            Filter riskIncidenceFilter = new Filter(
+              new SimpleFilterParameter(RodaConstants.RISK_INCIDENCE_FILE_ID, indexedFile.getId()));
+            CountRequest riskIncidenceCountRequest = new CountRequest(riskIncidenceFilter, true);
+            CompletableFuture<LongResponse> riskCounterCompletableFuture = services
+              .rodaEntityRestService(s -> s.count(riskIncidenceCountRequest), RiskIncidence.class)
+              .handle((longResponse, throwable1) -> {
+                if (throwable1 != null) {
+                  return new LongResponse(-1L);
+                }
+                return longResponse;
+              });
 
-            @Override
-            public void onFailure(Throwable caught) {
-              AsyncCallbackUtils.defaultFailureTreatment(caught);
-            }
+            Filter preservationEventFilter = new Filter(
+              new SimpleFilterParameter(RodaConstants.PRESERVATION_EVENT_FILE_UUID, indexedFile.getUUID()));
+            CountRequest preservationEventsCountRequest = new CountRequest(preservationEventFilter, true);
 
-            @Override
-            public void onSuccess(final BrowseFileBundle bundle) {
-              instance = new BrowseFile(viewers, bundle);
-              callback.onSuccess(instance);
-            }
-          });
+            CompletableFuture<LongResponse> preservationCounterCompletableFuture = services
+              .rodaEntityRestService(s -> s.count(preservationEventsCountRequest), IndexedPreservationEvent.class)
+              .handle((longResponse, throwable2) -> {
+                if (throwable2 != null) {
+                  return new LongResponse(-1L);
+                }
+                return longResponse;
+              });
+
+            Filter dipsFilter = new Filter(
+              new SimpleFilterParameter(RodaConstants.DIP_FILE_UUIDS, indexedFile.getUUID()));
+            CountRequest dipsCountRequest = new CountRequest(dipsFilter, true);
+            CompletableFuture<LongResponse> dipCounterCompletableFuture = services
+              .rodaEntityRestService(s -> s.count(dipsCountRequest), IndexedDIP.class)
+              .handle((longResponse, throwable3) -> {
+                if (throwable3 != null) {
+                  return new LongResponse(-1L);
+                }
+                return longResponse;
+              });
+
+            CompletableFuture<IndexedAIP> retrieveAIPCompletableFuture = services.rodaEntityRestService(
+              s -> s.findByUuid(indexedFile.getAipId(), LocaleInfo.getCurrentLocale().getLocaleName()),
+              IndexedAIP.class);
+
+            CompletableFuture<IndexedRepresentation> retrieveRepresentationCompletableFuture = services
+              .rodaEntityRestService(
+                s -> s.findByUuid(indexedFile.getRepresentationUUID(), LocaleInfo.getCurrentLocale().getLocaleName()),
+                IndexedRepresentation.class);
+
+            CompletableFuture<List<String>> getRepresentationInformationFields = services
+              .fileResource(FileRestService::retrieveFileRuleProperties);
+
+            CompletableFuture<TechnicalMetadataInfos> retrieveTechnicalMetadataCompletableFuture = services
+              .fileResource(s -> s.retrieveTechnicalMetadataInfos(indexedFile.getUUID(),
+                LocaleInfo.getCurrentLocale().getLocaleName()));
+
+            CompletableFuture.allOf(riskCounterCompletableFuture, preservationCounterCompletableFuture,
+              dipCounterCompletableFuture, retrieveAIPCompletableFuture, retrieveRepresentationCompletableFuture,
+              retrieveTechnicalMetadataCompletableFuture).thenApply(unused -> {
+                BrowseFileResponse response = new BrowseFileResponse();
+                response.setIndexedAIP(retrieveAIPCompletableFuture.join());
+                response.setIndexedRepresentation(retrieveRepresentationCompletableFuture.join());
+                response.setRiskCounterResponse(riskCounterCompletableFuture.join());
+                response.setDipCounterResponse(dipCounterCompletableFuture.join());
+                response.setPreservationCounterResponse(preservationCounterCompletableFuture.join());
+                response.setRepresentationInformationFields(getRepresentationInformationFields.join());
+                response.setTechnicalMetadataInfos(retrieveTechnicalMetadataCompletableFuture.join());
+                return response;
+              }).whenComplete((response, caught) -> {
+                instance = new BrowseFile(viewers, response, indexedFile, services);
+                callback.onSuccess(instance);
+              });
+          }
+        });
       } else {
         errorRedirect(callback);
       }
@@ -128,84 +208,98 @@ public class BrowseFile extends Composite {
 
   private static BrowseFile instance = null;
 
-  private SliderPanel disseminationsSlider;
-
   private ClientLogger logger = new ClientLogger(getClass().getName());
 
   @UiField
   AccessibleFocusPanel keyboardFocus;
 
-  @UiField(provided = true)
-  IndexedFilePreview filePreview;
-
-  @UiField
-  FlowPanel center;
-
   @UiField
   NavigationToolbar<IndexedFile> navigationToolbar;
 
-  public BrowseFile(Viewers viewers, final BrowseFileBundle bundle) {
-    final boolean justActive = AIPState.ACTIVE.equals(bundle.getAip().getState());
-    // initialize preview
-    filePreview = new IndexedFilePreview(viewers, bundle.getFile(), bundle.isAvailable(), justActive,
-      bundle.getAip().getPermissions(), new Command() {
+  @UiField
+  BrowseFileActionsToolbar objectToolbar;
 
-        @Override
-        public void execute() {
-          Scheduler.get().scheduleDeferred(new Command() {
-            @Override
-            public void execute() {
-              Filter filter = new Filter(
-                new SimpleFilterParameter(RodaConstants.DIP_FILE_UUIDS, bundle.getFile().getUUID()));
-              BrowserService.Util.getInstance().count(IndexedDIP.class.getName(), filter, justActive,
-                new AsyncCallback<Long>() {
+  @UiField
+  FocusPanel sidePanel;
 
-                  @Override
-                  public void onFailure(Throwable caught) {
-                    AsyncCallbackUtils.defaultFailureTreatment(caught);
-                  }
+  @UiField
+  FlowPanel disseminationCards;
 
-                  @Override
-                  public void onSuccess(Long dipCount) {
-                    if (dipCount > 0) {
-                      disseminationsSlider.open();
-                    }
-                  }
-                });
-            }
-          });
-        }
-      });
+  @UiField
+  BrowseFileTabs browseTab;
 
+  @UiField
+  TitlePanel title;
+
+  private final Map<Actionable.ActionImpact, Runnable> handlers;
+  private AsyncCallback<Actionable.ActionImpact> handler = new NoAsyncCallback<Actionable.ActionImpact>() {
+    @Override
+    public void onSuccess(Actionable.ActionImpact result) {
+      if (handlers.containsKey(result)) {
+        handlers.get(result).run();
+      }
+    }
+  };
+  private String aipId;
+  private String repId;
+
+  public BrowseFile(Viewers viewers, final BrowseFileResponse response, IndexedFile indexedFile, Services services) {
+    final boolean justActive = AIPState.ACTIVE.equals(response.getIndexedAIP().getState());
     // initialize widget
     initWidget(uiBinder.createAndBindUi(this));
 
-    navigationToolbar.withObject(bundle.getFile()).withPermissions(bundle.getAip().getPermissions())
-      .withActionImpactHandler(Actionable.ActionImpact.DESTROYED, () -> {
-        HistoryUtils.newHistory(BrowseRepresentation.RESOLVER, bundle.getFile().getAipId(),
-          bundle.getFile().getRepresentationId());
-      }).build();
-    navigationToolbar.updateBreadcrumb(bundle);
+    navigationToolbar.withObject(indexedFile).withPermissions(response.getIndexedAIP().getPermissions())
+      .withActionImpactHandler(Actionable.ActionImpact.DESTROYED, () -> HistoryUtils
+        .newHistory(BrowseRepresentation.RESOLVER, indexedFile.getAipId(), indexedFile.getRepresentationId()))
+      .build();
+    navigationToolbar.updateBreadcrumb(response.getIndexedAIP(), response.getIndexedRepresentation(), indexedFile);
 
-    // STATUS
-    this.addStyleName(bundle.getAip().getState().toString().toLowerCase());
+    handlers = new HashMap<>();
 
-    // bind slider buttons
-    disseminationsSlider = Sliders.createDisseminationsSlider(center, navigationToolbar.getDisseminationsButton(),
-      bundle.getFile());
-    Sliders.createFileInfoSlider(center, navigationToolbar.getInfoSidebarButton(), bundle);
-    navigationToolbar.getDisseminationsButton().setVisible(bundle.getDipCount() > 0);
+    aipId = indexedFile.getAipId();
+    repId = indexedFile.getRepresentationId();
+    initHandlers();
+
+    // TITLE
+    this.title.setIcon(
+      DescriptionLevelUtils.getElementLevelIconSafeHtml(DescriptionLevelUtils.getFileLevel(indexedFile), false));
+    this.title.setText(indexedFile.getId());
+
+    // TOOLBAR
+    this.objectToolbar.setObjectAndBuild(indexedFile, response.getIndexedAIP().getState(),
+      response.getIndexedAIP().getPermissions(), handler);
+
+    // SIDEBAR
+    Filter filter = new Filter(new SimpleFilterParameter(RodaConstants.DIP_FILE_UUIDS, indexedFile.getUUID()));
+    services.rodaEntityRestService(s -> s.count(new CountRequest(filter, justActive)), IndexedDIP.class)
+      .whenComplete((longResponse, caught) -> {
+        if (caught != null) {
+          AsyncCallbackUtils.defaultFailureTreatment(caught);
+        } else {
+          if (longResponse.getResult() > 0) {
+            this.disseminationCards.add(new FileDisseminationCardList(response.getIndexedAIP().getId(),
+              response.getIndexedRepresentation().getId(), indexedFile.getId(), indexedFile.getUUID()));
+          } else {
+            this.sidePanel.setVisible(false);
+          }
+        }
+      });
+
+    // TABS
+    browseTab.init(viewers, indexedFile, response, services);
 
     keyboardFocus.setFocus(true);
 
-    this.addStyleName("browse");
-    this.addStyleName("browse-file");
+    this.keyboardFocus.addStyleName("browse browse-file browse_main_panel");
 
-    Element firstElement = this.getElement().getFirstChildElement();
+    Element firstElement = this.keyboardFocus.getElement().getFirstChildElement();
     if ("input".equalsIgnoreCase(firstElement.getTagName())) {
       firstElement.setAttribute("title", "browse input");
     }
+  }
 
-    WCAGUtilities.getInstance().makeAccessible(center.getElement());
+  private void initHandlers() {
+    this.handlers.put(Actionable.ActionImpact.DESTROYED,
+      () -> HistoryUtils.newHistory(BrowseRepresentation.RESOLVER, aipId, repId));
   }
 }

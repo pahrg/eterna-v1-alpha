@@ -7,6 +7,7 @@
  */
 package org.roda.core.data.v2.ip;
 
+import java.io.Serial;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -14,10 +15,11 @@ import java.util.Objects;
 
 import org.roda.core.data.common.RodaConstants;
 import org.roda.core.data.v2.IsModelObject;
-import org.roda.core.data.v2.ip.disposal.aipMetadata.DisposalAIPMetadata;
-import org.roda.core.data.v2.ip.disposal.aipMetadata.DisposalHoldAIPMetadata;
-import org.roda.core.data.v2.ip.disposal.aipMetadata.DisposalTransitiveHoldAIPMetadata;
+import org.roda.core.data.v2.disposal.metadata.DisposalAIPMetadata;
+import org.roda.core.data.v2.disposal.metadata.DisposalHoldAIPMetadata;
+import org.roda.core.data.v2.disposal.metadata.DisposalTransitiveHoldAIPMetadata;
 import org.roda.core.data.v2.ip.metadata.DescriptiveMetadata;
+import org.roda.core.data.v2.ip.metadata.TechnicalMetadata;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -26,6 +28,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class AIP implements IsModelObject, HasId, HasState, HasPermissions, HasDisposal, HasInstanceID {
 
+  @Serial
   private static final long serialVersionUID = 430629679119752757L;
   private static final int VERSION = 1;
 
@@ -63,15 +66,13 @@ public class AIP implements IsModelObject, HasId, HasState, HasPermissions, HasD
   }
 
   public AIP(String id, String parentId, String type, AIPState state, Permissions permissions) {
-    this(id, parentId, type, null, state, permissions, new ArrayList<DescriptiveMetadata>(),
-      new ArrayList<Representation>(), new AIPFormat(), new ArrayList<Relationship>(), new Date(), null, new Date(),
-      null, new DisposalAIPMetadata());
+    this(id, parentId, type, null, state, permissions, new ArrayList<>(), new ArrayList<>(), new AIPFormat(),
+      new ArrayList<>(), new Date(), null, new Date(), null, new DisposalAIPMetadata());
   }
 
   public AIP(String id, String parentId, String type, AIPState state, Permissions permissions, String createdBy) {
-    this(id, parentId, type, null, state, permissions, new ArrayList<DescriptiveMetadata>(),
-      new ArrayList<Representation>(), new AIPFormat(), new ArrayList<Relationship>(), new Date(), createdBy,
-      new Date(), createdBy, new DisposalAIPMetadata());
+    this(id, parentId, type, null, state, permissions, new ArrayList<>(), new ArrayList<>(), new AIPFormat(),
+      new ArrayList<>(), new Date(), createdBy, new Date(), createdBy, new DisposalAIPMetadata());
   }
 
   public AIP(String id, String parentId, String type, String instanceId, AIPState state, Permissions permissions,
@@ -113,16 +114,6 @@ public class AIP implements IsModelObject, HasId, HasState, HasPermissions, HasD
     return id;
   }
 
-  /**
-   * Get the identifier of the parent AIP or <code>null</code> if this AIP is on
-   * the top-level.
-   *
-   * @return
-   */
-  public String getParentId() {
-    return parentId;
-  }
-
   public void setId(String id) {
     this.id = id;
 
@@ -140,9 +131,27 @@ public class AIP implements IsModelObject, HasId, HasState, HasPermissions, HasD
           repDm.setAipId(id);
           repDm.setRepresentationId(representation.getId());
         }
+
+        for (TechnicalMetadata techMd : representation.getTechnicalMetadata()) {
+          techMd.setAipId(id);
+          techMd.setRepresentationId(representation.getId());
+        }
       }
     }
+  }
 
+  /**
+   * Get the identifier of the parent AIP or <code>null</code> if this AIP is on
+   * the top-level.
+   *
+   * @return
+   */
+  public String getParentId() {
+    return parentId;
+  }
+
+  public void setParentId(String parentId) {
+    this.parentId = parentId;
   }
 
   public Boolean getGhost() {
@@ -159,10 +168,6 @@ public class AIP implements IsModelObject, HasId, HasState, HasPermissions, HasD
 
   public void setHasShallowFiles(Boolean hasShallowFiles) {
     this.hasShallowFiles = hasShallowFiles;
-  }
-
-  public void setParentId(String parentId) {
-    this.parentId = parentId;
   }
 
   public String getType() {
@@ -209,17 +214,17 @@ public class AIP implements IsModelObject, HasId, HasState, HasPermissions, HasD
     return ingestSIPIds;
   }
 
+  public AIP setIngestSIPIds(List<String> ingestSIPIds) {
+    this.ingestSIPIds = ingestSIPIds;
+    return this;
+  }
+
   public String getIngestSIPUUID() {
     return ingestSIPUUID;
   }
 
   public AIP setIngestSIPUUID(String ingestSIPUUID) {
     this.ingestSIPUUID = ingestSIPUUID;
-    return this;
-  }
-
-  public AIP setIngestSIPIds(List<String> ingestSIPIds) {
-    this.ingestSIPIds = ingestSIPIds;
     return this;
   }
 
@@ -254,6 +259,17 @@ public class AIP implements IsModelObject, HasId, HasState, HasPermissions, HasD
         if (representation.getId().equals(descriptiveMetadata.getRepresentationId())) {
           representation.addDescriptiveMetadata(descriptiveMetadata);
           break;
+        }
+      }
+    }
+  }
+
+  public void addTechnicalMetadata(TechnicalMetadata technicalMetadata) {
+    if (!technicalMetadata.isFromAIP()) {
+      for (Representation representation : this.representations) {
+        if (representation.getId().equals(technicalMetadata.getRepresentationId() )) {
+            representation.addTechnicalMetadata(technicalMetadata);
+            break;
         }
       }
     }

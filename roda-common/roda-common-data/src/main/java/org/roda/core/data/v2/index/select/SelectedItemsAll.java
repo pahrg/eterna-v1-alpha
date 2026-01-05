@@ -7,10 +7,14 @@
  */
 package org.roda.core.data.v2.index.select;
 
+import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.roda.core.data.v2.IsRODAObject;
+
+import java.io.Serial;
 
 public class SelectedItemsAll<T extends IsRODAObject> implements SelectedItems<T> {
 
+  @Serial
   private static final long serialVersionUID = -5364779540199737165L;
 
   private String selectedClass;

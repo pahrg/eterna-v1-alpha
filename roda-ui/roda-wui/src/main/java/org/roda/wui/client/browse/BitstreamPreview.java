@@ -10,6 +10,7 @@ package org.roda.wui.client.browse;
 import org.apache.http.HttpStatus;
 import org.roda.core.data.common.RodaConstants;
 import org.roda.core.data.v2.index.IsIndexed;
+import org.roda.core.data.v2.ip.AIPState;
 import org.roda.core.data.v2.ip.IndexedDIP;
 import org.roda.core.data.v2.ip.IndexedFile;
 import org.roda.core.data.v2.ip.Permissions;
@@ -79,6 +80,7 @@ public class BitstreamPreview<T extends IsIndexed> extends Composite {
 
   private boolean justActive;
   private Permissions permissions;
+  private final AIPState state;
 
   private final T object;
   private boolean fileIsFromDistributedInstance;
@@ -101,12 +103,12 @@ public class BitstreamPreview<T extends IsIndexed> extends Composite {
 
   public BitstreamPreview(Viewers viewers, SafeUri bitstreamDownloadUri, FileFormat format, String filename, long size,
     boolean isDirectory, Command onPreviewFailure, T object, boolean justActive, Permissions permissions) {
-    this(viewers, bitstreamDownloadUri, format, filename, size, isDirectory, true, onPreviewFailure, object, false,
-      permissions);
+    this(viewers, bitstreamDownloadUri, format, filename, size, isDirectory, true, onPreviewFailure, object, justActive,
+      null, permissions);
   }
 
   public BitstreamPreview(Viewers viewers, SafeUri bitstreamDownloadUri, FileFormat format, String filename, long size,
-    boolean isDirectory, boolean isAvailable, Command onPreviewFailure, T object, boolean justActive,
+    boolean isDirectory, boolean isAvailable, Command onPreviewFailure, T object, boolean justActive, AIPState aipState,
     Permissions permissions) {
     super();
     this.object = object;
@@ -123,6 +125,7 @@ public class BitstreamPreview<T extends IsIndexed> extends Composite {
 
     this.onPreviewFailure = onPreviewFailure;
 
+    this.state = aipState;
     this.justActive = justActive;
     this.permissions = permissions;
 
@@ -250,7 +253,7 @@ public class BitstreamPreview<T extends IsIndexed> extends Composite {
 
   private void pdfPreview() {
 
-    String viewerPdf = GWT.getHostPageBaseURL() + "pdf/web/viewer.html" + "?file="
+    String viewerPdf = GWT.getHostPageBaseURL() + "webjars/pdf-js/web/viewer.html" + "?file="
       + encode(GWT.getHostPageBaseURL() + bitstreamDownloadUri.asString()) + "#" + viewers.getOptions();
 
     final Frame frame = new Frame(viewerPdf);
@@ -385,7 +388,11 @@ public class BitstreamPreview<T extends IsIndexed> extends Composite {
     final Frame frame = new Frame(url);
     frame.setStyleName("viewDIPPreview");
     frame.setTitle(dip.getTitle());
-    frame.addLoadHandler(ev -> JavascriptUtils.runIframeResizer(frame.getElement()));
+    frame.getElement().setAttribute("scrolling", "auto");
+
+    if(isSameOrigin(url)){
+        frame.addLoadHandler(ev -> JavascriptUtils.runIframeResizer(frame.getElement()));
+    }
     panel.add(frame);
   }
 
@@ -508,6 +515,10 @@ public class BitstreamPreview<T extends IsIndexed> extends Composite {
     return object;
   }
 
+  public AIPState getState() {
+    return this.state;
+  }
+
   public boolean getJustActive() {
     return justActive;
   }
@@ -527,5 +538,10 @@ public class BitstreamPreview<T extends IsIndexed> extends Composite {
       }
     }
     return false;
+  }
+
+  public boolean isSameOrigin(String url){
+      String base = GWT.getHostPageBaseURL();
+      return url !=null && base != null && url.startsWith(base);
   }
 }

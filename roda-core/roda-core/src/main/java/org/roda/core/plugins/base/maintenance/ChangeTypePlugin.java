@@ -7,12 +7,6 @@
  */
 package org.roda.core.plugins.base.maintenance;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 import org.roda.core.data.common.RodaConstants;
 import org.roda.core.data.common.RodaConstants.PreservationEventType;
 import org.roda.core.data.exceptions.AuthorizationDeniedException;
@@ -35,12 +29,17 @@ import org.roda.core.model.ModelService;
 import org.roda.core.plugins.AbstractPlugin;
 import org.roda.core.plugins.Plugin;
 import org.roda.core.plugins.PluginException;
+import org.roda.core.plugins.PluginHelper;
 import org.roda.core.plugins.RODAObjectsProcessingLogic;
 import org.roda.core.plugins.orchestrate.JobPluginInfo;
-import org.roda.core.plugins.PluginHelper;
-import org.roda.core.storage.StorageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class ChangeTypePlugin<T extends IsRODAObject> extends AbstractPlugin<T> {
   private static final Logger LOGGER = LoggerFactory.getLogger(ChangeTypePlugin.class);
@@ -51,11 +50,13 @@ public class ChangeTypePlugin<T extends IsRODAObject> extends AbstractPlugin<T> 
 
   private static Map<String, PluginParameter> pluginParameters = new HashMap<>();
   static {
-    pluginParameters.put(RodaConstants.PLUGIN_PARAMS_NEW_TYPE, new PluginParameter(RodaConstants.PLUGIN_PARAMS_NEW_TYPE,
-      "New type", PluginParameterType.STRING, "", false, false, "New type"));
+    pluginParameters.put(RodaConstants.PLUGIN_PARAMS_NEW_TYPE,
+      PluginParameter.getBuilder(RodaConstants.PLUGIN_PARAMS_NEW_TYPE, "New type", PluginParameterType.STRING)
+        .isMandatory(false).withDescription("New type").build());
 
-    pluginParameters.put(RodaConstants.PLUGIN_PARAMS_DETAILS, new PluginParameter(RodaConstants.PLUGIN_PARAMS_DETAILS,
-      "Event details", PluginParameterType.STRING, "", false, false, "Details that will be used when creating event"));
+    pluginParameters.put(RodaConstants.PLUGIN_PARAMS_DETAILS,
+      PluginParameter.getBuilder(RodaConstants.PLUGIN_PARAMS_DETAILS, "Event details", PluginParameterType.STRING)
+        .isMandatory(false).withDescription("Details that will be used when creating event").build());
   }
 
   @Override
@@ -104,17 +105,17 @@ public class ChangeTypePlugin<T extends IsRODAObject> extends AbstractPlugin<T> 
   }
 
   @Override
-  public Report execute(IndexService index, ModelService model, StorageService storage,
+  public Report execute(IndexService index, ModelService model,
     List<LiteOptionalWithCause> liteList) throws PluginException {
 
     return PluginHelper.processObjects(this,
-      (RODAObjectsProcessingLogic<T>) (index1, model1, storage1, report, cachedJob, jobPluginInfo, plugin, objects) -> {
+            (RODAObjectsProcessingLogic<T>) (index1, model1, report, cachedJob, jobPluginInfo, plugin, objects) -> {
         if (objects.get(0) instanceof AIP) {
           processAIP(model1, report, jobPluginInfo, cachedJob, (List<AIP>) objects);
         } else if (objects.get(0) instanceof Representation) {
           processRepresentation(model1, report, jobPluginInfo, cachedJob, (List<Representation>) objects);
         }
-      }, index, model, storage, liteList);
+            }, index, model, liteList);
   }
 
   private void processAIP(ModelService model, Report report, JobPluginInfo jobPluginInfo, Job job, List<AIP> aips) {
@@ -137,7 +138,7 @@ public class ChangeTypePlugin<T extends IsRODAObject> extends AbstractPlugin<T> 
           .append("' changed its type from '").append(aip.getType()).append("' to '").append(newType).append("'.");
 
         model.createUpdateAIPEvent(aip.getId(), null, null, null, PreservationEventType.UPDATE, EVENT_DESCRIPTION,
-          state, outcomeText.toString(), details, job.getUsername(), true);
+          state, outcomeText.toString(), details, job.getUsername(), true, null);
         report.addReport(reportItem);
         PluginHelper.updatePartialJobReport(this, model, reportItem, true, job);
       }
@@ -167,7 +168,7 @@ public class ChangeTypePlugin<T extends IsRODAObject> extends AbstractPlugin<T> 
 
         model.createUpdateAIPEvent(representation.getAipId(), representation.getId(), null, null,
           PreservationEventType.UPDATE, EVENT_DESCRIPTION, state, outcomeText.toString(), details, job.getUsername(),
-          true);
+          true, null);
         report.addReport(reportItem);
         PluginHelper.updatePartialJobReport(this, model, reportItem, true, job);
       }
@@ -175,13 +176,13 @@ public class ChangeTypePlugin<T extends IsRODAObject> extends AbstractPlugin<T> 
   }
 
   @Override
-  public Report beforeAllExecute(IndexService index, ModelService model, StorageService storage)
+  public Report beforeAllExecute(IndexService index, ModelService model)
     throws PluginException {
     return new Report();
   }
 
   @Override
-  public Report afterAllExecute(IndexService index, ModelService model, StorageService storage) throws PluginException {
+  public Report afterAllExecute(IndexService index, ModelService model) throws PluginException {
     return new Report();
   }
 

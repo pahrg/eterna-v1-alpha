@@ -22,15 +22,17 @@ import java.util.Optional;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.roda.core.RodaCoreFactory;
-import org.roda.core.common.iterables.CloseableIterable;
 import org.roda.core.data.common.RodaConstants;
-import org.roda.core.data.exceptions.AlreadyExistsException;
-import org.roda.core.data.exceptions.AuthorizationDeniedException;
 import org.roda.core.data.exceptions.GenericException;
 import org.roda.core.data.exceptions.NotFoundException;
 import org.roda.core.data.exceptions.RequestNotValidException;
-import org.roda.core.data.utils.JsonUtils;
 import org.roda.core.data.v2.IsRODAObject;
+import org.roda.core.data.v2.LiteRODAObject;
+import org.roda.core.data.v2.accessKey.AccessKey;
+import org.roda.core.data.v2.common.OptionalWithCause;
+import org.roda.core.data.v2.disposal.confirmation.DisposalConfirmation;
+import org.roda.core.data.v2.disposal.hold.DisposalHold;
+import org.roda.core.data.v2.disposal.schedule.DisposalSchedule;
 import org.roda.core.data.v2.index.select.SelectedItems;
 import org.roda.core.data.v2.index.select.SelectedItemsFilter;
 import org.roda.core.data.v2.index.select.SelectedItemsList;
@@ -44,14 +46,14 @@ import org.roda.core.data.v2.ip.IndexedDIP;
 import org.roda.core.data.v2.ip.IndexedFile;
 import org.roda.core.data.v2.ip.IndexedRepresentation;
 import org.roda.core.data.v2.ip.Representation;
-import org.roda.core.data.v2.ip.ShallowFile;
 import org.roda.core.data.v2.ip.StoragePath;
-import org.roda.core.data.v2.ip.disposal.DisposalConfirmation;
-import org.roda.core.data.v2.ip.disposal.DisposalHold;
-import org.roda.core.data.v2.ip.disposal.DisposalSchedule;
 import org.roda.core.data.v2.ip.metadata.DescriptiveMetadata;
+import org.roda.core.data.v2.ip.metadata.IndexedPreservationAgent;
+import org.roda.core.data.v2.ip.metadata.IndexedPreservationEvent;
+import org.roda.core.data.v2.ip.metadata.OtherMetadata;
 import org.roda.core.data.v2.ip.metadata.PreservationMetadata;
 import org.roda.core.data.v2.ip.metadata.PreservationMetadata.PreservationMetadataType;
+import org.roda.core.data.v2.jobs.IndexedJob;
 import org.roda.core.data.v2.jobs.IndexedReport;
 import org.roda.core.data.v2.jobs.Job;
 import org.roda.core.data.v2.jobs.Report;
@@ -62,15 +64,25 @@ import org.roda.core.data.v2.risks.IndexedRisk;
 import org.roda.core.data.v2.risks.Risk;
 import org.roda.core.data.v2.risks.RiskIncidence;
 import org.roda.core.data.v2.synchronization.central.DistributedInstance;
+import org.roda.core.entity.transaction.TransactionalModelOperationLog;
 import org.roda.core.index.IndexService;
-import org.roda.core.protocols.Protocol;
-import org.roda.core.storage.ContentPayload;
-import org.roda.core.storage.DefaultBinary;
+import org.roda.core.model.lites.ParsedAIPLite;
+import org.roda.core.model.lites.ParsedDIPFileLite;
+import org.roda.core.model.lites.ParsedDIPLite;
+import org.roda.core.model.lites.ParsedDescriptiveMetadataLite;
+import org.roda.core.model.lites.ParsedDisposalHoldLite;
+import org.roda.core.model.lites.ParsedFileLite;
+import org.roda.core.model.lites.ParsedJobLite;
+import org.roda.core.model.lites.ParsedLite;
+import org.roda.core.model.lites.ParsedNotificationLite;
+import org.roda.core.model.lites.ParsedPreservationMetadataLite;
+import org.roda.core.model.lites.ParsedReportLite;
+import org.roda.core.model.lites.ParsedRepresentationInformationLite;
+import org.roda.core.model.lites.ParsedRepresentationLite;
+import org.roda.core.model.lites.ParsedRiskIncidenceLite;
+import org.roda.core.model.lites.ParsedRiskLite;
 import org.roda.core.storage.DefaultStoragePath;
-import org.roda.core.storage.JsonContentPayload;
-import org.roda.core.storage.Resource;
-import org.roda.core.storage.StorageService;
-import org.roda.core.storage.fs.FileStorageService;
+import org.roda.core.storage.Directory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -732,8 +744,8 @@ public final class ModelUtils {
     return DefaultStoragePath.parse(path);
   }
 
-  public static StoragePath getTechnicalMetadataPath(String aipId, String representationId,
-    List<String> fileDirectoryPath, String fileId) throws RequestNotValidException {
+  public static StoragePath getTechnicalMetadataStoragePath(String aipId, String representationId,
+                                                            List<String> fileDirectoryPath, String fileId) throws RequestNotValidException {
     List<String> path = build(getRepresentationPath(aipId, representationId), RodaConstants.STORAGE_DIRECTORY_METADATA,
       RodaConstants.STORAGE_DIRECTORY_TECHNICAL);
     path.addAll(fileDirectoryPath);
@@ -947,6 +959,158 @@ public final class ModelUtils {
     return DefaultStoragePath.parse(path);
   }
 
+  public static <T extends IsRODAObject> StoragePath getStoragePath(T object) throws RequestNotValidException {
+    if (object instanceof AIP aip) {
+      return getAIPStoragePath(aip.getId());
+    }
+    if (object instanceof IndexedAIP aip) {
+      return getAIPStoragePath(aip.getId());
+    }
+    if (object instanceof Representation representation) {
+      return getRepresentationStoragePath(representation.getAipId(), representation.getId());
+    }
+    if (object instanceof DescriptiveMetadata descriptiveMetadata) {
+      return getDescriptiveMetadataStoragePath(descriptiveMetadata);
+    }
+    if (object instanceof Directory directory) {
+      return directory.getStoragePath();
+    }
+    if (object instanceof File file) {
+      return getFileStoragePath(file);
+    }
+    if (object instanceof IndexedFile file) {
+      return getFileStoragePath(file.getAipId(), file.getRepresentationId(), file.getPath(), file.getId());
+    }
+    if (object instanceof DIPFile dipFile) {
+      return getDIPFileStoragePath(dipFile);
+    }
+    if (object instanceof PreservationMetadata pm) {
+      return getPreservationMetadataStoragePath(pm);
+    }
+    if (object instanceof OtherMetadata om) {
+      return getOtherMetadataStoragePath(om.getAipId(), om.getRepresentationId(), om.getFileDirectoryPath(),
+        om.getFileId(), om.getFileSuffix(), om.getType());
+    }
+    if (object instanceof IndexedPreservationEvent event) {
+      return getPreservationEventStoragePath(event.getFileUUID());
+    }
+    if (object instanceof IndexedPreservationAgent agent) {
+      return getPreservationMetadataStoragePath(agent.getId(), PreservationMetadataType.AGENT);
+    }
+    if (object instanceof Job job) {
+      return getJobStoragePath(job.getId());
+    }
+    if (object instanceof IndexedJob job) {
+      return getJobStoragePath(job.getId());
+    }
+    if (object instanceof DisposalHold disposalHold) {
+      return getDisposalHoldStoragePath(disposalHold.getId());
+    }
+    if (object instanceof DisposalConfirmation disposalConfirmation) {
+      return getDisposalConfirmationStoragePath(disposalConfirmation.getId());
+    }
+    if (object instanceof DistributedInstance distributedInstance) {
+      return getDistributedInstanceStoragePath(distributedInstance.getId());
+    }
+    if (object instanceof AccessKey accessKey) {
+      return getAccessKeysStoragePath(accessKey.getId());
+    }
+    if (object instanceof Report report) {
+      return getJobReportStoragePath(report.getJobId(), report.getId());
+    }
+    if (object instanceof Risk risk) {
+      return getRiskStoragePath(risk.getId());
+    }
+    if (object instanceof RiskIncidence riskIncidence) {
+      return getRiskIncidenceStoragePath(riskIncidence.getId());
+    }
+    if (object instanceof RepresentationInformation representationInformation) {
+      return getRepresentationInformationStoragePath(representationInformation.getId());
+    }
+    if (object instanceof Notification notification) {
+      return getNotificationStoragePath(notification.getId());
+    }
+    if (object instanceof DIP dip) {
+      return getDIPStoragePath(dip.getId());
+    }
+    throw new RequestNotValidException("Cannot get storage path for entity using only its object: "
+      + object.getClass().getSimpleName() + " " + object.getId());
+  }
+
+  public static StoragePath getStoragePath(LiteRODAObject lite) throws RequestNotValidException, GenericException {
+    OptionalWithCause<ParsedLite> parsedLiteOptional = ParsedLite.parse(lite);
+    if (!parsedLiteOptional.isPresent()) {
+      throw new RequestNotValidException("Couldn't parse Lite " + lite);
+    }
+    ParsedLite parsedLite = parsedLiteOptional.get();
+    return getStoragePath(parsedLite);
+  }
+
+  public static StoragePath getStoragePath(ParsedLite parsedLite) throws RequestNotValidException, GenericException {
+    if (parsedLite instanceof ParsedAIPLite aip) {
+      return getAIPStoragePath(aip.getId());
+    }
+    if (parsedLite instanceof ParsedRepresentationLite representation) {
+      return getRepresentationStoragePath(representation.getAipId(), representation.getId());
+    }
+    if (parsedLite instanceof ParsedDescriptiveMetadataLite descriptiveMetadata) {
+      if (descriptiveMetadata.getRepresentationId() != null) {
+        return getDescriptiveMetadataStoragePath(descriptiveMetadata.getAipId(),
+          descriptiveMetadata.getRepresentationId(), descriptiveMetadata.getId());
+      } else {
+        return getDescriptiveMetadataStoragePath(descriptiveMetadata.getAipId(), descriptiveMetadata.getId());
+      }
+    }
+    if (parsedLite instanceof ParsedFileLite file) {
+      return getFileStoragePath(file.getAipId(), file.getRepresentationId(), file.getDirectoryPath(), file.getId());
+    }
+    if (parsedLite instanceof ParsedDIPFileLite dipFile) {
+      return getDIPFileStoragePath(dipFile.getId(), dipFile.getDirectoryPath(), dipFile.getFileId());
+    }
+    if (parsedLite instanceof ParsedPreservationMetadataLite pm) {
+      String id = pm.getId();
+      String aipId = pm.getAipId();
+      String representationId = pm.getRepresentationId();
+      String fileId = pm.getFileId();
+      List<String> filePath = pm.getFileDirectoryPath();
+
+      if (aipId != null && representationId != null && fileId != null && filePath != null) {
+        return getPreservationMetadataStoragePath(id, pm.getType(), aipId, representationId, filePath, fileId);
+      } else if (aipId != null && representationId != null) {
+        return getPreservationMetadataStoragePath(id, pm.getType(), aipId, representationId);
+      } else if (aipId != null) {
+        return getPreservationMetadataStoragePath(id, pm.getType(), aipId);
+      } else {
+        return getPreservationMetadataStoragePath(id, pm.getType());
+      }
+    }
+    if (parsedLite instanceof ParsedJobLite job) {
+      return getJobStoragePath(job.getId());
+    }
+    if (parsedLite instanceof ParsedDisposalHoldLite disposalHold) {
+      return getDisposalHoldStoragePath(disposalHold.getId());
+    }
+    if (parsedLite instanceof ParsedReportLite report) {
+      return getJobReportStoragePath(report.getJobId(), report.getId());
+    }
+    if (parsedLite instanceof ParsedRiskLite risk) {
+      return getRiskStoragePath(risk.getId());
+    }
+    if (parsedLite instanceof ParsedRiskIncidenceLite riskIncidence) {
+      return getRiskIncidenceStoragePath(riskIncidence.getId());
+    }
+    if (parsedLite instanceof ParsedRepresentationInformationLite representationInformation) {
+      return getRepresentationInformationStoragePath(representationInformation.getId());
+    }
+    if (parsedLite instanceof ParsedNotificationLite notification) {
+      return getNotificationStoragePath(notification.getId());
+    }
+    if (parsedLite instanceof ParsedDIPLite dip) {
+      return getDIPStoragePath(dip.getId());
+    }
+    throw new RequestNotValidException("Cannot get storage path for entity using only its lite -> " + parsedLite);
+  }
+
   public static <T extends Serializable> StoragePath getContainerPath(Class<T> clazz) throws RequestNotValidException {
     if (clazz.equals(RepresentationInformation.class)) {
       return getRepresentationInformationContainerPath();
@@ -974,6 +1138,10 @@ public final class ModelUtils {
       return getDisposalConfirmationContainerPath();
     } else if (clazz.equals(DistributedInstance.class)) {
       return getDistributedInstancesContainerPath();
+    } else if (clazz.equals(IndexedPreservationAgent.class)) {
+      return getPreservationAgentStoragePath();
+    } else if (clazz.equals(IndexedPreservationEvent.class)) {
+      return getPreservationRepositoryEventStoragePath();
     } else {
       throw new RequestNotValidException("Unknown class for getting container path: " + clazz.getName());
     }
@@ -1113,46 +1281,6 @@ public final class ModelUtils {
     return Arrays.asList(RodaConstants.STORAGE_CONTAINER_DISPOSAL_CONFIRMATION, confirmationId);
   }
 
-  public static StorageService resolveTemporaryResourceShallow(String jobId, StorageService storage,
-    StoragePath storagePath) throws GenericException {
-    FileStorageService temporaryStorage;
-    Path tempPath = RodaCoreFactory.getFileShallowTmpDirectoryPath().resolve(jobId)
-      .resolve(String.valueOf(storagePath.hashCode()));
-    try {
-      if (Files.exists(tempPath)) {
-        temporaryStorage = new FileStorageService(tempPath, false, null, false);
-      } else {
-        Files.createDirectories(tempPath);
-        temporaryStorage = new FileStorageService(tempPath, false, null, false);
-
-        temporaryStorage.copy(storage, storagePath, storagePath);
-        List<StoragePath> externalFiles = temporaryStorage.getShallowFiles(storagePath);
-        for (StoragePath externalFile : externalFiles) {
-          final CloseableIterable<Resource> resources = temporaryStorage.listResourcesUnderFile(externalFile, true);
-          for (Resource resource : resources) {
-            if (resource instanceof DefaultBinary) {
-              ContentPayload content = ((DefaultBinary) resource).getContent();
-              if (content instanceof JsonContentPayload) {
-                ShallowFile shallowFile = JsonUtils.getObjectFromJson(content.createInputStream(), ShallowFile.class);
-                Protocol pm = RodaCoreFactory.getProtocol(shallowFile.getLocation());
-                // ProtocolManager pm =
-                // ProtocolManagerFactory.createProtocolManager(shallowFile.getLocation());
-                pm.downloadResource(temporaryStorage.getDirectAccess(externalFile).getPath().getParent());
-              }
-
-            }
-          }
-          temporaryStorage.deleteResource(externalFile);
-        }
-      }
-    } catch (IOException | AlreadyExistsException | AuthorizationDeniedException e) {
-      throw new GenericException("Cannot create temporary directory " + tempPath);
-    } catch (RequestNotValidException | NotFoundException e) {
-      throw new GenericException("Cannot found resources at " + storagePath.toString());
-    }
-    return temporaryStorage;
-  }
-
   public static void removeTemporaryResourceShallow(String jobId, StoragePath storagePath) throws IOException {
     Path tempPath = RodaCoreFactory.getFileShallowTmpDirectoryPath().resolve(jobId)
       .resolve(String.valueOf(storagePath.hashCode()));
@@ -1181,5 +1309,11 @@ public final class ModelUtils {
         LOGGER.error("Could not delete temporary AIP shallow" + aip.getId());
       }
     }
+  }
+
+  public static void removeTemporaryRepresentationDataShallow(String jobId, String aipId, String representationId)
+    throws RequestNotValidException, IOException {
+    StoragePath storagePath = getRepresentationDataStoragePath(aipId, representationId);
+    removeTemporaryResourceShallow(jobId, storagePath);
   }
 }

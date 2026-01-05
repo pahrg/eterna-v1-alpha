@@ -8,10 +8,11 @@
 package org.roda.wui.client.common.slider;
 
 import org.roda.core.data.v2.index.IsIndexed;
-import org.roda.wui.client.browse.bundle.BrowseAIPBundle;
-import org.roda.wui.client.browse.bundle.BrowseFileBundle;
-import org.roda.wui.client.browse.bundle.BrowseRepresentationBundle;
-import org.roda.wui.client.browse.bundle.Bundle;
+import org.roda.core.data.v2.ip.IndexedFile;
+import org.roda.wui.client.common.model.BrowseAIPResponse;
+import org.roda.wui.client.common.model.BrowseFileResponse;
+import org.roda.wui.client.common.model.BrowseRepresentationResponse;
+import org.roda.wui.client.services.Services;
 
 import com.google.gwt.user.client.ui.FlowPanel;
 import com.google.gwt.user.client.ui.FocusPanel;
@@ -30,55 +31,31 @@ public class Sliders {
     return slider;
   }
 
-  public static <T extends IsIndexed> SliderPanel createDisseminationsSlider(FlowPanel container,
-    FocusPanel toggleButton, T object) {
+  public static <T extends IsIndexed> SliderPanel createDisseminationSlider(FlowPanel container,
+    FocusPanel toggleButton, T object, Services services) {
     SliderPanel slider = createSlider(container, toggleButton);
-    DisseminationsSliderHelper.updateDisseminationsObjectSliderPanel(object, slider);
+    DisseminationsSliderHelper.updateDisseminationsObjectSliderPanel(object, slider, services);
     return slider;
   }
 
-  public static <T extends IsIndexed> SliderPanel createInfoSlider(FlowPanel container, FocusPanel toggleButton,
-    T object) {
+  public static SliderPanel createAipInfoSlider(FlowPanel container, FocusPanel toggleButton,
+    BrowseAIPResponse response) {
     SliderPanel slider = createSlider(container, toggleButton);
-    InfoSliderHelper.updateInfoObjectSliderPanel(object, slider);
+    InfoSliderHelper.updateInfoSliderPanel(response, slider);
     return slider;
   }
 
-  public static SliderPanel createInfoSlider(FlowPanel container, FocusPanel toggleButton, Bundle bundle) {
-    if (bundle instanceof BrowseFileBundle) {
-      return createFileInfoSlider(container, toggleButton, (BrowseFileBundle) bundle);
-    } else if (bundle instanceof BrowseRepresentationBundle) {
-      return createRepresentationInfoSlider(container, toggleButton, (BrowseRepresentationBundle) bundle);
-    } else if (bundle instanceof BrowseAIPBundle) {
-      return createAipInfoSlider(container, toggleButton, (BrowseAIPBundle) bundle);
-    }
-    return null;
-  }
-
-  public static SliderPanel createFileInfoSlider(FlowPanel container, FocusPanel toggleButton,
-    BrowseFileBundle bundle) {
+  public static SliderPanel createFileInfoSlider(FlowPanel container, FocusPanel toggleButton, IndexedFile file,
+    BrowseFileResponse response) {
     SliderPanel slider = createSlider(container, toggleButton);
-    InfoSliderHelper.updateInfoSliderPanel(bundle, slider);
-    return slider;
-  }
-
-  public static SliderPanel createAipInfoSlider(FlowPanel container, FocusPanel toggleButton, BrowseAIPBundle bundle) {
-    SliderPanel slider = createSlider(container, toggleButton);
-    InfoSliderHelper.updateInfoSliderPanel(bundle, slider);
+    InfoSliderHelper.createFileInfoSliderPanel(file, response, slider);
     return slider;
   }
 
   public static SliderPanel createRepresentationInfoSlider(FlowPanel container, FocusPanel toggleButton,
-    BrowseRepresentationBundle bundle) {
+    BrowseRepresentationResponse response) {
     SliderPanel slider = createSlider(container, toggleButton);
-    InfoSliderHelper.updateInfoSliderPanel(bundle, slider);
-    return slider;
-  }
-
-  public static <T extends IsIndexed> SliderPanel createOptionsSlider(FlowPanel container, FocusPanel toggleButton,
-    T object) {
-    SliderPanel slider = createSlider(container, toggleButton);
-    OptionsSliderHelper.updateOptionsObjectSliderPanel(object, slider);
+    InfoSliderHelper.updateInfoSliderPanel(response, slider);
     return slider;
   }
 

@@ -1,14 +1,16 @@
 services:
+
   zoo:
-    image: docker.io/zookeeper:3.9.2-jre-17
+    image: docker.io/zookeeper:3.9-jre-17
     restart: unless-stopped
     environment:
       - ZOO_4LW_COMMANDS_WHITELIST=mntr,conf,ruok
     volumes:
       - zookeeper_data:/data
       - zookeeper_datalog:/datalog
+
   solr:
-    image: docker.io/solr:9.5.0
+    image: docker.io/solr:9.8.1
     restart: unless-stopped
     ports:
       - "8983:8983"
@@ -20,11 +22,12 @@ services:
       - solr_data:/var/solr
 
   clamd:
-    image: docker.io/clamav/clamav:1.2.2
+    image: docker.io/clamav/clamav:1.4
     restart: unless-stopped
     volumes:
       - clam_data:/var/lib/clamav
       - roda_data:/roda/data/
+
   siegfried:
     image: ghcr.io/keeps/siegfried:v1.11.0
     restart: unless-stopped
@@ -34,6 +37,7 @@ services:
     volumes:
       - siegfried_data:/root/siegfried/
       - roda_data:/roda/data/
+
   swagger:
     image: docker.io/swaggerapi/swagger-ui:v5.13.0
     restart: on-failure
@@ -43,6 +47,31 @@ services:
       - URL=http://localhost:8080/api/openapi.json
       - DOC_EXPANSION=none
       - VALIDATOR_URL=none
+
+  mailpit:
+    image: axllent/mailpit:v1.24
+    restart: unless-stopped
+    ports:
+      - "1025:1025" # smtp server
+      - "8025:8025" # web ui
+
+  openldap:
+    image: docker.io/bitnami/openldap:2.6
+    restart: unless-stopped
+    user: 1001:root
+    ports:
+      - "1389:1389"
+      - "1636:1636"
+    environment:
+      - BITNAMI_DEBUG=true
+      - LDAP_ROOT=dc=roda,dc=org
+      - LDAP_SKIP_DEFAULT_TREE=yes
+      - LDAP_ADMIN_USERNAME=admin
+      - LDAP_ADMIN_PASSWORD=roda
+      - LDAP_EXTRA_SCHEMAS=cosine,inetorgperson,nis,pbkdf2
+    volumes:
+      - ./ldap/ldif/pbkdf2.ldif:/opt/bitnami/openldap/etc/schema/pbkdf2.ldif
+
   eterna:
     image: ghcr.io/eterna-earkiv/eterna:v0.5.0
     restart: unless-stopped
@@ -52,9 +81,14 @@ services:
       - solr
       - clamd
       - siegfried
+      - postgres
     volumes:
       - roda_data:/roda/data/
+      - ./roda/config/roda-core.properties:/roda/config/roda-core.properties:ro
     environment:
+      # Spring configuration
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/roda_core_db
+
       # Solr Cloud configuration
       - RODA_CORE_SOLR_TYPE=CLOUD
       - RODA_CORE_SOLR_CLOUD_URLS=zoo:2181
@@ -64,6 +98,24 @@ services:
       - SIEGFRIED_SERVER_URL=http://siegfried:5138
       - CLAMD_TCPADDR=clamd
       - CLAMD_TCPSOCKET=3310
+      # SMTP configuration
+      - SMTP_HOST=mailpit
+      - SMTP_PORT=1025
+
+  postgres:
+    image: docker.io/postgres:17
+    container_name: postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: roda
+      POSTGRES_DB: roda_core_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+
 volumes:
   zookeeper_data:
   zookeeper_datalog:
@@ -71,3 +123,4 @@ volumes:
   clam_data:
   siegfried_data:
   roda_data:
+  pg_data:

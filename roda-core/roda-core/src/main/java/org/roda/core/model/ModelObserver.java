@@ -10,11 +10,16 @@ package org.roda.core.model;
 import java.util.List;
 
 import org.roda.core.data.exceptions.ReturnWithExceptions;
-import org.roda.core.data.v2.ip.*;
-import org.roda.core.data.v2.ip.disposal.DisposalConfirmation;
+import org.roda.core.data.v2.disposal.confirmation.DisposalConfirmation;
+import org.roda.core.data.v2.ip.AIP;
+import org.roda.core.data.v2.ip.DIP;
+import org.roda.core.data.v2.ip.DIPFile;
+import org.roda.core.data.v2.ip.File;
+import org.roda.core.data.v2.ip.Representation;
 import org.roda.core.data.v2.ip.metadata.DescriptiveMetadata;
 import org.roda.core.data.v2.ip.metadata.OtherMetadata;
 import org.roda.core.data.v2.ip.metadata.PreservationMetadata;
+import org.roda.core.data.v2.jobs.IndexedJob;
 import org.roda.core.data.v2.jobs.Job;
 import org.roda.core.data.v2.jobs.Report;
 import org.roda.core.data.v2.log.LogEntry;
@@ -98,6 +103,8 @@ public interface ModelObserver {
   public ReturnWithExceptions<Void, ModelObserver> jobDeleted(String jobId);
 
   public ReturnWithExceptions<Void, ModelObserver> jobReportCreatedOrUpdated(Report jobReport, Job cachedJob);
+
+  public ReturnWithExceptions<Void, ModelObserver> jobReportCreatedOrUpdated(Report jobReport, IndexedJob indexedJob);
 
   public ReturnWithExceptions<Void, ModelObserver> jobReportDeleted(String jobReportId);
 

@@ -14,13 +14,13 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.roda.core.data.common.RodaConstants;
-import org.roda.core.data.exceptions.NotFoundException;
 import org.roda.core.data.v2.user.User;
 import org.roda.wui.client.common.UserLogin;
 import org.roda.wui.client.common.dialogs.Dialogs;
 import org.roda.wui.client.main.Login;
 import org.roda.wui.client.management.recaptcha.RecaptchaException;
 import org.roda.wui.client.management.recaptcha.RecaptchaWidget;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.client.welcome.Welcome;
 import org.roda.wui.common.client.ClientLogger;
 import org.roda.wui.common.client.HistoryResolver;
@@ -41,6 +41,7 @@ import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.google.gwt.user.client.ui.Button;
 import com.google.gwt.user.client.ui.Composite;
 import com.google.gwt.user.client.ui.FlowPanel;
+import com.google.gwt.user.client.ui.Label;
 import com.google.gwt.user.client.ui.TextBox;
 import com.google.gwt.user.client.ui.Widget;
 
@@ -110,7 +111,10 @@ public class RecoverLogin extends Composite {
   FlowPanel recoverPanel;
 
   @UiField
-  TextBox usernameOrEmail;
+  Label emailError;
+
+  @UiField
+  TextBox email;
 
   @UiField
   Button cancel;
@@ -119,11 +123,11 @@ public class RecoverLogin extends Composite {
 
   private RecoverLogin() {
     initWidget(uiBinder.createAndBindUi(this));
-    usernameOrEmail.getElement().setTitle(messages.recoverLoginUsernameOrEmail());
+    email.getElement().setTitle(messages.recoverLoginEmail());
 
     addAttachHandler(event -> {
       if (event.isAttached()) {
-        usernameOrEmail.setFocus(true);
+        email.setFocus(true);
       }
     });
 
@@ -137,11 +141,24 @@ public class RecoverLogin extends Composite {
       recaptchaActive = false;
     }
 
-    usernameOrEmail.addKeyUpHandler(event -> {
+    email.addKeyUpHandler(event -> {
       if (checked) {
-        isValid();
+        validateEmailField();
       }
     });
+  }
+
+  private void validateEmailField() {
+    if (!email.getText().isEmpty() && email.getText()
+      .matches("^[_A-Za-z0-9-%+]+(\\.[_A-Za-z0-9-%+]+)*@[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)*(\\.[A-Za-z0-9-]+)$")) {
+      email.removeStyleName("isWrong");
+      emailError.setVisible(false);
+    } else {
+      if (!email.getText().isEmpty()) {
+        email.removeStyleName("isWrong");
+        emailError.setVisible(false);
+      }
+    }
   }
 
   /**
@@ -152,11 +169,16 @@ public class RecoverLogin extends Composite {
   public boolean isValid() {
     boolean valid = true;
 
-    if (usernameOrEmail.getText().length() == 0) {
+    // Check if the email field is empty
+    if (email.getText().isEmpty() || !email.getText()
+      .matches("^[_A-Za-z0-9-%+]+(\\.[_A-Za-z0-9-%+]+)*@[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)*(\\.[A-Za-z0-9-]+)$")) {
       valid = false;
-      usernameOrEmail.addStyleName("isWrong");
+      email.addStyleName("isWrong");
+      emailError.setText(messages.emailNotValid());
+      emailError.setVisible(true);
     } else {
-      usernameOrEmail.removeStyleName("isWrong");
+      email.removeStyleName("isWrong");
+      emailError.setVisible(false);
     }
 
     checked = true;
@@ -169,7 +191,7 @@ public class RecoverLogin extends Composite {
     doRecover();
   }
 
-  @UiHandler("usernameOrEmail")
+  @UiHandler("email")
   void handleUsernameKeyPress(KeyPressEvent event) {
     tryToRecoverWhenEnterIsPressed(event);
   }
@@ -182,23 +204,23 @@ public class RecoverLogin extends Composite {
 
   private void doRecover() {
     if (isValid()) {
-      String recaptchaResponse = null;
+      String recaptchaResponse;
       if (recaptchaActive && recaptchaWidget != null) {
         recaptchaResponse = recaptchaWidget.getResponse();
+      } else {
+        recaptchaResponse = null;
       }
-      UserManagementService.Util.getInstance().requestPasswordReset(usernameOrEmail.getValue(), recaptchaResponse,
-              LocaleInfo.getCurrentLocale().getLocaleName(), new AsyncCallback<Void>() {
-
-                @Override
-                public void onFailure(Throwable caught) {
-                  errorMessage(caught);
-                }
-
-                @Override
-                public void onSuccess(Void result) {
-                  showRecoverLoginMessage();
-                }
-              });
+      Services services = new Services("Recover login", "recover");
+      services
+        .membersResource(
+          s -> s.recoverLogin(email.getValue(), LocaleInfo.getCurrentLocale().getLocaleName(), recaptchaResponse))
+        .whenComplete((res, error) -> {
+          if (error == null) {
+            showRecoverLoginMessage();
+          } else {
+            errorMessage(error);
+          }
+        });
     }
   }
 
@@ -216,18 +238,18 @@ public class RecoverLogin extends Composite {
 
   private void showRecoverLoginMessage() {
     Dialogs.showInformationDialog(messages.recoverLoginSuccessDialogTitle(),
-            messages.recoverLoginSuccessDialogMessage(), messages.recoverLoginSuccessDialogButton(), false,
-            new AsyncCallback<Void>() {
+      messages.recoverLoginSuccessDialogMessage(), messages.recoverLoginSuccessDialogButton(), false,
+      new AsyncCallback<Void>() {
 
-              @Override
-              public void onFailure(Throwable caught) {
-                HistoryUtils.newHistory(Login.RESOLVER);
-              }
+        @Override
+        public void onFailure(Throwable caught) {
+          HistoryUtils.newHistory(Login.RESOLVER);
+        }
 
-              @Override
-              public void onSuccess(Void result) {
-                HistoryUtils.newHistory(Login.RESOLVER);
-              }
-            });
+        @Override
+        public void onSuccess(Void result) {
+          HistoryUtils.newHistory(Login.RESOLVER);
+        }
+      });
   }
 }

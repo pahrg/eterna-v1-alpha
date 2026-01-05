@@ -11,9 +11,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.roda.core.data.v2.synchronization.local.LocalInstance;
-import org.roda.wui.client.browse.BrowserService;
-import org.roda.wui.client.common.NoAsyncCallback;
 import org.roda.wui.client.common.dialogs.Dialogs;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.tools.StringUtils;
 import org.roda.wui.common.client.tools.ValidationUtils;
 
@@ -217,10 +216,10 @@ public class LocalInstanceConfigurationDataPanel extends Composite implements Ha
   @UiHandler("buttonTest")
   void buttonTestHandler(ClickEvent e) {
     if (isValid()) {
-      BrowserService.Util.getInstance().testLocalInstanceConfiguration(getLocalInstance(),
-        new NoAsyncCallback<List<String>>() {
-          @Override
-          public void onSuccess(List<String> result) {
+      Services services = new Services("Test local instance configuration", "test");
+      services.distributedInstanceResource(s -> s.testLocalInstanceConfiguration(getLocalInstance()))
+        .whenComplete((result, error) -> {
+          if (result != null) {
             if (result.isEmpty()) {
               Dialogs.showInformationDialog(messages.testLocalInstanceConfigurationDialogTitle(),
                 messages.testLocalInstanceConfigurationDialogMessage(centralInstanceURLValue.getText()),

@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Callable;
 
-import org.roda.wui.client.browse.MetadataValue;
+import org.roda.core.data.v2.generics.MetadataValue;
 import org.roda.wui.client.common.RichTextToolbar;
 
 import com.google.gwt.core.client.GWT;
@@ -78,9 +78,6 @@ public class FormUtilities {
           addTextField(panel, layout, mv, mandatory, onChange);
         } else {
           switch (controlType) {
-            case "text":
-              addTextField(panel, layout, mv, mandatory, onChange);
-              break;
             case "textarea":
             case "big-text":
             case "text-area":
@@ -99,6 +96,7 @@ public class FormUtilities {
               layout.addStyleName("form-separator");
               addSeparator(panel, layout, mv);
               break;
+            case "text":
             default:
               addTextField(panel, layout, mv, mandatory, onChange);
               break;
@@ -596,7 +594,7 @@ public class FormUtilities {
       for (MetadataValue mv : values) {
         String value = mv.get("value");
         boolean mandatory = mv.get("mandatory") != null && "true".equalsIgnoreCase(mv.get("mandatory"));
-        if (mandatory && (value == null || "".equals(value.trim()))) {
+        if (mandatory && (value == null || value.trim().isEmpty())) {
           String labels = mv.get("l");
           errors.add(messages.isAMandatoryField(labels));
           mv.set("error", messages.mandatoryField());
@@ -605,6 +603,7 @@ public class FormUtilities {
         }
       }
     }
+
     extra.clear();
     create(extra, values, true, null);
     return errors;

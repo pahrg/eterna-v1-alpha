@@ -47,6 +47,7 @@ import org.roda.core.index.IndexService;
 import org.roda.core.index.IndexTestUtils;
 import org.roda.core.model.ModelService;
 import org.roda.core.plugins.base.ingest.BagitToAIPPlugin;
+import org.roda.core.security.LdapUtilityTestHelper;
 import org.roda.core.storage.fs.FSUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,8 +57,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import com.google.common.collect.Iterables;
-
-import jersey.repackaged.com.google.common.collect.Lists;
+import com.google.common.collect.Lists;
 
 @Test(groups = {RodaConstants.TEST_GROUP_ALL, RodaConstants.TEST_GROUP_DEV, RodaConstants.TEST_GROUP_TRAVIS})
 public class BagitSIPPluginsTest {
@@ -68,6 +68,7 @@ public class BagitSIPPluginsTest {
 
   private static ModelService model;
   private static IndexService index;
+  private static LdapUtilityTestHelper ldapUtilityTestHelper;
 
   private static Path corporaPath;
 
@@ -76,6 +77,7 @@ public class BagitSIPPluginsTest {
   @BeforeMethod
   public void setUp() throws Exception {
     basePath = TestsHelper.createBaseTempDir(getClass(), true);
+    ldapUtilityTestHelper = new LdapUtilityTestHelper();
 
     boolean deploySolr = true;
     boolean deployLdap = true;
@@ -84,7 +86,7 @@ public class BagitSIPPluginsTest {
     boolean deployPluginManager = true;
     boolean deployDefaultResources = false;
     RodaCoreFactory.instantiateTest(deploySolr, deployLdap, deployFolderMonitor, deployOrchestrator,
-      deployPluginManager, deployDefaultResources, false);
+      deployPluginManager, deployDefaultResources, false, ldapUtilityTestHelper.getLdapUtility());
     model = RodaCoreFactory.getModelService();
     index = RodaCoreFactory.getIndexService();
 
@@ -97,6 +99,7 @@ public class BagitSIPPluginsTest {
   @AfterMethod
   public void tearDown() throws Exception {
     IndexTestUtils.resetIndex();
+    ldapUtilityTestHelper.shutdown();
     RodaCoreFactory.shutdown();
     FSUtils.deletePath(basePath);
   }
@@ -118,7 +121,7 @@ public class BagitSIPPluginsTest {
     AlreadyExistsException, AuthorizationDeniedException, IOException {
     String aipType = RodaConstants.AIP_TYPE_MIXED;
 
-    AIP root = model.createAIP(null, aipType, new Permissions(), RodaConstants.ADMIN);
+    AIP root = model.createAIP(null, aipType, new Permissions(), RodaConstants.ADMIN, null);
 
     Map<String, String> parameters = new HashMap<>();
     parameters.put(RodaConstants.PLUGIN_PARAMS_PARENT_ID, root.getId());

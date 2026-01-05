@@ -7,13 +7,6 @@
  */
 package org.roda.core.plugins.base.maintenance;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-
 import org.apache.commons.lang3.StringUtils;
 import org.roda.core.RodaCoreFactory;
 import org.roda.core.data.common.RodaConstants;
@@ -52,12 +45,18 @@ import org.roda.core.model.utils.ModelUtils;
 import org.roda.core.plugins.AbstractPlugin;
 import org.roda.core.plugins.Plugin;
 import org.roda.core.plugins.PluginException;
+import org.roda.core.plugins.PluginHelper;
 import org.roda.core.plugins.RODAObjectsProcessingLogic;
 import org.roda.core.plugins.orchestrate.JobPluginInfo;
-import org.roda.core.plugins.PluginHelper;
-import org.roda.core.storage.StorageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 public class MovePlugin<T extends IsRODAObject> extends AbstractPlugin<T> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MovePlugin.class);
@@ -68,11 +67,14 @@ public class MovePlugin<T extends IsRODAObject> extends AbstractPlugin<T> {
 
   private static Map<String, PluginParameter> pluginParameters = new HashMap<>();
   static {
-    pluginParameters.put(RodaConstants.PLUGIN_PARAMS_ID, new PluginParameter(RodaConstants.PLUGIN_PARAMS_ID,
-      "Destination object identifier", PluginParameterType.STRING, "", false, false, "Destination object identifier"));
+    pluginParameters.put(RodaConstants.PLUGIN_PARAMS_ID,
+      PluginParameter
+        .getBuilder(RodaConstants.PLUGIN_PARAMS_ID, "Destination object identifier", PluginParameterType.STRING)
+        .isMandatory(false).withDescription("Destination object identifier").build());
 
-    pluginParameters.put(RodaConstants.PLUGIN_PARAMS_DETAILS, new PluginParameter(RodaConstants.PLUGIN_PARAMS_DETAILS,
-      "Event details", PluginParameterType.STRING, "", false, false, "Details that will be used when creating event"));
+    pluginParameters.put(RodaConstants.PLUGIN_PARAMS_DETAILS,
+      PluginParameter.getBuilder(RodaConstants.PLUGIN_PARAMS_DETAILS, "Event details", PluginParameterType.STRING)
+        .isMandatory(false).withDefaultValue("Details that will be used when creating event").build());
   }
 
   @Override
@@ -121,11 +123,11 @@ public class MovePlugin<T extends IsRODAObject> extends AbstractPlugin<T> {
   }
 
   @Override
-  public Report execute(IndexService index, ModelService model, StorageService storage,
+  public Report execute(IndexService index, ModelService model,
     List<LiteOptionalWithCause> liteList) throws PluginException {
 
     return PluginHelper.processObjects(this,
-      (RODAObjectsProcessingLogic<T>) (index1, model1, storage1, report, cachedJob, jobPluginInfo, plugin, objects) -> {
+            (RODAObjectsProcessingLogic<T>) (index1, model1, report, cachedJob, jobPluginInfo, plugin, objects) -> {
         if (!objects.isEmpty()) {
           if (objects.get(0) instanceof AIP) {
             for (T object : objects) {
@@ -139,7 +141,7 @@ public class MovePlugin<T extends IsRODAObject> extends AbstractPlugin<T> {
             processTransferredResource(model1, report, jobPluginInfo, cachedJob, (List<TransferredResource>) objects);
           }
         }
-      }, index, model, storage, liteList);
+            }, index, model, liteList);
   }
 
   private void updateReport(ModelService model, Report reportItem, JobPluginInfo jobPluginInfo, Report report, Job job,
@@ -172,7 +174,7 @@ public class MovePlugin<T extends IsRODAObject> extends AbstractPlugin<T> {
     sources.add(PluginHelper.getLinkingIdentifier(entityId, RodaConstants.PRESERVATION_LINKING_OBJECT_SOURCE));
 
     model.createUpdateAIPEvent(entityId, null, null, null, PreservationEventType.UPDATE, EVENT_DESCRIPTION,
-      PluginState.FAILURE, outcomeText, details, job.getUsername(), true);
+      PluginState.FAILURE, outcomeText, details, job.getUsername(), true, null);
   }
 
   private void processAIP(ModelService model, IndexService index, Report report, JobPluginInfo jobPluginInfo, Job job,
@@ -240,7 +242,7 @@ public class MovePlugin<T extends IsRODAObject> extends AbstractPlugin<T> {
 
       jobPluginInfo.incrementObjectsProcessed(state);
       model.createUpdateAIPEvent(aip.getId(), null, null, null, PreservationEventType.UPDATE, EVENT_DESCRIPTION, state,
-        outcomeText, details, job.getUsername(), true);
+        outcomeText, details, job.getUsername(), true, null);
     }
   }
 
@@ -291,7 +293,7 @@ public class MovePlugin<T extends IsRODAObject> extends AbstractPlugin<T> {
 
     jobPluginInfo.incrementObjectsProcessed(state);
     model.createUpdateAIPEvent(file.getAipId(), file.getRepresentationId(), null, null, PreservationEventType.UPDATE,
-      EVENT_DESCRIPTION, state, outcomeText.toString(), details, job.getUsername(), true);
+      EVENT_DESCRIPTION, state, outcomeText.toString(), details, job.getUsername(), true, null);
   }
 
   @SuppressWarnings("unchecked")
@@ -336,15 +338,15 @@ public class MovePlugin<T extends IsRODAObject> extends AbstractPlugin<T> {
   }
 
   @Override
-  public Report beforeAllExecute(IndexService index, ModelService model, StorageService storage)
+  public Report beforeAllExecute(IndexService index, ModelService model)
     throws PluginException {
     return new Report();
   }
 
   @Override
-  public Report afterAllExecute(IndexService index, ModelService model, StorageService storage) throws PluginException {
+  public Report afterAllExecute(IndexService index, ModelService model) throws PluginException {
     try {
-      Job job = PluginHelper.getJob(this, index);
+      Job job = PluginHelper.getJob(this, model);
       if (TransferredResource.class.getName().equals(job.getSourceObjects().getSelectedClass())) {
         String relativePath = "";
         if (getParameterValues().containsKey(RodaConstants.PLUGIN_PARAMS_ID)) {

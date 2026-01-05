@@ -10,6 +10,7 @@ package org.roda.core.data.v2.ip;
 import java.io.Serial;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -17,6 +18,7 @@ import org.roda.core.data.common.RodaConstants;
 import org.roda.core.data.v2.index.IsIndexed;
 import org.roda.core.data.v2.ip.metadata.FileFormat;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 @jakarta.xml.bind.annotation.XmlRootElement(name = RodaConstants.RODA_OBJECT_FILE)
@@ -34,6 +36,7 @@ public class IndexedFile
   private String representationUUID;
   private List<String> path;
   private List<String> ancestorsPath;
+  private List<String> technicalMetadataIds;
   private String id;
   private String referenceUUID;
   private String referenceURL;
@@ -53,22 +56,24 @@ public class IndexedFile
   private List<String> ancestors;
   private Map<String, List<String>> otherProperties;
 
-  private Map<String, Object> fields;
+  private Map<String, Object> fields = new HashMap<>();
 
   private String instanceId;
-
   private String instanceName = null;
+  private boolean isLocalInstance = false;
 
   private Date createdOn = null;
+
+  private boolean isAvailable;
 
   public IndexedFile() {
     super();
   }
 
   public IndexedFile(String uuid, String parentUUID, String aipId, String representationId, String representationUUID,
-    List<String> path, List<String> ancestorsPath, String id, String referenceUUID, String referenceURL,
-    String referenceManifest, FileFormat fileFormat, String originalName, long size, boolean isDirectory,
-    boolean isReference, String creatingApplicationName, String creatingApplicationVersion,
+    List<String> path, List<String> ancestorsPath, List<String> technicalMetadataIds, String id, String referenceUUID,
+    String referenceURL, String referenceManifest, FileFormat fileFormat, String originalName, long size,
+    boolean isDirectory, boolean isReference, String creatingApplicationName, String creatingApplicationVersion,
     String dateCreatedByApplication, List<String> hash, String storagePath, List<String> ancestors,
     Map<String, List<String>> otherProperties, String instanceId, String instanceName) {
     this.uuid = uuid;
@@ -79,6 +84,7 @@ public class IndexedFile
     this.representationUUID = representationUUID;
     this.path = path;
     this.ancestorsPath = ancestorsPath;
+    this.technicalMetadataIds = technicalMetadataIds;
     this.id = id;
 
     this.referenceUUID = referenceUUID;
@@ -287,12 +293,21 @@ public class IndexedFile
     this.ancestorsPath = ancestorsPath;
   }
 
+  public List<String> getTechnicalMetadataIds() {
+    return technicalMetadataIds;
+  }
+
+  public void setTechnicalMetadataIds(List<String> technicalMetadataIds) {
+    this.technicalMetadataIds = technicalMetadataIds;
+  }
+
   public Map<String, Object> getFields() {
     return fields;
   }
 
   public void setFields(Map<String, Object> fields) {
-    this.fields = fields;
+    fields.entrySet().stream().filter(p -> p.getValue() != null)
+      .forEach(e -> this.fields.put(e.getKey(), e.getValue()));
   }
 
   public String getInstanceId() {
@@ -311,12 +326,28 @@ public class IndexedFile
     this.instanceName = instanceName;
   }
 
+  public boolean isLocalInstance() {
+    return isLocalInstance;
+  }
+
+  public void setLocalInstance(boolean localInstance) {
+    isLocalInstance = localInstance;
+  }
+
   public Date getCreatedOn() {
     return createdOn;
   }
 
   public void setCreatedOn(Date createdOn) {
     this.createdOn = createdOn;
+  }
+
+  public boolean isAvailable() {
+    return isAvailable;
+  }
+
+  public void setAvailable(boolean available) {
+    isAvailable = available;
   }
 
   @Override
@@ -485,15 +516,17 @@ public class IndexedFile
       RodaConstants.FILE_PATH, RodaConstants.INDEX_ID);
   }
 
+  @JsonIgnore
   public String getSHA256Checksum() {
-    if (hash.size() != 0) {
+    if (!hash.isEmpty()) {
       return hash.get(1).split(" ")[0];
     } else
       return null;
   }
 
+  @JsonIgnore
   public String getSHA256Type() {
-    if (hash.size() != 0) {
+    if (!hash.isEmpty()) {
       return hash.get(1).split("\\(")[1].split(",")[0];
     } else
       return null;

@@ -10,9 +10,12 @@ package org.roda.core.data.v2.index.filter;
 import java.io.Serial;
 import java.io.Serializable;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
-import com.fasterxml.jackson.annotation.JsonSubTypes.Type;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+
+import io.swagger.v3.oas.annotations.media.DiscriminatorMapping;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
  * This is a parameter of a {@link Filter}.
@@ -20,20 +23,42 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
  * @author Rui Castro
  */
 
-@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "type")
-@JsonSubTypes({@Type(value = BasicSearchFilterParameter.class, name = "BasicSearchFilterParameter"),
-  @Type(value = EmptyKeyFilterParameter.class, name = "EmptyKeyFilterParameter"),
-  @Type(value = LikeFilterParameter.class, name = "LikeFilterParameter"),
-  @Type(value = NotSimpleFilterParameter.class, name = "NotSimpleFilterParameter"),
-  @Type(value = OneOfManyFilterParameter.class, name = "OneOfManyFilterParameter"),
-  @Type(value = DateIntervalFilterParameter.class, name = "DateIntervalFilterParameter"),
-  @Type(value = DateRangeFilterParameter.class, name = "DateRangeFilterParameter"),
-  @Type(value = LongRangeFilterParameter.class, name = "LongRangeFilterParameter"),
-  @Type(value = StringRangeFilterParameter.class, name = "StringRangeFilterParameter"),
-  @Type(value = SimpleFilterParameter.class, name = "SimpleFilterParameter"),
-  @Type(value = OrFiltersParameters.class, name = "OrFiltersParameters"),
-  @Type(value = AndFiltersParameters.class, name = "AndFiltersParameters"),
-  @Type(value = AllFilterParameter.class, name = "AllFilterParameter")})
+@JsonIgnoreProperties(ignoreUnknown = true)
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, visible = true, include = JsonTypeInfo.As.PROPERTY, property = "type")
+@JsonSubTypes({@JsonSubTypes.Type(value = BasicSearchFilterParameter.class, name = "BasicSearchFilterParameter"),
+  @JsonSubTypes.Type(value = EmptyKeyFilterParameter.class, name = "EmptyKeyFilterParameter"),
+  @JsonSubTypes.Type(value = LikeFilterParameter.class, name = "LikeFilterParameter"),
+  @JsonSubTypes.Type(value = NotSimpleFilterParameter.class, name = "NotSimpleFilterParameter"),
+  @JsonSubTypes.Type(value = OneOfManyFilterParameter.class, name = "OneOfManyFilterParameter"),
+  @JsonSubTypes.Type(value = DateIntervalFilterParameter.class, name = "DateIntervalFilterParameter"),
+  @JsonSubTypes.Type(value = DateRangeFilterParameter.class, name = "DateRangeFilterParameter"),
+  @JsonSubTypes.Type(value = LongRangeFilterParameter.class, name = "LongRangeFilterParameter"),
+  @JsonSubTypes.Type(value = StringRangeFilterParameter.class, name = "StringRangeFilterParameter"),
+  @JsonSubTypes.Type(value = SimpleFilterParameter.class, name = "SimpleFilterParameter"),
+  @JsonSubTypes.Type(value = OrFiltersParameters.class, name = "OrFiltersParameters"),
+  @JsonSubTypes.Type(value = AndFiltersParameters.class, name = "AndFiltersParameters"),
+  @JsonSubTypes.Type(value = AllFilterParameter.class, name = "AllFilterParameter"),
+  @JsonSubTypes.Type(value = ParentWhichFilterParameter.class, name = "ParentWhichFilterParameter"),
+  @JsonSubTypes.Type(value = ChildOfFilterParameter.class, name = "ChildOfFilterParameter"),})
+@Schema(type = "object", subTypes = {BasicSearchFilterParameter.class, EmptyKeyFilterParameter.class,
+  LikeFilterParameter.class, NotSimpleFilterParameter.class, OneOfManyFilterParameter.class,
+  DateIntervalFilterParameter.class, DateRangeFilterParameter.class, LongRangeFilterParameter.class,
+  StringRangeFilterParameter.class, SimpleFilterParameter.class, OrFiltersParameters.class, AndFiltersParameters.class,
+  AllFilterParameter.class, ParentWhichFilterParameter.class, ChildOfFilterParameter.class}, discriminatorMapping = {
+    @DiscriminatorMapping(value = "BasicSearchFilterParameter", schema = BasicSearchFilterParameter.class),
+    @DiscriminatorMapping(value = "LikeFilterParameter", schema = LikeFilterParameter.class),
+    @DiscriminatorMapping(value = "NotSimpleFilterParameter", schema = NotSimpleFilterParameter.class),
+    @DiscriminatorMapping(value = "OneOfManyFilterParameter", schema = OneOfManyFilterParameter.class),
+    @DiscriminatorMapping(value = "DateIntervalFilterParameter", schema = DateIntervalFilterParameter.class),
+    @DiscriminatorMapping(value = "DateRangeFilterParameter", schema = DateRangeFilterParameter.class),
+    @DiscriminatorMapping(value = "LongRangeFilterParameter", schema = LongRangeFilterParameter.class),
+    @DiscriminatorMapping(value = "StringRangeFilterParameter", schema = StringRangeFilterParameter.class),
+    @DiscriminatorMapping(value = "SimpleFilterParameter", schema = SimpleFilterParameter.class),
+    @DiscriminatorMapping(value = "OrFiltersParameters", schema = OrFiltersParameters.class),
+    @DiscriminatorMapping(value = "AndFiltersParameters", schema = AndFiltersParameters.class),
+    @DiscriminatorMapping(value = "AllFilterParameter", schema = AllFilterParameter.class),
+    @DiscriminatorMapping(value = "ParentWhichFilterParameter", schema = ParentWhichFilterParameter.class),
+    @DiscriminatorMapping(value = "ChildOfFilterParameter", schema = ChildOfFilterParameter.class)}, discriminatorProperty = "type")
 public abstract class FilterParameter implements Serializable {
   @Serial
   private static final long serialVersionUID = 3744111668897879761L;
@@ -43,7 +68,7 @@ public abstract class FilterParameter implements Serializable {
   /**
    * Constructs an empty {@link FilterParameter}.
    */
-  public FilterParameter() {
+  protected FilterParameter() {
     // do nothing
   }
 

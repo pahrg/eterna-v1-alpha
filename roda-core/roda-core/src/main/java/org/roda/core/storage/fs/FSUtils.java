@@ -24,6 +24,7 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -43,6 +44,7 @@ import org.roda.core.RodaCoreFactory;
 import org.roda.core.common.iterables.CloseableIterable;
 import org.roda.core.data.common.RodaConstants;
 import org.roda.core.data.exceptions.AlreadyExistsException;
+import org.roda.core.data.exceptions.AuthorizationDeniedException;
 import org.roda.core.data.exceptions.GenericException;
 import org.roda.core.data.exceptions.NotFoundException;
 import org.roda.core.data.exceptions.RequestNotValidException;
@@ -60,6 +62,7 @@ import org.roda.core.storage.DefaultBinaryVersion;
 import org.roda.core.storage.DefaultContainer;
 import org.roda.core.storage.DefaultDirectory;
 import org.roda.core.storage.DefaultStoragePath;
+import org.roda.core.storage.DirectResourceAccess;
 import org.roda.core.storage.ExternalFileManifestContentPayload;
 import org.roda.core.storage.InputStreamContentPayload;
 import org.roda.core.storage.JsonContentPayload;
@@ -108,6 +111,8 @@ public class FSUtils {
    */
   public static void safeUpdate(InputStream stream, Path toPath) throws IOException {
     try {
+      Files.createDirectories(toPath.getParent());
+
       Path tempToPath = toPath.getParent().resolve(toPath.getFileName().toString() + ".temp" + System.nanoTime());
       Files.copy(stream, tempToPath);
       Files.move(tempToPath, toPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
@@ -398,6 +403,190 @@ public class FSUtils {
     return storagePath.asString(SEPARATOR, SEPARATOR_REGEX, SEPARATOR_REPLACEMENT, skipContainer);
   }
 
+  public static StoragePath getStoragePathFromString(String stringStoragePath) throws RequestNotValidException {
+    if (StringUtils.isBlank(stringStoragePath)) {
+      return DefaultStoragePath.empty();
+    }
+    List<String> pathPartials = new ArrayList<>();
+    String[] parts = stringStoragePath.split(SEPARATOR_REGEX);
+    for (String part : parts) {
+      if (StringUtils.isNotBlank(part)) {
+        pathPartials.add(decodePathPartial(part));
+      }
+    }
+    return DefaultStoragePath.parse(pathPartials);
+  }
+
+  /**
+   * Lists direct access resources under a direct access resource
+   * 
+   * @param resource
+   * @param recursive
+   * @return
+   * @throws RequestNotValidException
+   * @throws AuthorizationDeniedException
+   * @throws NotFoundException
+   * @throws GenericException
+   * @throws IOException
+   */
+  public static CloseableIterable<DirectResourceAccess> listDirectAccessResourceChildren(DirectResourceAccess resource,
+    boolean recursive)
+    throws RequestNotValidException, AuthorizationDeniedException, NotFoundException, GenericException {
+    final CloseableIterable<Path> listPaths = recursive ? FSUtils.recursivelyListPaths(resource.getPath())
+      : FSUtils.listPaths(resource.getPath());
+    return new CloseableIterable<DirectResourceAccess>() {
+      @Override
+      public void close() throws IOException {
+        listPaths.close();
+      }
+
+      @Override
+      public Iterator<DirectResourceAccess> iterator() {
+        return new Iterator<DirectResourceAccess>() {
+          @Override
+          public boolean hasNext() {
+            return listPaths.iterator().hasNext();
+          }
+
+          @Override
+          public DirectResourceAccess next() {
+            Path next = listPaths.iterator().next();
+            return new DirectResourceAccess() {
+              @Override
+              public Path getPath() {
+                return next;
+              }
+
+              @Override
+              public boolean isDirectory() {
+                return Files.isDirectory(next);
+              }
+
+              @Override
+              public boolean exists() {
+                return FSUtils.exists(getPath());
+              }
+
+              @Override
+              public void close() {
+                // nothing to do
+              }
+            };
+          }
+        };
+      }
+    };
+  }
+
+  public static Date getDateFromDirectResourceAccess(DirectResourceAccess resource)
+    throws AuthorizationDeniedException, RequestNotValidException, NotFoundException, GenericException, IOException {
+    Path path = resource.getPath();
+    BasicFileAttributes attr = Files.readAttributes(path, BasicFileAttributes.class);
+    FileTime fileTime = attr.creationTime();
+    return new Date(fileTime.toMillis());
+  }
+
+  /**
+   * Counts direct access resources under a direct access resource
+   *
+   * @param resource
+   * @param recursive
+   * @return
+   * @throws RequestNotValidException
+   * @throws AuthorizationDeniedException
+   * @throws NotFoundException
+   * @throws GenericException
+   * @throws IOException
+   */
+  public static Long countDirectAccessResourceChildren(DirectResourceAccess resource, boolean recursive)
+    throws RequestNotValidException, AuthorizationDeniedException, NotFoundException, GenericException, IOException {
+    Long count = 0L;
+    try (final CloseableIterable<Path> listPaths = recursive ? FSUtils.recursivelyListPaths(resource.getPath())
+      : FSUtils.listPaths(resource.getPath())) {
+      for (Path ignored : listPaths) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  public static DirectResourceAccess resolve(DirectResourceAccess directResourceAccess, String... pathPartials)
+    throws AuthorizationDeniedException, RequestNotValidException, NotFoundException, GenericException {
+    Path resolved = directResourceAccess.getPath();
+    for (String pathPartial : pathPartials) {
+      resolved = resolved.resolve(pathPartial);
+    }
+    final Path path = resolved;
+    return new DirectResourceAccess() {
+      @Override
+      public Path getPath() {
+        return path;
+      }
+
+      @Override
+      public boolean isDirectory() {
+        return Files.isDirectory(path);
+      }
+
+      @Override
+      public boolean exists() {
+        return FSUtils.exists(getPath());
+      }
+
+      @Override
+      public void close() throws IOException {
+        // nothing to do
+      }
+    };
+  }
+
+  /**
+   * List absolute paths inside certain path
+   *
+   * @param path
+   *          path to list paths under
+   * @throws NotFoundException
+   * @throws GenericException
+   */
+  public static CloseableIterable<Path> listPaths(final Path path) throws NotFoundException, GenericException {
+    CloseableIterable<Path> pathIterable;
+    try {
+      final DirectoryStream<Path> directoryStream = Files.newDirectoryStream(path);
+      final Iterator<Path> pathIterator = directoryStream.iterator();
+      pathIterable = new CloseableIterable<Path>() {
+
+        @Override
+        public Iterator<Path> iterator() {
+          return new Iterator<Path>() {
+
+            @Override
+            public boolean hasNext() {
+              return pathIterator.hasNext();
+            }
+
+            @Override
+            public Path next() {
+              return pathIterator.next();
+            }
+
+          };
+        }
+
+        @Override
+        public void close() throws IOException {
+          directoryStream.close();
+        }
+      };
+
+    } catch (NoSuchFileException e) {
+      throw new NotFoundException("Could not list contents of entity because it doesn't exist: " + path, e);
+    } catch (IOException e) {
+      throw new GenericException("Could not list contents of entity at: " + path, e);
+    }
+
+    return pathIterable;
+  }
+
   /**
    * List content of the certain folder
    *
@@ -408,7 +597,7 @@ public class FSUtils {
    * @throws NotFoundException
    * @throws GenericException
    */
-  public static CloseableIterable<Resource> listPath(final Path basePath, final Path path)
+  public static CloseableIterable<Resource> listPathResources(final Path basePath, final Path path)
     throws NotFoundException, GenericException {
     CloseableIterable<Resource> resourceIterable;
     try {
@@ -543,7 +732,53 @@ public class FSUtils {
     return count;
   }
 
-  public static CloseableIterable<Resource> recursivelyListPath(final Path basePath, final Path path)
+  public static CloseableIterable<Path> recursivelyListPaths(final Path path)
+    throws NotFoundException, GenericException {
+    CloseableIterable<Path> pathIterable;
+    try {
+      final Stream<Path> walk = Files.walk(path, FileVisitOption.FOLLOW_LINKS);
+      final Iterator<Path> pathIterator = walk.iterator();
+
+      // skip root
+      if (pathIterator.hasNext()) {
+        pathIterator.next();
+      }
+
+      pathIterable = new CloseableIterable<Path>() {
+
+        @Override
+        public Iterator<Path> iterator() {
+          return new Iterator<Path>() {
+
+            @Override
+            public boolean hasNext() {
+              return pathIterator.hasNext();
+            }
+
+            @Override
+            public Path next() {
+              return pathIterator.next();
+            }
+
+          };
+        }
+
+        @Override
+        public void close() {
+          walk.close();
+        }
+      };
+
+    } catch (NoSuchFileException e) {
+      throw new NotFoundException("Could not list contents of entity because it doesn't exist: " + path, e);
+    } catch (IOException e) {
+      throw new GenericException("Could not list contents of entity at: " + path, e);
+    }
+
+    return pathIterable;
+  }
+
+  public static CloseableIterable<Resource> recursivelyListPathResources(final Path basePath, final Path path)
     throws NotFoundException, GenericException {
     CloseableIterable<Resource> resourceIterable;
     try {
@@ -769,8 +1004,7 @@ public class FSUtils {
         ret.setBinary(binary);
       } else {
         Date createdDate = new Date(Files.readAttributes(path, BasicFileAttributes.class).creationTime().toMillis());
-        Map<String, String> defaultProperties = new HashMap<>();
-        ret = new DefaultBinaryVersion(binary, id, createdDate, defaultProperties);
+        ret = new DefaultBinaryVersion(binary, id, createdDate, new HashMap<>());
       }
 
     } catch (IOException e) {

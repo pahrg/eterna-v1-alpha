@@ -12,7 +12,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.roda.core.data.common.RodaConstants;
-import org.roda.core.data.v2.index.IndexResult;
+import org.roda.core.data.v2.index.FindRequest;
 import org.roda.core.data.v2.index.IsIndexed;
 import org.roda.core.data.v2.index.facet.Facets;
 import org.roda.core.data.v2.index.filter.Filter;
@@ -24,7 +24,6 @@ import org.roda.core.data.v2.ip.IndexedAIP;
 import org.roda.core.data.v2.ip.IndexedDIP;
 import org.roda.core.data.v2.ip.IndexedFile;
 import org.roda.core.data.v2.ip.IndexedRepresentation;
-import org.roda.wui.client.browse.BrowserService;
 import org.roda.wui.client.common.actions.Actionable;
 import org.roda.wui.client.common.actions.DisseminationActions;
 import org.roda.wui.client.common.actions.model.ActionableObject;
@@ -32,17 +31,14 @@ import org.roda.wui.client.common.actions.widgets.ActionableWidgetBuilder;
 import org.roda.wui.client.common.popup.CalloutPopup;
 import org.roda.wui.client.common.popup.CalloutPopup.CalloutPosition;
 import org.roda.wui.client.common.utils.AsyncCallbackUtils;
-import org.roda.wui.client.common.utils.IndexedDIPUtils;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.tools.HistoryUtils;
-import org.roda.wui.common.client.tools.StringUtils;
-import org.roda.wui.common.client.widgets.Toast;
 
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.event.dom.client.ClickEvent;
 import com.google.gwt.event.dom.client.ClickHandler;
 import com.google.gwt.i18n.client.LocaleInfo;
 import com.google.gwt.safehtml.shared.SafeHtmlUtils;
-import com.google.gwt.user.client.Window;
 import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.google.gwt.user.client.ui.FlowPanel;
 import com.google.gwt.user.client.ui.FocusPanel;
@@ -78,6 +74,36 @@ public class DisseminationsSliderHelper {
     updateDisseminations(filter, disseminationsSliderPanel);
   }
 
+  private static void updateDisseminationsSliderPanel(IndexedFile file, final SliderPanel disseminationsSliderPanel,
+    Services services) {
+    Filter filter = new Filter(new SimpleFilterParameter(RodaConstants.DIP_FILE_UUIDS, file.getUUID()));
+    updateDisseminations(filter, disseminationsSliderPanel, services);
+  }
+
+  private static void updateDisseminations(Filter filter, final SliderPanel disseminationsSliderPanel,
+    Services services) {
+    Sorter sorter = new Sorter(new SortParameter(RodaConstants.DIP_DATE_CREATED, true));
+    Sublist sublist = new Sublist(0, 100);
+    Facets facets = Facets.NONE;
+    String localeString = LocaleInfo.getCurrentLocale().getLocaleName();
+
+    List<String> dipFields = new ArrayList<>(RodaConstants.DIP_PERMISSIONS_FIELDS_TO_RETURN);
+    dipFields.addAll(Arrays.asList(RodaConstants.INDEX_UUID, RodaConstants.DIP_ID, RodaConstants.DIP_TITLE,
+      RodaConstants.DIP_DESCRIPTION, RodaConstants.DIP_DELETE_EXTERNAL_URL, RodaConstants.DIP_OPEN_EXTERNAL_URL));
+
+    FindRequest findRequest = FindRequest.getBuilder(filter, true).withSorter(sorter)
+      .withSublist(sublist).withFacets(facets).build();
+
+    services.rodaEntityRestService(s -> s.find(findRequest, localeString), IndexedDIP.class)
+      .whenComplete((indexedDIPIndexResult, throwable) -> {
+        if (throwable != null) {
+          AsyncCallbackUtils.defaultFailureTreatment(throwable);
+        } else {
+          updateDisseminationsSliderPanel(indexedDIPIndexResult.getResults(), disseminationsSliderPanel);
+        }
+      });
+  }
+
   private static void updateDisseminations(Filter filter, final SliderPanel disseminationsSliderPanel) {
     Sorter sorter = new Sorter(new SortParameter(RodaConstants.DIP_DATE_CREATED, true));
     Sublist sublist = new Sublist(0, 100);
@@ -88,19 +114,16 @@ public class DisseminationsSliderHelper {
     dipFields.addAll(Arrays.asList(RodaConstants.INDEX_UUID, RodaConstants.DIP_ID, RodaConstants.DIP_TITLE,
       RodaConstants.DIP_DESCRIPTION, RodaConstants.DIP_DELETE_EXTERNAL_URL, RodaConstants.DIP_OPEN_EXTERNAL_URL));
 
-    BrowserService.Util.getInstance().find(IndexedDIP.class.getName(), filter, sorter, sublist, facets, localeString,
-      true, dipFields, new AsyncCallback<IndexResult<IndexedDIP>>() {
+    FindRequest request = FindRequest.getBuilder(filter, true).withFieldsToReturn(dipFields).withSublist(sublist).withSorter(sorter).withFacets(facets).build();
 
-        @Override
-        public void onFailure(Throwable caught) {
-          AsyncCallbackUtils.defaultFailureTreatment(caught);
-        }
-
-        @Override
-        public void onSuccess(IndexResult<IndexedDIP> result) {
-          updateDisseminationsSliderPanel(result.getResults(), disseminationsSliderPanel);
-        }
-      });
+    Services services = new Services("Find Indexed DIP", "get");
+    services.dipResource(s -> s.find(request, localeString)).whenComplete((indexedDIPIndexResult, throwable) -> {
+      if (throwable != null) {
+        AsyncCallbackUtils.defaultFailureTreatment(throwable.getCause());
+      } else {
+        updateDisseminationsSliderPanel(indexedDIPIndexResult.getResults(), disseminationsSliderPanel);
+      }
+    });
   }
 
   private static void updateDisseminationsSliderPanel(List<IndexedDIP> dips, SliderPanel disseminationsSliderPanel) {
@@ -177,6 +200,19 @@ public class DisseminationsSliderHelper {
       updateDisseminationsSliderPanel((IndexedRepresentation) object, disseminationsSliderPanel);
     } else if (object instanceof IndexedFile) {
       updateDisseminationsSliderPanel((IndexedFile) object, disseminationsSliderPanel);
+    } else {
+      // do nothing
+    }
+  }
+
+  protected static <T extends IsIndexed> void updateDisseminationsObjectSliderPanel(final T object,
+    final SliderPanel disseminationsSliderPanel, Services services) {
+    if (object instanceof IndexedAIP) {
+      updateDisseminationsSliderPanel((IndexedAIP) object, disseminationsSliderPanel);
+    } else if (object instanceof IndexedRepresentation) {
+      updateDisseminationsSliderPanel((IndexedRepresentation) object, disseminationsSliderPanel);
+    } else if (object instanceof IndexedFile) {
+      updateDisseminationsSliderPanel((IndexedFile) object, disseminationsSliderPanel, services);
     } else {
       // do nothing
     }

@@ -7,6 +7,7 @@
  */
 package org.roda.core.data.v2.index;
 
+import java.io.Serial;
 import java.io.Serializable;
 
 import org.roda.core.data.v2.index.filter.Filter;
@@ -18,34 +19,45 @@ import org.roda.core.data.v2.index.filter.Filter;
  */
 public class CountRequest implements Serializable {
 
+  @Serial
   private static final long serialVersionUID = -6793510712321710035L;
 
-  /** Class name of resources to return. */
-  public String classToReturn;
   /** Filter. */
-  public Filter filter;
+  private Filter filter;
   /** Return only active resources? */
-  public boolean onlyActive;
+  private boolean onlyActive;
 
   /**
    * Constructor.
    */
   public CountRequest() {
-    this(null, new Filter(), false);
+    this(new Filter(), false);
   }
 
   /**
    * Constructor.
    *
-   * @param classToReturn
-   *          Class name of resources to return.
    * @param filter
    *          Filter.
    */
-  public CountRequest(final String classToReturn, final Filter filter, final boolean onlyActive) {
-    this.classToReturn = classToReturn;
+  public CountRequest(final Filter filter, final boolean onlyActive) {
     this.filter = filter;
     this.onlyActive = onlyActive;
   }
 
+  public Filter getFilter() {
+    return filter;
+  }
+
+  public void setFilter(Filter filter) {
+    this.filter = filter;
+  }
+
+  public boolean isOnlyActive() {
+    return onlyActive;
+  }
+
+  public void setOnlyActive(boolean onlyActive) {
+    this.onlyActive = onlyActive;
+  }
 }

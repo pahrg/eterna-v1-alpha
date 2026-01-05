@@ -9,12 +9,10 @@ package org.roda.wui.client.management.distributed;
 
 import java.util.List;
 
-import org.roda.core.data.v2.synchronization.central.DistributedInstance;
 import org.roda.core.data.v2.synchronization.local.LocalInstance;
-import org.roda.wui.client.browse.BrowserService;
-import org.roda.wui.client.common.NoAsyncCallback;
 import org.roda.wui.client.common.UserLogin;
-import org.roda.wui.client.common.utils.JavascriptUtils;
+import org.roda.wui.client.services.DistributedInstancesRestService;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.HistoryResolver;
 import org.roda.wui.common.client.tools.HistoryUtils;
 import org.roda.wui.common.client.tools.ListUtils;
@@ -38,14 +36,15 @@ public class EditLocalInstanceConfiguration extends Composite {
 
     @Override
     public void resolve(List<String> historyTokens, AsyncCallback<Widget> callback) {
-      BrowserService.Util.getInstance().retrieveLocalInstance(new NoAsyncCallback<LocalInstance>() {
-        @Override
-        public void onSuccess(LocalInstance localInstance) {
-          EditLocalInstanceConfiguration editLocalInstanceConfiguration = new EditLocalInstanceConfiguration(
-            localInstance);
-          callback.onSuccess(editLocalInstanceConfiguration);
-        }
-      });
+      Services services = new Services("Get local instance", "get");
+      services.distributedInstanceResource(DistributedInstancesRestService::getLocalInstance)
+        .whenComplete((localInstance, error) -> {
+          if (!localInstance.equals(new LocalInstance())) {
+            EditLocalInstanceConfiguration editLocalInstanceConfiguration = new EditLocalInstanceConfiguration(
+              localInstance);
+            callback.onSuccess(editLocalInstanceConfiguration);
+          }
+        });
     }
 
     @Override
@@ -85,20 +84,14 @@ public class EditLocalInstanceConfiguration extends Composite {
     initWidget(uiBinder.createAndBindUi(this));
   }
 
-  @Override
-  protected void onLoad() {
-    super.onLoad();
-    JavascriptUtils.stickSidebar();
-  }
-
   @UiHandler("buttonSave")
   void buttonApplyHandler(ClickEvent e) {
     if (localInstanceConfigurationDataPanel.isValid()) {
       LocalInstance localInstanceReturned = localInstanceConfigurationDataPanel.getLocalInstance();
-      BrowserService.Util.getInstance().updateLocalInstanceConfiguration(localInstanceReturned,
-        new NoAsyncCallback<DistributedInstance>() {
-          @Override
-          public void onSuccess(DistributedInstance distributedInstance) {
+      Services services = new Services("Update local instance", "update");
+      services.distributedInstanceResource(s -> s.updateLocalInstanceConfiguration(localInstanceReturned))
+        .whenComplete((updateLocalInstance, error) -> {
+          if (updateLocalInstance != null) {
             HistoryUtils.newHistory(LocalInstanceManagement.RESOLVER);
           }
         });

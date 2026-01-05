@@ -19,8 +19,8 @@ import org.roda.wui.client.common.actions.Actionable;
 import org.roda.wui.client.common.actions.RODAMemberActions;
 import org.roda.wui.client.common.actions.model.ActionableObject;
 import org.roda.wui.client.common.actions.widgets.ActionableWidgetBuilder;
-import org.roda.wui.client.common.utils.JavascriptUtils;
 import org.roda.wui.client.common.utils.SidebarUtils;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.HistoryResolver;
 import org.roda.wui.common.client.tools.ConfigurationManager;
 import org.roda.wui.common.client.tools.HistoryUtils;
@@ -49,17 +49,13 @@ public class ShowGroup extends Composite {
     public void resolve(List<String> historyTokens, final AsyncCallback<Widget> callback) {
       if (historyTokens.size() == 1) {
         String groupname = historyTokens.get(0);
-        UserManagementService.Util.getInstance().getGroup(groupname, new AsyncCallback<Group>() {
-
-          @Override
-          public void onFailure(Throwable caught) {
-            callback.onFailure(caught);
-          }
-
-          @Override
-          public void onSuccess(Group group) {
+        Services services = new Services("Get Group", "get");
+        services.membersResource(s -> s.getGroup(groupname)).whenComplete((group, error) -> {
+          if (group != null) {
             ShowGroup showGroup = new ShowGroup(group);
             callback.onSuccess(showGroup);
+          } else if (error != null) {
+            callback.onFailure(error);
           }
         });
       } else {
@@ -177,12 +173,6 @@ public class ShowGroup extends Composite {
     panel.add(value);
 
     return panel;
-  }
-
-  @Override
-  protected void onLoad() {
-    super.onLoad();
-    JavascriptUtils.stickSidebar();
   }
 
 }

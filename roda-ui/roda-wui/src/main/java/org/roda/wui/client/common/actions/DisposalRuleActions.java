@@ -7,11 +7,6 @@
  */
 package org.roda.wui.client.common.actions;
 
-import com.google.gwt.core.client.GWT;
-import com.google.gwt.user.client.rpc.AsyncCallback;
-import config.i18n.client.ClientMessages;
-import org.roda.core.data.v2.jobs.Job;
-import org.roda.wui.client.browse.BrowserService;
 import org.roda.wui.client.common.NoAsyncCallback;
 import org.roda.wui.client.common.dialogs.Dialogs;
 import org.roda.wui.client.common.dialogs.DisposalDialogs;
@@ -19,8 +14,14 @@ import org.roda.wui.client.common.utils.AsyncCallbackUtils;
 import org.roda.wui.client.disposal.policy.DisposalPolicy;
 import org.roda.wui.client.ingest.process.ShowJob;
 import org.roda.wui.client.process.InternalProcess;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.tools.HistoryUtils;
 import org.roda.wui.common.client.widgets.Toast;
+
+import com.google.gwt.core.client.GWT;
+import com.google.gwt.user.client.rpc.AsyncCallback;
+
+import config.i18n.client.ClientMessages;
 
 /**
  * @author Miguel Guimarães <mguimaraes@keep.pt>
@@ -37,17 +38,14 @@ public class DisposalRuleActions {
           if (result) {
             DisposalDialogs.showApplyRules(messages.applyDisposalRulesDialogTitle(), new NoAsyncCallback<Boolean>() {
               @Override
-              public void onSuccess(Boolean applyToManuallyInclusive) {
-                BrowserService.Util.getInstance().applyDisposalRules(applyToManuallyInclusive,
-                  new AsyncCallback<Job>() {
-                    @Override
-                    public void onFailure(Throwable caught) {
-                      AsyncCallbackUtils.defaultFailureTreatment(caught);
+              public void onSuccess(Boolean overrideManualAssociations) {
+                Services services = new Services("Apply disposal rules", "job");
+                services.disposalRuleResource(s -> s.applyDisposalRules(overrideManualAssociations))
+                  .whenComplete((job, throwable) -> {
+                    if (throwable != null) {
+                      AsyncCallbackUtils.defaultFailureTreatment(throwable);
                       HistoryUtils.newHistory(InternalProcess.RESOLVER);
-                    }
-
-                    @Override
-                    public void onSuccess(Job job) {
+                    } else {
                       Dialogs.showJobRedirectDialog(messages.jobCreatedMessage(), new AsyncCallback<Void>() {
                         @Override
                         public void onFailure(Throwable caught) {

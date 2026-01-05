@@ -12,7 +12,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.roda.core.data.common.RodaConstants;
 import org.roda.core.data.v2.ip.metadata.IndexedPreservationAgent;
 import org.roda.wui.client.common.actions.model.ActionableBundle;
 import org.roda.wui.client.common.actions.model.ActionableGroup;
@@ -36,19 +35,8 @@ public class PreservationAgentActions extends AbstractActionable<IndexedPreserva
     // do nothing
   }
 
-  public enum PreservationAgentAction implements Action<IndexedPreservationAgent> {
-    DOWNLOAD();
-
-    private List<String> methods;
-
-    PreservationAgentAction(String... methods) {
-      this.methods = Arrays.asList(methods);
-    }
-
-    @Override
-    public List<String> getMethods() {
-      return this.methods;
-    }
+  public static PreservationAgentActions get() {
+    return INSTANCE;
   }
 
   @Override
@@ -61,13 +49,15 @@ public class PreservationAgentActions extends AbstractActionable<IndexedPreserva
     return PreservationAgentAction.valueOf(name);
   }
 
-  public static PreservationAgentActions get() {
-    return INSTANCE;
+  @Override
+  public CanActResult userCanAct(Action<IndexedPreservationAgent> action, IndexedPreservationAgent agent) {
+    return new CanActResult(hasPermissions(action), CanActResult.Reason.USER, messages.reasonUserLacksPermission());
   }
 
   @Override
-  public boolean canAct(Action<IndexedPreservationAgent> action, IndexedPreservationAgent agent) {
-    return hasPermissions(action) && POSSIBLE_ACTIONS_ON_SINGLE_AGENT.contains(action);
+  public CanActResult contextCanAct(Action<IndexedPreservationAgent> action, IndexedPreservationAgent agent) {
+    return new CanActResult(POSSIBLE_ACTIONS_ON_SINGLE_AGENT.contains(action), CanActResult.Reason.CONTEXT,
+      messages.reasonCantActOnMultipleObjects());
   }
 
   @Override
@@ -82,8 +72,7 @@ public class PreservationAgentActions extends AbstractActionable<IndexedPreserva
 
   // ACTIONS
   private void download(IndexedPreservationAgent agent, AsyncCallback<ActionImpact> callback) {
-    SafeUri downloadUri = RestUtils.createPreservationAgentUri(agent.getId(),
-      RodaConstants.API_QUERY_VALUE_ACCEPT_FORMAT_BIN);
+    SafeUri downloadUri = RestUtils.createPreservationAgentDownloadUri(agent.getId());
     callback.onSuccess(ActionImpact.NONE);
     Window.Location.assign(downloadUri.asString());
   }
@@ -99,5 +88,20 @@ public class PreservationAgentActions extends AbstractActionable<IndexedPreserva
 
     preservationAgentActionableBundle.addGroup(managementGroup);
     return preservationAgentActionableBundle;
+  }
+
+  public enum PreservationAgentAction implements Action<IndexedPreservationAgent> {
+    DOWNLOAD();
+
+    private List<String> methods;
+
+    PreservationAgentAction(String... methods) {
+      this.methods = Arrays.asList(methods);
+    }
+
+    @Override
+    public List<String> getMethods() {
+      return this.methods;
+    }
   }
 }

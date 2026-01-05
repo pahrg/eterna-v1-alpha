@@ -26,10 +26,9 @@ import org.roda.core.model.ModelService;
 import org.roda.core.plugins.AbstractPlugin;
 import org.roda.core.plugins.Plugin;
 import org.roda.core.plugins.PluginException;
+import org.roda.core.plugins.PluginHelper;
 import org.roda.core.plugins.RODAObjectProcessingLogic;
 import org.roda.core.plugins.orchestrate.JobPluginInfo;
-import org.roda.core.plugins.PluginHelper;
-import org.roda.core.storage.StorageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,15 +71,15 @@ public class SIPRemovePlugin extends AbstractPlugin<TransferredResource> {
   }
 
   @Override
-  public Report execute(IndexService index, ModelService model, StorageService storage,
+  public Report execute(IndexService index, ModelService model,
     List<LiteOptionalWithCause> liteList) throws PluginException {
     return PluginHelper.processObjects(this, new RODAObjectProcessingLogic<TransferredResource>() {
       @Override
-      public void process(IndexService index, ModelService model, StorageService storage, Report report, Job cachedJob,
+      public void process(IndexService index, ModelService model, Report report, Job cachedJob,
         JobPluginInfo jobPluginInfo, Plugin<TransferredResource> plugin, TransferredResource object) {
         processTransferredResource(model, report, jobPluginInfo, cachedJob, object);
       }
-    }, index, model, storage, liteList);
+    }, index, model, liteList);
   }
 
   private void processTransferredResource(ModelService model, Report report, JobPluginInfo pluginInfo, Job job,
@@ -97,7 +96,7 @@ public class SIPRemovePlugin extends AbstractPlugin<TransferredResource> {
         model.createRepositoryEvent(PreservationEventType.DELETION,
           "The process of deleting an object of the repository", PluginState.SUCCESS,
           "The transferred resource " + transferredResource.getId() + " has been deleted.", "", job.getUsername(),
-          true);
+          true, null);
       }
 
       pluginInfo.incrementObjectsProcessedWithSuccess();
@@ -106,7 +105,7 @@ public class SIPRemovePlugin extends AbstractPlugin<TransferredResource> {
         model.createRepositoryEvent(PreservationEventType.DELETION,
           "The process of deleting an object of the repository", PluginState.SUCCESS,
           "The transferred resource " + transferredResource.getId() + " has not been deleted.", "", job.getUsername(),
-          true);
+          true, null);
       }
 
       pluginInfo.incrementObjectsProcessedWithFailure();
@@ -154,14 +153,14 @@ public class SIPRemovePlugin extends AbstractPlugin<TransferredResource> {
   }
 
   @Override
-  public Report beforeAllExecute(IndexService index, ModelService model, StorageService storage)
+  public Report beforeAllExecute(IndexService index, ModelService model)
     throws PluginException {
     createEvent = Boolean.parseBoolean(RodaCoreFactory.getRodaConfigurationAsString("event", "create", "all"));
     return new Report();
   }
 
   @Override
-  public Report afterAllExecute(IndexService index, ModelService model, StorageService storage) throws PluginException {
+  public Report afterAllExecute(IndexService index, ModelService model) throws PluginException {
     return new Report();
   }
 

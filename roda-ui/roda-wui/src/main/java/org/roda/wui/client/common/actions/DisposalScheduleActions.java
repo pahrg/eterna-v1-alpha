@@ -14,11 +14,9 @@ import java.util.List;
 import java.util.Set;
 
 import org.roda.core.data.common.RodaConstants;
+import org.roda.core.data.utils.SelectedItemsUtils;
 import org.roda.core.data.v2.index.select.SelectedItems;
 import org.roda.core.data.v2.ip.IndexedAIP;
-import org.roda.core.data.v2.jobs.Job;
-import org.roda.wui.client.browse.BrowserService;
-import org.roda.wui.client.common.actions.callbacks.ActionAsyncCallback;
 import org.roda.wui.client.common.actions.callbacks.ActionNoAsyncCallback;
 import org.roda.wui.client.common.actions.model.ActionableBundle;
 import org.roda.wui.client.common.actions.model.ActionableGroup;
@@ -27,6 +25,7 @@ import org.roda.wui.client.common.dialogs.Dialogs;
 import org.roda.wui.client.common.lists.utils.ClientSelectedItemsUtils;
 import org.roda.wui.client.ingest.process.ShowJob;
 import org.roda.wui.client.process.InternalProcess;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.tools.HistoryUtils;
 import org.roda.wui.common.client.widgets.Toast;
 
@@ -83,11 +82,17 @@ public class DisposalScheduleActions extends AbstractActionable<IndexedAIP> {
   }
 
   @Override
-  public boolean canAct(Action<IndexedAIP> action, ActionableObject<IndexedAIP> object) {
+  public CanActResult userCanAct(Action<IndexedAIP> action, ActionableObject<IndexedAIP> object) {
+    return new CanActResult(hasPermissions(action), CanActResult.Reason.USER, messages.reasonUserLacksPermission());
+  }
+
+  @Override
+  public CanActResult contextCanAct(Action<IndexedAIP> action, ActionableObject<IndexedAIP> object) {
     if (object.getObject() != null || object.getObjects() != null) {
-      return hasPermissions(action) && POSSIBLE_ACTIONS_ON_DISPOSAL_SCHEDULE.contains(action);
+      return new CanActResult(POSSIBLE_ACTIONS_ON_DISPOSAL_SCHEDULE.contains(action), CanActResult.Reason.CONTEXT,
+        messages.reasonInvalidContext());
     } else {
-      return false;
+      return new CanActResult(false, CanActResult.Reason.CONTEXT, messages.reasonNoObjectSelected());
     }
   }
 
@@ -119,16 +124,15 @@ public class DisposalScheduleActions extends AbstractActionable<IndexedAIP> {
             @Override
             public void onSuccess(Boolean result) {
               if (result) {
-                BrowserService.Util.getInstance().disassociateDisposalSchedule(items,
-                  new ActionAsyncCallback<Job>(callback) {
-                    @Override
-                    public void onFailure(Throwable caught) {
-                      callback.onFailure(caught);
+                Services services = new Services("Disassociate disposal schedule from AIP", "job");
+                services
+                  .disposalScheduleResource(
+                    s -> s.disassociatedDisposalSchedule(SelectedItemsUtils.convertToRESTRequest(items)))
+                  .whenComplete((job, throwable) -> {
+                    if (throwable != null) {
+                      callback.onFailure(throwable);
                       HistoryUtils.newHistory(InternalProcess.RESOLVER);
-                    }
-
-                    @Override
-                    public void onSuccess(Job job) {
+                    } else {
                       Dialogs.showJobRedirectDialog(messages.jobCreatedMessage(), new AsyncCallback<Void>() {
 
                         @Override

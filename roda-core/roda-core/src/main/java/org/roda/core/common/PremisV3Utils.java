@@ -57,14 +57,12 @@ import org.roda.core.data.exceptions.RequestNotValidException;
 import org.roda.core.data.utils.URNUtils;
 import org.roda.core.data.utils.XMLUtils;
 import org.roda.core.data.v2.ip.File;
-import org.roda.core.data.v2.ip.StoragePath;
 import org.roda.core.data.v2.ip.metadata.Fixity;
 import org.roda.core.data.v2.ip.metadata.IndexedPreservationAgent;
 import org.roda.core.data.v2.ip.metadata.IndexedPreservationEvent;
 import org.roda.core.data.v2.ip.metadata.LinkingIdentifier;
 import org.roda.core.data.v2.ip.metadata.PreservationMetadata;
 import org.roda.core.data.v2.ip.metadata.PreservationMetadata.PreservationMetadataType;
-import org.roda.core.data.v2.jobs.Job;
 import org.roda.core.data.v2.jobs.JobUserDetails;
 import org.roda.core.data.v2.user.RODAMember;
 import org.roda.core.data.v2.user.User;
@@ -173,7 +171,9 @@ public final class PremisV3Utils {
   }
 
   public static void updateFileFormat(gov.loc.premis.v3.File file, String formatDesignationName,
-    String formatDesignationVersion, String pronom, String mimeType) {
+    String formatDesignationVersion, String pronom, String mimeType, List<String> notes) {
+
+    setAllFormatNotes(file, notes);
 
     if (StringUtils.isNotBlank(formatDesignationName)) {
       FormatDesignationComplexType fdct = getFormatDesignation(file);
@@ -194,6 +194,11 @@ public final class PremisV3Utils {
       frct.setFormatRegistryKey(getStringPlusAuthority(mimeType));
     }
 
+  }
+
+  public static void updateFileFormat(gov.loc.premis.v3.File file, String formatDesignationName,
+    String formatDesignationVersion, String pronom, String mimeType) {
+    updateFileFormat(file, formatDesignationName, formatDesignationVersion, pronom, mimeType, null);
   }
 
   public static void updateTechnicalMetadata(gov.loc.premis.v3.File file, TechnicalMetadata technicalMetadata)
@@ -274,6 +279,86 @@ public final class PremisV3Utils {
     return extensionComplexType;
   }
 
+  public static List<String> getFormatNotes(ModelService model, String aipId, String representationId,
+    List<String> fileDirectoryPath, String fileId, String username) {
+    Binary premisBin = null;
+
+    try {
+      try {
+        premisBin = model.retrievePreservationFile(aipId, representationId, fileDirectoryPath, fileId);
+      } catch (NotFoundException e) {
+        LOGGER.debug("PREMIS object skeleton does not exist yet. Creating PREMIS object!");
+        List<String> algorithms = RodaCoreFactory.getFixityAlgorithms();
+
+        if (fileId == null) {
+          PremisSkeletonPluginUtils.createPremisSkeletonOnRepresentation(model, aipId, representationId, algorithms,
+            username);
+        } else {
+          File file = model.retrieveFile(aipId, representationId, fileDirectoryPath, fileId);
+          PremisSkeletonPluginUtils.createPremisSkeletonOnFile(model, file, algorithms, username);
+        }
+
+        premisBin = model.retrievePreservationFile(aipId, representationId, fileDirectoryPath, fileId);
+        LOGGER.debug("PREMIS object skeleton created");
+      }
+      gov.loc.premis.v3.File premisFile = binaryToFile(premisBin.getContent(), false);
+      ObjectCharacteristicsComplexType objectCharacteristics;
+      if (premisFile.getObjectIdentifier() != null && !premisFile.getObjectIdentifier().isEmpty()) {
+        objectCharacteristics = premisFile.getObjectCharacteristics().get(0);
+        if (objectCharacteristics.getFormat() != null && !objectCharacteristics.getFormat().isEmpty()) {
+          for (FormatComplexType format : objectCharacteristics.getFormat()) {
+            if (format.getFormatNote() != null) {
+              return format.getFormatNote();
+            }
+          }
+        }
+      }
+    } catch (RODAException | IOException e) {
+      LOGGER.error("PREMIS could not be checked due to an error", e);
+    }
+    return new ArrayList<>();
+  }
+
+  public static boolean formatWasManuallyModified(ModelService model, String aipId, String representationId,
+    List<String> fileDirectoryPath, String fileId, String username) {
+    Binary premisBin = null;
+
+    try {
+      try {
+        premisBin = model.retrievePreservationFile(aipId, representationId, fileDirectoryPath, fileId);
+      } catch (NotFoundException e) {
+        LOGGER.debug("PREMIS object skeleton does not exist yet. Creating PREMIS object!");
+        List<String> algorithms = RodaCoreFactory.getFixityAlgorithms();
+
+        if (fileId == null) {
+          PremisSkeletonPluginUtils.createPremisSkeletonOnRepresentation(model, aipId, representationId, algorithms,
+            username);
+        } else {
+          File file = model.retrieveFile(aipId, representationId, fileDirectoryPath, fileId);
+          PremisSkeletonPluginUtils.createPremisSkeletonOnFile(model, file, algorithms, username);
+        }
+
+        premisBin = model.retrievePreservationFile(aipId, representationId, fileDirectoryPath, fileId);
+        LOGGER.debug("PREMIS object skeleton created");
+      }
+      gov.loc.premis.v3.File premisFile = binaryToFile(premisBin.getContent(), false);
+      ObjectCharacteristicsComplexType objectCharacteristics;
+      if (premisFile.getObjectIdentifier() != null && !premisFile.getObjectIdentifier().isEmpty()) {
+        objectCharacteristics = premisFile.getObjectCharacteristics().get(0);
+        if (objectCharacteristics.getFormat() != null && !objectCharacteristics.getFormat().isEmpty()) {
+          for (FormatComplexType format : objectCharacteristics.getFormat()) {
+            if (format.getFormatNote() != null) {
+              return format.getFormatNote().contains(RodaConstants.PRESERVATION_FORMAT_NOTE_MANUAL);
+            }
+          }
+        }
+      }
+    } catch (RODAException | IOException e) {
+      LOGGER.error("PREMIS could not be checked due to an error", e);
+    }
+    return false;
+  }
+
   public static FormatRegistryComplexType getFormatRegistry(gov.loc.premis.v3.File file, String registryName) {
     ObjectCharacteristicsComplexType objectCharacteristics;
     FormatRegistryComplexType formatRegistry = null;
@@ -333,6 +418,25 @@ public final class PremisV3Utils {
       formatDesignation = FACTORY.createFormatDesignationComplexType();
     }
     return formatDesignation;
+  }
+
+  public static void setAllFormatNotes(gov.loc.premis.v3.File file, List<String> notes) {
+    ObjectCharacteristicsComplexType objectCharacteristics;
+    if (file.getObjectCharacteristics() != null && !file.getObjectCharacteristics().isEmpty()) {
+      objectCharacteristics = file.getObjectCharacteristics().get(0);
+    } else {
+      objectCharacteristics = FACTORY.createObjectCharacteristicsComplexType();
+      file.getObjectCharacteristics().add(objectCharacteristics);
+    }
+
+    if (objectCharacteristics.getFormat() != null && !objectCharacteristics.getFormat().isEmpty()) {
+      for (FormatComplexType format : objectCharacteristics.getFormat()) {
+        format.getFormatNote().clear();
+        format.getFormatNote().addAll(notes);
+      }
+    } else {
+      FACTORY.createFormatComplexType().getFormatNote().addAll(notes);
+    }
   }
 
   public static ContentPayload createPremisEventBinary(String eventID, Date date, String type, String details,
@@ -546,7 +650,7 @@ public final class PremisV3Utils {
     objectCharacteristics.getFormat().add(formatComplexType);
     file.getObjectCharacteristics().add(objectCharacteristics);
 
-    Binary binary = model.getStorage().getBinary(ModelUtils.getFileStoragePath(originalFile));
+    Binary binary = model.getBinary(originalFile);
     if (binary != null && binary.getContentDigest() != null && !binary.getContentDigest().isEmpty()) {
       // use binary content digest information
       for (Entry<String, String> entry : binary.getContentDigest().entrySet()) {
@@ -568,7 +672,7 @@ public final class PremisV3Utils {
           objectCharacteristics.getFixity().add(premisFixity);
         }
       } catch (IOException | NoSuchAlgorithmException e) {
-        LOGGER.warn("Could not calculate fixity for file " + originalFile);
+        LOGGER.warn("Could not calculate fixity for file {}", originalFile);
       }
     }
 
@@ -582,10 +686,9 @@ public final class PremisV3Utils {
     StorageComplexType storage = FACTORY.createStorageComplexType();
     String contentLocation;
     try {
-      contentLocation = String
-        .valueOf(model.getStorage().getBinary(ModelUtils.getFileStoragePath(originalFile)).getContent().getURI());
+      contentLocation = String.valueOf(model.getBinary(originalFile).getContent().getURI());
     } catch (IOException e) {
-      LOGGER.debug(String.format("Can't create URI, %s: %s", e.getCause(), e.getMessage()));
+      LOGGER.debug("Can't create URI, {}: {}", e.getCause(), e.getMessage());
       contentLocation = ModelUtils.getFileStoragePath(originalFile).asString("/", null, null, false);
     }
 
@@ -874,8 +977,7 @@ public final class PremisV3Utils {
     } else if (pm.getType().equals(PreservationMetadataType.REPRESENTATION)
       || pm.getType().equals(PreservationMetadataType.FILE)) {
       try {
-        StoragePath path = ModelUtils.getPreservationMetadataStoragePath(pm);
-        ContentPayload payload = model.getStorage().getBinary(path).getContent();
+        ContentPayload payload = model.getBinary(pm).getContent();
 
         model.createPreservationMetadata(pm.getType(), updatedId, pm.getAipId(), pm.getRepresentationId(),
           pm.getFileDirectoryPath(), pm.getFileId(), payload, username, false);
@@ -932,8 +1034,9 @@ public final class PremisV3Utils {
   }
 
   public static PreservationMetadata createOrUpdatePremisUserAgentBinary(String username, ModelService model,
-    IndexService index, boolean notify, Job job) throws GenericException, ValidationException, NotFoundException,
-    RequestNotValidException, AuthorizationDeniedException, AlreadyExistsException {
+    IndexService index, boolean notify, List<JobUserDetails> jobUserDetails)
+    throws GenericException, ValidationException, NotFoundException, RequestNotValidException,
+    AuthorizationDeniedException, AlreadyExistsException {
     PreservationMetadata pm = null;
 
     if (StringUtils.isNotBlank(username)) {
@@ -943,11 +1046,11 @@ public final class PremisV3Utils {
       String note = "";
       String version = "";
 
-      if (job != null) {
-        for (JobUserDetails jobUserDetails : job.getJobUsersDetails()) {
-          if (jobUserDetails.getUsername().equals(username)) {
-            fullName = jobUserDetails.getFullname();
-            note = jobUserDetails.getEmail();
+      if (jobUserDetails != null) {
+        for (JobUserDetails jobUserDetail : jobUserDetails) {
+          if (jobUserDetail.getUsername().equals(username)) {
+            fullName = jobUserDetail.getFullname();
+            note = jobUserDetail.getEmail();
           }
         }
       } else {
@@ -984,7 +1087,7 @@ public final class PremisV3Utils {
 
   public static void updateFormatPreservationMetadata(ModelService model, String aipId, String representationId,
     List<String> fileDirectoryPath, String fileId, String format, String version, String pronom, String mime,
-    String username, boolean notify) {
+    List<String> notes, String username, boolean notify) {
     Binary premisBin;
 
     try {
@@ -998,14 +1101,6 @@ public final class PremisV3Utils {
           PremisSkeletonPluginUtils.createPremisSkeletonOnRepresentation(model, aipId, representationId, algorithms,
             username);
         } else {
-          // File file;
-          // if (shallow) {
-          // file = model.retrieveFileInsideManifest(aipId, representationId,
-          // fileDirectoryPath, fileId);
-          // } else {
-          // file = model.retrieveFile(aipId, representationId, fileDirectoryPath,
-          // fileId);
-          // }
           File file = model.retrieveFile(aipId, representationId, fileDirectoryPath, fileId);
           PremisSkeletonPluginUtils.createPremisSkeletonOnFile(model, file, algorithms, username);
         }
@@ -1015,7 +1110,7 @@ public final class PremisV3Utils {
       }
 
       gov.loc.premis.v3.File premisFile = binaryToFile(premisBin.getContent(), false);
-      PremisV3Utils.updateFileFormat(premisFile, format, version, pronom, mime);
+      PremisV3Utils.updateFileFormat(premisFile, format, version, pronom, mime, notes);
 
       PreservationMetadataType type = PreservationMetadataType.FILE;
       String id = IdUtils.getPreservationFileId(fileId, RODAInstanceUtils.getLocalInstanceIdentifier());
@@ -1079,8 +1174,8 @@ public final class PremisV3Utils {
     ValidationEventCollector validationCollector = new ValidationEventCollector();
 
     try {
-      jaxbContext = JAXBContext.newInstance(gov.loc.premis.v3.PremisComplexType.class, gov.loc.premis.v3.AgentComplexType.class,
-              gov.loc.premis.v3.EventComplexType.class);
+      jaxbContext = JAXBContext.newInstance(gov.loc.premis.v3.PremisComplexType.class,
+        gov.loc.premis.v3.AgentComplexType.class, gov.loc.premis.v3.EventComplexType.class);
       Unmarshaller jaxbUnmarshaller = jaxbContext.createUnmarshaller();
 
       if (validate) {

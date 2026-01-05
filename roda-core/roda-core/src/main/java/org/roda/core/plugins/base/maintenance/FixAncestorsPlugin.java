@@ -42,7 +42,6 @@ import org.roda.core.plugins.PluginException;
 import org.roda.core.plugins.PluginHelper;
 import org.roda.core.plugins.RODAProcessingLogic;
 import org.roda.core.plugins.orchestrate.JobPluginInfo;
-import org.roda.core.storage.StorageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,7 +55,6 @@ public class FixAncestorsPlugin extends AbstractPlugin<Void> {
     pluginParameters.put(RodaConstants.PLUGIN_PARAMS_OTHER_JOB_ID,
       PluginParameter
         .getBuilder(RodaConstants.PLUGIN_PARAMS_OTHER_JOB_ID, "Ingest job identifier", PluginParameterType.STRING)
-        .isMandatory(false).isReadOnly(false)
         .withDescription("The identifier of the job responsible to ingest the information package to fix.").build());
   }
 
@@ -114,18 +112,17 @@ public class FixAncestorsPlugin extends AbstractPlugin<Void> {
   }
 
   @Override
-  public Report execute(IndexService index, ModelService model, StorageService storage,
+  public Report execute(IndexService index, ModelService model,
     List<LiteOptionalWithCause> list) throws PluginException {
 
     final int counter = calculateSourceObjectsCount(index);
     return PluginHelper.processVoids(this, new RODAProcessingLogic<Void>() {
       @Override
-      public void process(IndexService index, ModelService model, StorageService storage, Report report, Job cachedJob,
+      public void process(IndexService index, ModelService model, Report report, Job cachedJob,
         JobPluginInfo jobPluginInfo, Plugin<Void> plugin) {
-        fixAncestors(index, model, report, jobPluginInfo, jobPluginInfo.getSourceObjectsCount(),
-          cachedJob.getUsername());
+        fixAncestors(index, model, report, cachedJob, jobPluginInfo, jobPluginInfo.getSourceObjectsCount());
       }
-    }, index, model, storage, counter);
+    }, index, model, counter);
   }
 
   private int calculateSourceObjectsCount(IndexService index) {
@@ -146,11 +143,12 @@ public class FixAncestorsPlugin extends AbstractPlugin<Void> {
     return count;
   }
 
-  private void fixAncestors(IndexService index, ModelService model, Report report, JobPluginInfo jobPluginInfo,
-    int counter, String username) {
+  private void fixAncestors(IndexService index, ModelService model, Report report, Job cachedJob,
+    JobPluginInfo jobPluginInfo, int counter) {
     try {
       Optional<String> computedSearchScope = PluginHelper.getSearchScopeFromParameters(this, model);
-      PluginHelper.fixParents(index, model, Optional.ofNullable(originalJobId), computedSearchScope, username);
+      PluginHelper.fixParents(index, model, Optional.ofNullable(originalJobId), computedSearchScope,
+        cachedJob.getUsername());
       jobPluginInfo.incrementObjectsProcessedWithSuccess(counter);
       report.setPluginState(PluginState.SUCCESS);
     } catch (NotFoundException | GenericException | RequestNotValidException | AuthorizationDeniedException e) {
@@ -162,11 +160,7 @@ public class FixAncestorsPlugin extends AbstractPlugin<Void> {
       reportItem.setPluginDetails("Ancestors fix failed: " + e.getMessage());
       reportItem.setPluginState(PluginState.FAILURE);
       report.addReport(reportItem);
-      try {
-        PluginHelper.updatePartialJobReport(this, model, reportItem, true, PluginHelper.getJob(this, index));
-      } catch (NotFoundException | GenericException | RequestNotValidException e1) {
-        LOGGER.error("Error when updating job when ancestors fix failed", e1);
-      }
+      PluginHelper.updatePartialJobReport(this, model, reportItem, true, cachedJob);
     }
   }
 
@@ -206,14 +200,14 @@ public class FixAncestorsPlugin extends AbstractPlugin<Void> {
   }
 
   @Override
-  public Report beforeAllExecute(IndexService index, ModelService model, StorageService storage)
+  public Report beforeAllExecute(IndexService index, ModelService model)
     throws PluginException {
     // do nothing
     return null;
   }
 
   @Override
-  public Report afterAllExecute(IndexService index, ModelService model, StorageService storage) throws PluginException {
+  public Report afterAllExecute(IndexService index, ModelService model) throws PluginException {
     // do nothing
     return null;
   }

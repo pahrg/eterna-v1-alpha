@@ -26,6 +26,7 @@ import org.roda.core.data.v2.LiteOptionalWithCause;
 import org.roda.core.data.v2.Void;
 import org.roda.core.data.v2.jobs.PluginParameter;
 import org.roda.core.data.v2.jobs.PluginParameter.PluginParameterType;
+import org.roda.core.data.v2.jobs.PluginState;
 import org.roda.core.data.v2.jobs.PluginType;
 import org.roda.core.data.v2.jobs.Report;
 import org.roda.core.index.IndexService;
@@ -33,7 +34,7 @@ import org.roda.core.model.ModelService;
 import org.roda.core.plugins.AbstractPlugin;
 import org.roda.core.plugins.Plugin;
 import org.roda.core.plugins.PluginException;
-import org.roda.core.storage.StorageService;
+import org.roda.core.plugins.PluginHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -101,8 +102,11 @@ public class ActionLogCleanerPlugin extends AbstractPlugin<Void> {
   }
 
   @Override
-  public Report execute(IndexService index, ModelService model, StorageService storage,
+  public Report execute(IndexService index, ModelService model,
     List<LiteOptionalWithCause> entries) throws PluginException {
+
+    Report report = PluginHelper.initPluginReportItem(this, Report.NO_OUTCOME_OBJECT_ID, Report.NO_SOURCE_OBJECT_ID);
+    report.setPluginState(PluginState.SUCCESS);
 
     if (deleteOlderThanXDays > 0) {
       Calendar cal = Calendar.getInstance();
@@ -112,22 +116,25 @@ public class ActionLogCleanerPlugin extends AbstractPlugin<Void> {
       try {
         index.deleteActionLog(until);
       } catch (SolrServerException | IOException | AuthorizationDeniedException e) {
-        LOGGER.error("Error deleting audit logs until {}", until);
+        String errorMessage = "Error deleting audit logs until " + until;
+        LOGGER.error(errorMessage);
+        report.setPluginDetails(errorMessage);
+        report.setPluginState(PluginState.FAILURE);
       }
     }
 
-    return null;
+    return report;
   }
 
   @Override
-  public Report beforeAllExecute(IndexService index, ModelService model, StorageService storage)
+  public Report beforeAllExecute(IndexService index, ModelService model)
     throws PluginException {
     // do nothing
     return null;
   }
 
   @Override
-  public Report afterAllExecute(IndexService index, ModelService model, StorageService storage) throws PluginException {
+  public Report afterAllExecute(IndexService index, ModelService model) throws PluginException {
     LOGGER.debug("Optimizing indexes");
     try {
       index.optimizeIndex(RodaConstants.INDEX_ACTION_LOG);

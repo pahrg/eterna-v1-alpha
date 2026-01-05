@@ -36,6 +36,7 @@ import org.roda.core.data.v2.jobs.PluginType;
 import org.roda.core.data.v2.user.User;
 import org.roda.core.model.ModelService;
 import org.roda.core.plugins.base.maintenance.UpdatePermissionsPlugin;
+import org.roda.core.security.LdapUtilityTestHelper;
 import org.roda.core.storage.fs.FSUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,10 +52,12 @@ public class PermissionsRecursiveTest {
   private static Path basePath;
   private static ModelService model;
   private static IndexService index;
+  private static LdapUtilityTestHelper ldapUtilityTestHelper;
 
   @BeforeClass
   public static void setUp() throws Exception {
     basePath = TestsHelper.createBaseTempDir(PermissionsRecursiveTest.class, true);
+    ldapUtilityTestHelper = new LdapUtilityTestHelper();
 
     boolean deploySolr = true;
     boolean deployLdap = true;
@@ -63,7 +66,7 @@ public class PermissionsRecursiveTest {
     boolean deployPluginManager = true;
     boolean deployDefaultResources = false;
     RodaCoreFactory.instantiateTest(deploySolr, deployLdap, deployFolderMonitor, deployOrchestrator,
-      deployPluginManager, deployDefaultResources, false);
+      deployPluginManager, deployDefaultResources, false, ldapUtilityTestHelper.getLdapUtility());
 
     model = RodaCoreFactory.getModelService();
     index = RodaCoreFactory.getIndexService();
@@ -79,18 +82,20 @@ public class PermissionsRecursiveTest {
   @AfterClass
   public static void tearDown() throws Exception {
     IndexTestUtils.resetIndex();
+    ldapUtilityTestHelper.shutdown();
     RodaCoreFactory.shutdown();
     FSUtils.deletePath(basePath);
   }
 
   @Test
   public void testUpdatePermissionsRecursively() throws RODAException {
-    AIP parent = model.createAIP(null, "", new Permissions(), RodaConstants.ADMIN);
-    AIP firstChild = model.createAIP(parent.getId(), "", new Permissions(), RodaConstants.ADMIN);
-    AIP otherChild = model.createAIP(parent.getId(), "", new Permissions(), RodaConstants.ADMIN);
-    model.createAIP(otherChild.getId(), "", new Permissions(), RodaConstants.ADMIN);
+    AIP parent = model.createAIP(null, "", new Permissions(), RodaConstants.ADMIN, null);
+    AIP firstChild = model.createAIP(parent.getId(), "", new Permissions(), RodaConstants.ADMIN, null);
+    AIP otherChild = model.createAIP(parent.getId(), "", new Permissions(), RodaConstants.ADMIN, null);
+    model.createAIP(otherChild.getId(), "", new Permissions(), RodaConstants.ADMIN, null);
 
     User user = new User();
+    user.setId("rodauser");
     user.setName("rodauser");
     user.setFullName("Roda User");
     user.setEmail("rodauser@example.com");

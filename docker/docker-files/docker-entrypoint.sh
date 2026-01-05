@@ -9,8 +9,8 @@ then
 fi
 
 if [[ $# -eq 0 ]] ; then
-    echo 'Starting Apache Tomcat (user: roda)'
-    exec catalina.sh run
+    echo "Starting RODA (user: $(whoami))"
+    exec java -jar /KEEPS/bin/roda-wui-*.jar
 fi
 
 exec "$@"

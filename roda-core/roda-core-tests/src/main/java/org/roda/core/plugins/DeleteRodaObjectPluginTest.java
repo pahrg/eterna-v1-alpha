@@ -41,6 +41,7 @@ import org.roda.core.index.IndexService;
 import org.roda.core.index.IndexTestUtils;
 import org.roda.core.model.ModelService;
 import org.roda.core.plugins.base.maintenance.DeleteRODAObjectPlugin;
+import org.roda.core.security.LdapUtilityTestHelper;
 import org.roda.core.storage.StringContentPayload;
 import org.roda.core.storage.fs.FSUtils;
 import org.roda.core.util.IdUtils;
@@ -59,10 +60,12 @@ public class DeleteRodaObjectPluginTest {
   private static Path basePath;
   private static ModelService model;
   private static IndexService index;
+  private static LdapUtilityTestHelper ldapUtilityTestHelper;
 
   @BeforeClass
   public void setUp() throws Exception {
     basePath = TestsHelper.createBaseTempDir(getClass(), true);
+    ldapUtilityTestHelper = new LdapUtilityTestHelper();
 
     boolean deploySolr = true;
     boolean deployLdap = true;
@@ -71,7 +74,7 @@ public class DeleteRodaObjectPluginTest {
     boolean deployPluginManager = true;
     boolean deployDefaultResources = false;
     RodaCoreFactory.instantiateTest(deploySolr, deployLdap, deployFolderMonitor, deployOrchestrator,
-      deployPluginManager, deployDefaultResources, false);
+      deployPluginManager, deployDefaultResources, false, ldapUtilityTestHelper.getLdapUtility());
     model = RodaCoreFactory.getModelService();
     index = RodaCoreFactory.getIndexService();
 
@@ -81,6 +84,7 @@ public class DeleteRodaObjectPluginTest {
   @AfterClass
   public void tearDown() throws Exception {
     IndexTestUtils.resetIndex();
+    ldapUtilityTestHelper.shutdown();
     RodaCoreFactory.shutdown();
     FSUtils.deletePath(basePath);
   }
@@ -150,7 +154,7 @@ public class DeleteRodaObjectPluginTest {
   public void testDeleteAIPWithASingleLinkInDIP() throws AuthorizationDeniedException, GenericException,
     RequestNotValidException, NotFoundException, AlreadyExistsException {
     // create AIP and rep
-    AIP aip = model.createAIP(null, "", new Permissions(), RodaConstants.ADMIN);
+    AIP aip = model.createAIP(null, "", new Permissions(), RodaConstants.ADMIN, null);
 
     // create DIP
     DIP dip = createAIPDIP(Collections.singletonList(aip));
@@ -171,8 +175,8 @@ public class DeleteRodaObjectPluginTest {
   public void testDeleteAIPWithAMultiplesLinkInDIP() throws AuthorizationDeniedException, GenericException,
     RequestNotValidException, NotFoundException, AlreadyExistsException {
     // create AIP and rep
-    AIP aip = model.createAIP(null, "", new Permissions(), RodaConstants.ADMIN);
-    AIP aip2 = model.createAIP(null, "", new Permissions(), RodaConstants.ADMIN);
+    AIP aip = model.createAIP(null, "", new Permissions(), RodaConstants.ADMIN, null);
+    AIP aip2 = model.createAIP(null, "", new Permissions(), RodaConstants.ADMIN, null);
 
     // create DIP
     DIP dip = createAIPDIP(Arrays.asList(aip, aip2));
@@ -200,7 +204,7 @@ public class DeleteRodaObjectPluginTest {
   public void testDeleteAIPWithALinkedRepresentationInDIP() throws AuthorizationDeniedException, GenericException,
     RequestNotValidException, NotFoundException, AlreadyExistsException {
     // create AIP and rep
-    AIP aip = model.createAIP(null, "", new Permissions(), RodaConstants.ADMIN);
+    AIP aip = model.createAIP(null, "", new Permissions(), RodaConstants.ADMIN, null);
     Representation representation = model.createRepresentation(aip.getId(), IdUtils.createUUID(), true, "", true,
       RodaConstants.ADMIN);
 
@@ -223,7 +227,7 @@ public class DeleteRodaObjectPluginTest {
   public void testDeleteAIPWithALinkedFileInDIP() throws AuthorizationDeniedException, GenericException,
     RequestNotValidException, NotFoundException, AlreadyExistsException {
     // create AIP and rep
-    AIP aip = model.createAIP(null, "", new Permissions(), RodaConstants.ADMIN);
+    AIP aip = model.createAIP(null, "", new Permissions(), RodaConstants.ADMIN, null);
     Representation representation = model.createRepresentation(aip.getId(), IdUtils.createUUID(), true, "", true,
       RodaConstants.ADMIN);
     File file = model.createFile(aip.getId(), representation.getId(), Collections.emptyList(), "file",
@@ -248,14 +252,14 @@ public class DeleteRodaObjectPluginTest {
   public void testDeleteAIPWithAIPChildAndALinkInDIP() throws AuthorizationDeniedException, GenericException,
     RequestNotValidException, NotFoundException, AlreadyExistsException {
     // create AIP
-    AIP aip = model.createAIP(null, "", new Permissions(), RodaConstants.ADMIN);
+    AIP aip = model.createAIP(null, "", new Permissions(), RodaConstants.ADMIN, null);
     DIP dip = createAIPDIP(Collections.singletonList(aip));
 
     // create AIP child
-    AIP aipChild = model.createAIP(aip.getId(), "", new Permissions(), RodaConstants.ADMIN);
+    AIP aipChild = model.createAIP(aip.getId(), "", new Permissions(), RodaConstants.ADMIN, null);
     DIP dipChild = createAIPDIP(Collections.singletonList(aipChild));
 
-    AIP aipChild2 = model.createAIP(aip.getId(), "", new Permissions(), RodaConstants.ADMIN);
+    AIP aipChild2 = model.createAIP(aip.getId(), "", new Permissions(), RodaConstants.ADMIN, null);
     DIP dipChild2 = createAIPDIP(Collections.singletonList(aipChild2));
 
     Job jobDeleteAIP = TestsHelper.executeJob(DeleteRODAObjectPlugin.class, Collections.EMPTY_MAP, PluginType.INTERNAL,
@@ -283,7 +287,7 @@ public class DeleteRodaObjectPluginTest {
   public void testDeleteRepresentationWithASingleLinkInDIP() throws AuthorizationDeniedException, GenericException,
     RequestNotValidException, NotFoundException, AlreadyExistsException {
     // create AIP and rep
-    AIP aip = model.createAIP(null, "", new Permissions(), RodaConstants.ADMIN);
+    AIP aip = model.createAIP(null, "", new Permissions(), RodaConstants.ADMIN, null);
     Representation representation = model.createRepresentation(aip.getId(), IdUtils.createUUID(), true, "", true,
       RodaConstants.ADMIN);
 
@@ -306,7 +310,7 @@ public class DeleteRodaObjectPluginTest {
   public void testDeleteRepresentationWithALinkedFileInDIP() throws AuthorizationDeniedException, GenericException,
     RequestNotValidException, NotFoundException, AlreadyExistsException {
     // create AIP and rep
-    AIP aip = model.createAIP(null, "", new Permissions(), RodaConstants.ADMIN);
+    AIP aip = model.createAIP(null, "", new Permissions(), RodaConstants.ADMIN, null);
     Representation representation = model.createRepresentation(aip.getId(), IdUtils.createUUID(), true, "", true,
       RodaConstants.ADMIN);
     File file = model.createFile(aip.getId(), representation.getId(), Collections.emptyList(), "file",
@@ -331,7 +335,7 @@ public class DeleteRodaObjectPluginTest {
   public void testDeleteRepresentationWithAMultiplesLinkInDIP() throws AuthorizationDeniedException, GenericException,
     RequestNotValidException, NotFoundException, AlreadyExistsException {
     // create AIP and rep
-    AIP aip = model.createAIP(null, "", new Permissions(), RodaConstants.ADMIN);
+    AIP aip = model.createAIP(null, "", new Permissions(), RodaConstants.ADMIN, null);
     Representation representation = model.createRepresentation(aip.getId(), IdUtils.createUUID(), true, "", true,
       RodaConstants.ADMIN);
     Representation representation2 = model.createRepresentation(aip.getId(), IdUtils.createUUID(), true, "", true,
@@ -367,7 +371,7 @@ public class DeleteRodaObjectPluginTest {
   public void testDeleteFileWithASingleLinkInDIP() throws AuthorizationDeniedException, GenericException,
     RequestNotValidException, NotFoundException, AlreadyExistsException {
     // create AIP and rep
-    AIP aip = model.createAIP(null, "", new Permissions(), RodaConstants.ADMIN);
+    AIP aip = model.createAIP(null, "", new Permissions(), RodaConstants.ADMIN, null);
     Representation representation = model.createRepresentation(aip.getId(), IdUtils.createUUID(), true, "", true,
       RodaConstants.ADMIN);
     File file = model.createFile(aip.getId(), representation.getId(), Collections.emptyList(), "file",
@@ -392,7 +396,7 @@ public class DeleteRodaObjectPluginTest {
   public void testDeleteFileWithAMultiplesLinkInDIP() throws AuthorizationDeniedException, GenericException,
     RequestNotValidException, NotFoundException, AlreadyExistsException {
     // create AIP and rep
-    AIP aip = model.createAIP(null, "", new Permissions(), RodaConstants.ADMIN);
+    AIP aip = model.createAIP(null, "", new Permissions(), RodaConstants.ADMIN, null);
     Representation representation = model.createRepresentation(aip.getId(), IdUtils.createUUID(), true, "", true,
       RodaConstants.ADMIN);
     File file = model.createFile(aip.getId(), representation.getId(), Collections.emptyList(), "file",
@@ -420,6 +424,113 @@ public class DeleteRodaObjectPluginTest {
     if (!fileIdList.contains(file2.getId())) {
       AssertJUnit.fail("File 2 should be on the DIP");
     }
+  }
+
+  @Test
+  public void testDeleteFileFolderWithChildren() throws AuthorizationDeniedException, RequestNotValidException,
+    AlreadyExistsException, NotFoundException, GenericException, InterruptedException {
+    // create AIP and rep
+    AIP aip = model.createAIP(null, "", new Permissions(), RodaConstants.ADMIN, null);
+
+    Representation representation = model.createRepresentation(aip.getId(), IdUtils.createUUID(), true, "", true,
+      RodaConstants.ADMIN);
+
+    File fileTop = model.createFile(aip.getId(), representation.getId(), Collections.emptyList(), null, "FileTop",
+      RodaConstants.ADMIN, true);
+
+    File fileChild = model.createFile(aip.getId(), representation.getId(), fileTop.getPath(), fileTop.getId(),
+      "fileChild", RodaConstants.ADMIN, true);
+
+    File fileGrandChild = model.createFile(aip.getId(), representation.getId(), fileChild.getPath(), fileChild.getId(),
+      "fileGrandChild", RodaConstants.ADMIN, true);
+
+    Job jobDeleteFile = TestsHelper.executeJob(DeleteRODAObjectPlugin.class, Collections.EMPTY_MAP, PluginType.INTERNAL,
+      SelectedItemsList.create(IndexedFile.class, IdUtils.getFileId(fileTop)), Job.JOB_STATE.COMPLETED);
+
+    TestsHelper.getJobReports(index, jobDeleteFile, true);
+
+    List<File> files = Arrays.asList(fileTop, fileChild, fileGrandChild);
+
+    for (File file : files) {
+      try {
+        File retrievedFile = model.retrieveFile(file.getAipId(), file.getRepresentationId(), file.getPath(),
+          file.getId());
+        AssertJUnit.assertNull("Failed to delete File : " + file.getId(), retrievedFile);
+      } catch (NotFoundException e) {
+        // pass
+      }
+    }
+  }
+
+  @Test
+  public void testDeleteSingleFile() throws AuthorizationDeniedException, RequestNotValidException,
+    AlreadyExistsException, NotFoundException, GenericException, InterruptedException {
+    // create AIP and rep
+    AIP aip = model.createAIP(null, "", new Permissions(), RodaConstants.ADMIN, null);
+
+    Representation representation = model.createRepresentation(aip.getId(), IdUtils.createUUID(), true, "", true,
+      RodaConstants.ADMIN);
+
+    File file = model.createFile(aip.getId(), representation.getId(), Collections.emptyList(), "fileTop", "FileTop",
+      RodaConstants.ADMIN, true);
+
+    Job jobDeleteFile = TestsHelper.executeJob(DeleteRODAObjectPlugin.class, Collections.EMPTY_MAP, PluginType.INTERNAL,
+      SelectedItemsList.create(IndexedFile.class, IdUtils.getFileId(file)), Job.JOB_STATE.COMPLETED);
+
+    TestsHelper.getJobReports(index, jobDeleteFile, true);
+
+    try {
+      File retrievedFile = model.retrieveFile(file.getAipId(), file.getRepresentationId(), file.getPath(),
+        file.getId());
+      AssertJUnit.assertNull("Failed to delete File " + file.getId(), retrievedFile);
+    } catch (NotFoundException e) {
+      // pass
+    }
+
+  }
+
+  @Test
+  public void testDeleteChildren() throws AuthorizationDeniedException, RequestNotValidException,
+    AlreadyExistsException, NotFoundException, GenericException, InterruptedException {
+    // create AIP and rep
+    AIP aip = model.createAIP(null, "", new Permissions(), RodaConstants.ADMIN, null);
+
+    Representation representation = model.createRepresentation(aip.getId(), IdUtils.createUUID(), true, "", true,
+      RodaConstants.ADMIN);
+
+    File fileTop = model.createFile(aip.getId(), representation.getId(), Collections.emptyList(), null, "FileTop",
+      RodaConstants.ADMIN, true);
+
+    File fileChild = model.createFile(aip.getId(), representation.getId(), fileTop.getPath(), fileTop.getId(),
+      "fileChild", RodaConstants.ADMIN, true);
+
+    File fileGrandChild = model.createFile(aip.getId(), representation.getId(), fileChild.getPath(), fileChild.getId(),
+      "fileGrandChild", RodaConstants.ADMIN, true);
+
+    Job jobDeleteFile = TestsHelper.executeJob(DeleteRODAObjectPlugin.class, Collections.EMPTY_MAP, PluginType.INTERNAL,
+      SelectedItemsList.create(IndexedFile.class, IdUtils.getFileId(fileChild)), Job.JOB_STATE.COMPLETED);
+
+    TestsHelper.getJobReports(index, jobDeleteFile, true);
+
+    try {
+      File retrievedTopFile = model.retrieveFile(fileTop.getAipId(), fileTop.getRepresentationId(), fileTop.getPath(),
+        fileTop.getId());
+    } catch (NotFoundException e) {
+      AssertJUnit.fail("Failed to preserve File Top " + fileTop.getId() + " with children");
+    }
+
+    List<File> files = Arrays.asList(fileChild, fileGrandChild);
+    for (File file : files) {
+      try {
+
+        File retrievedFile = model.retrieveFile(file.getAipId(), file.getRepresentationId(), file.getPath(),
+          file.getId());
+        AssertJUnit.assertNull("Failed to delete File : " + file.getId(), retrievedFile);
+      } catch (NotFoundException e) {
+        // pass
+      }
+    }
+
   }
 
 }

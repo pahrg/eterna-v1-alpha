@@ -7,10 +7,8 @@
  */
 package org.roda.core.index;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.Serializable;
 import java.nio.file.NoSuchFileException;
 import java.util.ArrayList;
@@ -41,6 +39,8 @@ import org.roda.core.data.utils.XMLUtils;
 import org.roda.core.data.v2.IsModelObject;
 import org.roda.core.data.v2.IsRODAObject;
 import org.roda.core.data.v2.common.OptionalWithCause;
+import org.roda.core.data.v2.disposal.confirmation.DisposalConfirmation;
+import org.roda.core.data.v2.index.FindRequest;
 import org.roda.core.data.v2.index.IndexResult;
 import org.roda.core.data.v2.index.IndexRunnable;
 import org.roda.core.data.v2.index.IsIndexed;
@@ -59,7 +59,6 @@ import org.roda.core.data.v2.ip.IndexedRepresentation;
 import org.roda.core.data.v2.ip.Representation;
 import org.roda.core.data.v2.ip.StoragePath;
 import org.roda.core.data.v2.ip.TransferredResource;
-import org.roda.core.data.v2.ip.disposal.DisposalConfirmation;
 import org.roda.core.data.v2.ip.metadata.IndexedPreservationAgent;
 import org.roda.core.data.v2.ip.metadata.IndexedPreservationEvent;
 import org.roda.core.data.v2.ip.metadata.IndexedPreservationEvent.PreservationMetadataEventClass;
@@ -80,7 +79,6 @@ import org.roda.core.model.ModelObserver;
 import org.roda.core.model.ModelService;
 import org.roda.core.model.utils.ModelUtils;
 import org.roda.core.storage.Binary;
-import org.roda.core.storage.DefaultStoragePath;
 import org.roda.core.storage.Resource;
 import org.roda.core.storage.StorageService;
 import org.slf4j.Logger;
@@ -173,8 +171,14 @@ public class IndexService {
   public <T extends IsIndexed> IndexResult<T> find(Class<T> returnClass, Filter filter, Sorter sorter, Sublist sublist,
     Facets facets, User user, boolean justActive, final List<String> fieldsToReturn)
     throws GenericException, RequestNotValidException {
-    return SolrUtils.find(getSolrClient(), returnClass, filter, sorter, sublist, facets, user, justActive,
-      fieldsToReturn);
+    FindRequest findRequest = FindRequest.getBuilder(filter, justActive).withSorter(sorter).withSublist(sublist)
+      .withFacets(facets).withFieldsToReturn(fieldsToReturn).build();
+    return SolrUtils.find(getSolrClient(), returnClass, findRequest, user);
+  }
+
+  public <T extends IsIndexed> IndexResult<T> find(Class<T> returnClass, FindRequest findRequest, User user)
+    throws GenericException, RequestNotValidException {
+    return SolrUtils.find(getSolrClient(), returnClass, findRequest, user);
   }
 
   public <T extends IsIndexed> IterableIndexResult<T> findAll(final Class<T> returnClass, final Filter filter,
@@ -198,9 +202,14 @@ public class IndexService {
     return SolrUtils.count(getSolrClient(), returnClass, filter, user, justActive);
   }
 
+  public <T extends IsIndexed> T retrieve(Class<T> returnClass, String id, List<String> fieldsToReturn,
+    boolean appendChildren) throws NotFoundException, GenericException {
+    return SolrUtils.retrieve(getSolrClient(), returnClass, id, fieldsToReturn, appendChildren);
+  }
+
   public <T extends IsIndexed> T retrieve(Class<T> returnClass, String id, List<String> fieldsToReturn)
     throws NotFoundException, GenericException {
-    return SolrUtils.retrieve(getSolrClient(), returnClass, id, fieldsToReturn);
+    return retrieve(returnClass, id, fieldsToReturn, false);
   }
 
   public <T extends IsIndexed> List<T> retrieve(Class<T> returnClass, List<String> ids, List<String> fieldsToReturn)
@@ -419,44 +428,6 @@ public class IndexService {
       ret = observer.notificationCreatedOrUpdated(notification);
     }
     return ret;
-  }
-
-  public void reindexActionLogs()
-    throws GenericException, NotFoundException, AuthorizationDeniedException, RequestNotValidException {
-    RodaCoreFactory.checkIfWriteIsAllowedAndIfFalseThrowException(nodeType);
-
-    try (CloseableIterable<Resource> actionLogs = model.getStorage()
-      .listResourcesUnderContainer(DefaultStoragePath.parse(RodaConstants.STORAGE_CONTAINER_ACTIONLOG), false)) {
-
-      for (Resource resource : actionLogs) {
-        if (resource instanceof Binary) {
-          Binary b = (Binary) resource;
-          InputStreamReader reader = new InputStreamReader(b.getContent().createInputStream());
-          reindexActionLog(reader);
-        }
-      }
-    } catch (IOException e) {
-      throw new GenericException("Error retrieving/processing logs from storage", e);
-    }
-  }
-
-  public void reindexActionLog(InputStreamReader reader) throws GenericException, AuthorizationDeniedException {
-    RodaCoreFactory.checkIfWriteIsAllowedAndIfFalseThrowException(nodeType);
-
-    String line;
-    BufferedReader br = new BufferedReader(reader);
-    try {
-      while ((line = br.readLine()) != null) {
-        LogEntry entry = JsonUtils.getObjectFromJson(line, LogEntry.class);
-        if (entry != null) {
-          reindexActionLog(entry);
-        }
-      }
-      br.close();
-      reader.close();
-    } catch (IOException e) {
-      throw new GenericException("Error reading log", e);
-    }
   }
 
   public ReturnWithExceptions<Void, ModelObserver> reindexActionLog(LogEntry entry) {
@@ -691,7 +662,7 @@ public class IndexService {
     throws AuthorizationDeniedException {
     RodaCoreFactory.checkIfWriteIsAllowedAndIfFalseThrowException(nodeType);
 
-    SolrUtils.create(getSolrClient(), classToCreate, instance, this);
+    SolrUtils.create(getSolrClient(), model, classToCreate, instance, this);
   }
 
   public SolrClient getSolrClient() {

@@ -14,11 +14,14 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 
 import org.roda.core.data.common.RodaConstants;
 import org.roda.core.data.v2.common.Pair;
+import org.roda.core.data.v2.index.FindRequest;
 import org.roda.core.data.v2.index.IndexResult;
 import org.roda.core.data.v2.index.IsIndexed;
+import org.roda.core.data.v2.index.collapse.Collapse;
 import org.roda.core.data.v2.index.facet.FacetFieldResult;
 import org.roda.core.data.v2.index.facet.FacetParameter;
 import org.roda.core.data.v2.index.facet.FacetValue;
@@ -31,7 +34,12 @@ import org.roda.core.data.v2.index.select.SelectedItemsList;
 import org.roda.core.data.v2.index.sort.SortParameter;
 import org.roda.core.data.v2.index.sort.Sorter;
 import org.roda.core.data.v2.index.sublist.Sublist;
-import org.roda.wui.client.browse.BrowserService;
+import org.roda.core.data.v2.ip.IndexedAIP;
+import org.roda.core.data.v2.ip.TransferredResource;
+import org.roda.core.data.v2.jobs.IndexedReport;
+import org.roda.core.data.v2.log.LogEntry;
+import org.roda.core.data.v2.notifications.Notification;
+import org.roda.wui.client.common.ActionsToolbar;
 import org.roda.wui.client.common.NoAsyncCallback;
 import org.roda.wui.client.common.actions.Actionable;
 import org.roda.wui.client.common.actions.model.ActionableObject;
@@ -41,6 +49,8 @@ import org.roda.wui.client.common.lists.pagination.ListSelectionUtils;
 import org.roda.wui.client.common.popup.CalloutPopup;
 import org.roda.wui.client.common.utils.AsyncCallbackUtils;
 import org.roda.wui.client.common.utils.HtmlSnippetUtils;
+import org.roda.wui.client.services.ConfigurationRestService;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.ClientLogger;
 import org.roda.wui.common.client.tools.ConfigurationManager;
 import org.roda.wui.common.client.tools.HistoryUtils;
@@ -57,7 +67,6 @@ import com.google.gwt.cell.client.FieldUpdater;
 import com.google.gwt.core.client.Scheduler;
 import com.google.gwt.core.shared.GWT;
 import com.google.gwt.dom.client.Style.Unit;
-import com.google.gwt.event.dom.client.ClickEvent;
 import com.google.gwt.event.dom.client.ClickHandler;
 import com.google.gwt.event.logical.shared.HasValueChangeHandlers;
 import com.google.gwt.event.logical.shared.ValueChangeEvent;
@@ -113,33 +122,29 @@ public abstract class AsyncTableCell<T extends IsIndexed> extends FlowPanel
 
   static final ClientMessages messages = GWT.create(ClientMessages.class);
   private static final ClientLogger LOGGER = new ClientLogger(AsyncTableCell.class.getName());
-
+  private final List<CheckboxSelectionListener<T>> listeners = new ArrayList<>();
   private AsyncTableCellOptions<T> options;
-
   private Class<T> classToReturn;
   private String listId;
   private Actionable<T> actionable;
-
   private FlowPanel mainPanel;
   private FlowPanel sidePanel;
-
+  private ActionsToolbar actionsToolbar;
+  private SimplePanel sidePanelDivider;
+  private FlowPanel facetsPanel;
   private MyAsyncDataProvider<T> dataProvider;
   private SingleSelectionModel<T> selectionModel;
-
   private AccessibleSimplePager resultsPager;
   private RodaPageSizePager pageSizePager;
-
   private CellTable<T> display;
-
   private RadioButton selectAllRadioButton = null;
   private Set<T> selected = new HashSet<>();
-  private final List<CheckboxSelectionListener<T>> listeners = new ArrayList<>();
-
   private Filter filter;
   private boolean justActive;
   private Facets facets;
   private boolean selectable;
   private List<String> fieldsToReturn;
+  private Collapse collapse;
 
   private HandlerRegistration facetsValueChangedHandlerRegistration;
 
@@ -151,11 +156,6 @@ public abstract class AsyncTableCell<T extends IsIndexed> extends FlowPanel
   private boolean redirectOnSingleResult;
   private Filter originalFilter;
   private HandlerRegistration selectAllPopupHistoryChangedHandler = null;
-
-  enum AutoUpdateState {
-    AUTO_UPDATE_OFF, AUTO_UPDATE_ON, AUTO_UPDATE_ERROR, AUTO_UPDATE_PAUSED, AUTO_UPDATE_WORKING
-  }
-
   private Timer autoUpdateTimer = null;
   private int autoUpdateTimerMillis = 0;
   private AutoUpdateState autoUpdateState = AutoUpdateState.AUTO_UPDATE_OFF;
@@ -164,9 +164,6 @@ public abstract class AsyncTableCell<T extends IsIndexed> extends FlowPanel
   private HandlerRegistration autoUpdateHandler;
 
   private int selectedPageSize;
-
-  // private List<Consumer<AutoUpdateState>> autoUpdateConsumers = new
-  // ArrayList<>();
 
   public AsyncTableCell() {
     super();
@@ -215,33 +212,22 @@ public abstract class AsyncTableCell<T extends IsIndexed> extends FlowPanel
     this.dataProvider = new MyAsyncDataProvider<T>(display, fieldsToReturn, new IndexResultDataProvider<T>() {
 
       @Override
-      public void getData(Sublist sublist, Sorter sorter, List<String> fieldsToReturn,
-        final AsyncCallback<IndexResult<T>> callback) {
-        AsyncTableCell.this.getData(AsyncTableCell.this.getFilter(), sublist, sorter, fieldsToReturn,
-          new AsyncCallback<IndexResult<T>>() {
+      public CompletableFuture<IndexResult<T>> getData(Sublist sublist, Sorter sorter, List<String> fieldsToReturn) {
+        return AsyncTableCell.this.getData(sublist, sorter, fieldsToReturn).thenApply(tIndexResult -> {
+          setResult(tIndexResult);
+          if (redirectOnSingleResult && originalFilter.equals(AsyncTableCell.this.getFilter())
+            && tIndexResult.getResults().size() == 1) {
+            HistoryUtils.resolve(tIndexResult.getResults().get(0), true);
+          }
 
-            @Override
-            public void onFailure(Throwable caught) {
-              callback.onFailure(caught);
-            }
-
-            @Override
-            public void onSuccess(IndexResult<T> result) {
-              setResult(result);
-              callback.onSuccess(result);
-              if (redirectOnSingleResult && originalFilter.equals(AsyncTableCell.this.getFilter())
-                && getVisibleItems().size() == 1) {
-                HistoryUtils.resolve(getVisibleItems().get(0), true);
-              }
-
-              if (getVisibleItems().isEmpty()) {
-                AsyncTableCell.this.addStyleName("table-empty");
-              } else {
-                AsyncTableCell.this.removeStyleName("table-empty");
-              }
-              clearSelected();
-            }
-          });
+          if (tIndexResult.getResults().isEmpty()) {
+            AsyncTableCell.this.addStyleName("table-empty");
+          } else {
+            AsyncTableCell.this.removeStyleName("table-empty");
+          }
+          clearSelected();
+          return tIndexResult;
+        });
       }
 
       @Override
@@ -259,7 +245,7 @@ public abstract class AsyncTableCell<T extends IsIndexed> extends FlowPanel
     applySavedSortState(display);
     dataProvider.addDataDisplay(display);
 
-    resultsPager = new AccessibleSimplePager(AccessibleSimplePager.TextLocation.LEFT,
+    resultsPager = new AccessibleSimplePager(AccessibleSimplePager.TextLocation.CENTER,
       GWT.create(SimplePager.Resources.class), false, initialPageSize, false, false,
       GWT.create(SimplePager.ImageButtonsConstants.class));
     resultsPager.setDisplay(display);
@@ -302,8 +288,63 @@ public abstract class AsyncTableCell<T extends IsIndexed> extends FlowPanel
 
 
     Button csvDownloadButton = new Button(messages.tableDownloadCSV());
-    csvDownloadButton.addStyleName("btn btn-link csvDownloadButton");
+    csvDownloadButton.addStyleName("btn btn-link btn-download csvDownloadButton");
     csvDownloadButton.setVisible(options.isCsvDownloadButtonVisibility());
+
+    sidePanelDivider = new SimplePanel();
+    sidePanelDivider.setStyleName("sidebarActionsDivider");
+
+    actionsToolbar = new ActionsToolbar();
+    if (options.getActionable() != null && options.getActionable().hasAnyRoles() && isSelectable()) {
+      ActionableWidgetBuilder<T> builder = new ActionableWidgetBuilder<>(options.getActionable());
+      actionsToolbar.setLabelVisible(false);
+      actionsToolbar.setIcon(null);
+      actionsToolbar.setTagsVisible(false);
+      actionsToolbar.setActionableMenu(builder.buildListWithObjectsAndDefaults(getActionableObject(),
+        options.getActionWhitelist(), options.getActionBlacklist()));
+      addCheckboxSelectionListener(new CheckboxSelectionListener<T>() {
+        @Override
+        public void onSelectionChange(SelectedItems<T> selected) {
+          builder.withActionCallback(new NoAsyncCallback<Actionable.ActionImpact>() {
+            @Override
+            public void onSuccess(Actionable.ActionImpact impact) {
+              if (!Actionable.ActionImpact.NONE.equals(impact)) {
+                Timer timer = new Timer() {
+                  @Override
+                  public void run() {
+                    refresh();
+                  }
+                };
+                timer.schedule(RodaConstants.ACTION_TIMEOUT / 2);
+              }
+              if (actionableCallback != null) {
+                actionableCallback.onSuccess(impact);
+              }
+            }
+
+            @Override
+            public void onFailure(Throwable caught) {
+              Timer timer = new Timer() {
+                @Override
+                public void run() {
+                  refresh();
+                }
+              };
+              timer.schedule(RodaConstants.ACTION_TIMEOUT / 2);
+              super.onFailure(caught);
+              if (actionableCallback != null) {
+                actionableCallback.onFailure(caught);
+              }
+            }
+          });
+          actionsToolbar.setActionableMenu(builder.buildListWithObjectsAndDefaults(getActionableObject(),
+            options.getActionWhitelist(), options.getActionBlacklist()));
+        }
+      });
+    } else {
+      actionsToolbar.setVisible(false);
+      sidePanelDivider.setVisible(false);
+    }
 
     sidePanel = new FlowPanel();
     sidePanel.addStyleName("my-asyncdatagrid-side-panel");
@@ -316,38 +357,43 @@ public abstract class AsyncTableCell<T extends IsIndexed> extends FlowPanel
     autoUpdatePanel = new AccessibleFocusPanel();
     autoUpdatePanel.add(autoUpdateSignal);
 
+    facetsPanel = new FlowPanel();
+    facetsPanel.addStyleName("my-asyncdatagrid-facets-panel");
+
+    FlowPanel footer = new FlowPanel();
+    footer.addStyleName("my-asyncdatagrid-footer");
+
     mainPanel.add(display);
-    mainPanel.add(resultsPager);
-    mainPanel.add(pageSizePager);
+    mainPanel.add(footer);
+    footer.add(csvDownloadButton);
+    footer.add(pageSizePager);
     mainPanel.add(pageSizeSelectorPanel);
-    mainPanel.add(autoUpdatePanel);
-    mainPanel.add(csvDownloadButton);
+    footer.add(resultsPager);
+    footer.add(autoUpdatePanel);
+
+    sidePanel.add(actionsToolbar);
+    sidePanel.add(sidePanelDivider);
+    sidePanel.add(facetsPanel);
 
     SimplePanel clearfix = new SimplePanel();
     clearfix.addStyleName("clearfix");
     add(clearfix);
 
-    toggleSidePanel(createAndBindFacets(sidePanel));
+    toggleFacetsPanel(createAndBindFacets(facetsPanel));
 
-    csvDownloadButton.addClickHandler(new ClickHandler() {
-
-      @Override
-      public void onClick(ClickEvent event) {
-        BrowserService.Util.getInstance().getExportLimit(new AsyncCallback<Integer>() {
-
-          @Override
-          public void onFailure(Throwable caught) {
-            AsyncCallbackUtils.defaultFailureTreatment(caught);
-          }
-
-          @Override
-          public void onSuccess(Integer result) {
-            Toast.showInfo(messages.exportListTitle(), messages.exportListMessage(result));
+    csvDownloadButton.addClickHandler(event -> {
+      Services services = new Services("Retrieve export limit", "get");
+      services.configurationsResource(ConfigurationRestService::retrieveExportLimit)
+        .whenComplete((limit, throwable) -> {
+          if (throwable != null) {
+            AsyncCallbackUtils.defaultFailureTreatment(throwable);
+          } else {
+            Toast.showInfo(messages.exportListTitle(), messages.exportListMessage(limit.getResult().intValue()));
             RestUtils.requestCSVExport(getClassToReturn(), getFilter(), dataProvider.getSorter(),
-              new Sublist(0, result), getFacets(), getJustActive(), false, notNullSummary + ".csv");
+              new Sublist(0, limit.getResult().intValue()), getFacets(), getJustActive(), false,
+              notNullSummary + ".csv");
           }
         });
-      }
     });
 
     selectionModel = new SingleSelectionModel<>(getKeyProvider());
@@ -422,13 +468,13 @@ public abstract class AsyncTableCell<T extends IsIndexed> extends FlowPanel
     return options;
   }
 
-  private void toggleSidePanel(boolean toggle) {
+  private void toggleFacetsPanel(boolean toggle) {
     if (toggle) {
       mainPanel.removeStyleName("my-asyncdatagrid-main-panel-full");
-      sidePanel.removeStyleName("my-asyncdatagrid-side-panel-hidden");
+      facetsPanel.removeStyleName("my-asyncdatagrid-side-panel-hidden");
     } else {
       mainPanel.addStyleName("my-asyncdatagrid-main-panel-full");
-      sidePanel.addStyleName("my-asyncdatagrid-side-panel-hidden");
+      facetsPanel.addStyleName("my-asyncdatagrid-side-panel-hidden");
     }
   }
 
@@ -451,51 +497,6 @@ public abstract class AsyncTableCell<T extends IsIndexed> extends FlowPanel
 
       emptyTablewidget.add(msgBeforeLink);
       emptyTablewidget.add(resetFacetsAnchor);
-    } else if (actionable != null) {
-      emptyTablewidget.addStyleName("ActionableStyleButtons");
-
-      Label label = new Label();
-      label.addStyleName("table-empty-inner-label");
-      if (originalFilter.equals(this.getFilter())) {
-        label.setText(messages.noItemsToDisplayPreFilters(someOfAObject));
-      } else {
-        label.setText(messages.noItemsToDisplay(someOfAObject));
-      }
-      emptyTablewidget.add(label);
-
-      emptyTablewidget.add(
-        new ActionableWidgetBuilder<>(actionable).withActionCallback(new NoAsyncCallback<Actionable.ActionImpact>() {
-          @Override
-          public void onSuccess(Actionable.ActionImpact impact) {
-            if (!Actionable.ActionImpact.NONE.equals(impact)) {
-              Timer timer = new Timer() {
-                @Override
-                public void run() {
-                  AsyncTableCell.this.refresh();
-                }
-              };
-              timer.schedule(RodaConstants.ACTION_TIMEOUT / 2);
-            }
-            if (actionableCallback != null) {
-              actionableCallback.onSuccess(impact);
-            }
-          }
-
-          @Override
-          public void onFailure(Throwable caught) {
-            Timer timer = new Timer() {
-              @Override
-              public void run() {
-                AsyncTableCell.this.refresh();
-              }
-            };
-            timer.schedule(RodaConstants.ACTION_TIMEOUT / 2);
-            super.onFailure(caught);
-            if (actionableCallback != null) {
-              actionableCallback.onFailure(caught);
-            }
-          }
-        }).buildListWithObjects(new ActionableObject<T>(classToReturn)));
     } else {
       Label label = new Label();
       label.addStyleName("table-empty-inner-label");
@@ -655,19 +656,31 @@ public abstract class AsyncTableCell<T extends IsIndexed> extends FlowPanel
     };
   }
 
-  private void getData(Filter filter, Sublist sublist, Sorter sorter, List<String> fieldsToReturn,
-    AsyncCallback<IndexResult<T>> callback) {
-    if (isSearchRestricted()) {
-      callback.onSuccess(null);
-    } else {
-      getData(sublist, sorter, fieldsToReturn, callback);
-    }
+  private CompletableFuture<IndexResult<T>> getData(Sublist sublist, Sorter sorter, List<String> fieldsToReturn) {
+    String reason = "Get " + beautifyClassToReturn(getClassToReturn()) + " data";
+    Services services = new Services(reason, "get");
+    FindRequest findRequest = FindRequest.getBuilder(getFilter(), getJustActive()).withSublist(sublist)
+      .withFacets(getFacets()).withExportFacets(false).withSorter(sorter).withFieldsToReturn(fieldsToReturn)
+      .withCollapse(getCollapse()).build();
+    return services.rodaEntityRestService(s -> s.find(findRequest, LocaleInfo.getCurrentLocale().getLocaleName()),
+      getClassToReturn());
   }
 
-  private void getData(Sublist sublist, Sorter sorter, List<String> fieldsToReturn,
-    AsyncCallback<IndexResult<T>> callback) {
-    BrowserService.Util.getInstance().find(getClassToReturn().getName(), getFilter(), sorter, sublist, getFacets(),
-      LocaleInfo.getCurrentLocale().getLocaleName(), getJustActive(), fieldsToReturn, callback);
+  private String beautifyClassToReturn(Class<T> classToReturn) {
+    // GWT does not support isAssignableFrom
+    if (LogEntry.class.getName().equals(classToReturn.getName())) {
+      return "audit log";
+    } else if (Notification.class.getName().equals(classToReturn.getName())) {
+      return "notification";
+    } else if (TransferredResource.class.getName().equals(classToReturn.getName())) {
+      return "transferred resource";
+    } else if (IndexedAIP.class.getName().equals(classToReturn.getName())) {
+      return "AIP";
+    } else if (IndexedReport.class.getName().equals(classToReturn.getName())) {
+      return "report";
+    } else {
+      return classToReturn.getSimpleName().toLowerCase();
+    }
   }
 
   protected abstract Sorter getSorter(ColumnSortList columnSortList);
@@ -713,18 +726,12 @@ public abstract class AsyncTableCell<T extends IsIndexed> extends FlowPanel
       public void run() {
         setAutoUpdateState(AutoUpdateState.AUTO_UPDATE_WORKING);
 
-        dataProvider.update(fieldsToReturn, new AsyncCallback<Void>() {
-
-          @Override
-          public void onFailure(Throwable caught) {
-            // disable auto-update
+        dataProvider.update(fieldsToReturn).whenComplete((unused, throwable) -> {
+          if (throwable != null) {
             autoUpdateTimer.cancel();
             setAutoUpdateState(AutoUpdateState.AUTO_UPDATE_ERROR);
-            LOGGER.error("Could not auto-update table " + listId, caught);
-          }
-
-          @Override
-          public void onSuccess(Void result) {
+            LOGGER.error("Could not auto-update table " + listId, throwable);
+          } else {
             setAutoUpdateState(AutoUpdateState.AUTO_UPDATE_ON);
           }
         });
@@ -760,6 +767,15 @@ public abstract class AsyncTableCell<T extends IsIndexed> extends FlowPanel
     return filter;
   }
 
+  public void setFilter(Filter filter) {
+    this.filter = filter;
+    refresh();
+  }
+
+  public Collapse getCollapse() {
+    return collapse;
+  }
+
   public boolean isSearchRestricted() {
     return !isAttached() || !isVisible();
   }
@@ -773,11 +789,6 @@ public abstract class AsyncTableCell<T extends IsIndexed> extends FlowPanel
     refresh();
   }
 
-  public void setFilter(Filter filter) {
-    this.filter = filter;
-    refresh();
-  }
-
   public Facets getFacets() {
     return facets;
   }
@@ -785,13 +796,13 @@ public abstract class AsyncTableCell<T extends IsIndexed> extends FlowPanel
   public void setFacets(Facets facets) {
     this.facets = facets;
     refresh();
-    toggleSidePanel(createAndBindFacets(sidePanel));
+    toggleFacetsPanel(createAndBindFacets(facetsPanel));
   }
 
   public void set(Filter filter, boolean justActive, Facets facets) {
     this.facets = facets;
     set(filter, justActive);
-    toggleSidePanel(createAndBindFacets(sidePanel));
+    toggleFacetsPanel(createAndBindFacets(facetsPanel));
   }
 
   public void set(Filter filter, boolean justActive) {
@@ -970,12 +981,6 @@ public abstract class AsyncTableCell<T extends IsIndexed> extends FlowPanel
     return ret;
   }
 
-  // LISTENER
-  @FunctionalInterface
-  public interface CheckboxSelectionListener<T extends IsIndexed> {
-    public void onSelectionChange(SelectedItems<T> selected);
-  }
-
   public void addCheckboxSelectionListener(CheckboxSelectionListener<T> checkboxSelectionListener) {
     listeners.add(checkboxSelectionListener);
   }
@@ -1148,19 +1153,24 @@ public abstract class AsyncTableCell<T extends IsIndexed> extends FlowPanel
             boolean facetIsSelected = facetResult.getSelectedValues().contains(value);
             StringBuilder checkboxLabel = new StringBuilder();
             checkboxLabel.append(label);
-            if (count > 0 || facetResult.getSelectedValues().isEmpty() || facetIsSelected) {
-              checkboxLabel.append(" (").append(count).append(")");
-            }
 
             CheckBox facetValuePanel = new CheckBox(checkboxLabel.toString());
             facetValuePanel.setTitle(checkboxLabel.toString());
-            facetValuePanel.addStyleName("sidebar-facet-label");
-            facetValuePanel.addStyleName("fade-out");
+            facetValuePanel.addStyleName("sidebar-facet-label fade-out");
+
+            FlowPanel facetValueRow = new FlowPanel();
+            facetValueRow.addStyleName("sidebar-facet-row");
+            facetValueRow.add(facetValuePanel);
+            if (count > 0 || facetResult.getSelectedValues().isEmpty() || facetIsSelected) {
+              Label countLabel = new Label(String.valueOf(count));
+              countLabel.addStyleName("sidebar-facet-count");
+              facetValueRow.add(countLabel);
+            }
 
             boolean enabled = count > 0 || !facetResult.getSelectedValues().isEmpty();
             facetValuePanel.setEnabled(enabled);
 
-            facetPanel.add(facetValuePanel);
+            facetPanel.add(facetValueRow);
             facetValuePanel.setValue(facetIsSelected);
 
             facetValuePanel.addValueChangeHandler(facetValueChangedEvent -> {
@@ -1184,6 +1194,7 @@ public abstract class AsyncTableCell<T extends IsIndexed> extends FlowPanel
       }
 
       facetsPanel.setVisible(!allFacetsAreEmpty);
+      sidePanelDivider.setVisible(facetsPanel.isVisible() && actionsToolbar.isVisible());
     });
     return !facetPanels.isEmpty();
   }
@@ -1357,4 +1368,18 @@ public abstract class AsyncTableCell<T extends IsIndexed> extends FlowPanel
         }
       }
 
+
+  public FlowPanel getSidePanel() {
+    return this.sidePanel;
+  }
+
+  enum AutoUpdateState {
+    AUTO_UPDATE_OFF, AUTO_UPDATE_ON, AUTO_UPDATE_ERROR, AUTO_UPDATE_PAUSED, AUTO_UPDATE_WORKING
+  }
+
+  // LISTENER
+  @FunctionalInterface
+  public interface CheckboxSelectionListener<T extends IsIndexed> {
+    public void onSelectionChange(SelectedItems<T> selected);
+  }
 }

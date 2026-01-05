@@ -1,6 +1,7 @@
 services:
   zoo:
-    image: docker.io/zookeeper:3.9.2-jre-17
+    image: docker.io/zookeeper:3.9-jre-17
+    container_name: zookeeper
     restart: unless-stopped
     ports:
       - "2181:2181"
@@ -9,8 +10,10 @@ services:
     volumes:
       - zookeeper_data:/data
       - zookeeper_datalog:/datalog
+
   solr:
     image: docker.io/solr:9
+    container_name: solr
     restart: unless-stopped
     ports:
       - "8983:8983"
@@ -24,8 +27,10 @@ services:
       - -c
     volumes:
       - solr_data:/var/solr
+
   clamd:
-    image: docker.io/clamav/clamav:1.2.2
+    image: docker.io/clamav/clamav:1.4
+    container_name: clamd
     restart: unless-stopped
     ports:
       - "3310:3310"
@@ -33,11 +38,13 @@ services:
       - clam_data:/var/lib/clamav
       # Mapping $HOME/.roda to enable usage with spring-boot mode
       - $HOME/.roda/data/storage:$HOME/.roda/data/storage:ro
+      - $HOME/.roda/data/staging-storage:$HOME/.roda/data/staging-storage:ro
       # Mapping /tmp to enable usage with local testing via mvn test
       - /tmp:/tmp
 
   siegfried:
     image: ghcr.io/keeps/siegfried:v1.11.0
+    container_name: siegfried
     restart: unless-stopped
     ports:
       - "5138:5138"
@@ -48,10 +55,13 @@ services:
       - siegfried_data:/root/siegfried/
       # Mapping $HOME/.roda to enable usage with spring-boot mode
       - $HOME/.roda/data/storage:$HOME/.roda/data/storage:ro
+      - $HOME/.roda/data/staging-storage:$HOME/.roda/data/staging-storage:ro
       # Mapping /tmp to enable usage with local testing via mvn test
       - /tmp:/tmp:ro
+
   swagger:
-    image: docker.io/swaggerapi/swagger-ui:v5.13.0
+    image: docker.io/swaggerapi/swagger-ui:latest
+    container_name: swagger
     restart: on-failure
     ports:
       - "8081:8080"
@@ -59,9 +69,49 @@ services:
       - URL=http://localhost:8080/api/openapi.json
       - DOC_EXPANSION=none
       - VALIDATOR_URL=none
+
+  mailpit:
+    image: axllent/mailpit:v1.24
+    container_name: mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025" # smtp server
+      - "8025:8025" # web ui
+
+  openldap:
+    image: docker.io/bitnami/openldap:2.6
+    container_name: openldap
+    restart: unless-stopped
+    user: 1001:root
+    ports:
+      - "1389:1389"
+      - "1636:1636"
+    environment:
+      - BITNAMI_DEBUG=true
+      - LDAP_ROOT=dc=roda,dc=org
+      - LDAP_SKIP_DEFAULT_TREE=yes
+      - LDAP_ADMIN_USERNAME=admin
+      - LDAP_ADMIN_PASSWORD=roda
+      - LDAP_EXTRA_SCHEMAS=cosine,inetorgperson,nis,pbkdf2
+    volumes:
+      - ./ldap/ldif/pbkdf2.ldif:/opt/bitnami/openldap/etc/schema/pbkdf2.ldif
+
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: roda
+      POSTGRES_DB: roda_core_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
 volumes:
   zookeeper_data:
   zookeeper_datalog:
   solr_data:
   clam_data:
   siegfried_data:
+  pg_data:

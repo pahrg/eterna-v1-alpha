@@ -33,16 +33,16 @@ import org.roda.core.data.exceptions.NotFoundException;
 import org.roda.core.data.exceptions.RequestNotValidException;
 import org.roda.core.data.utils.JsonUtils;
 import org.roda.core.data.v2.LiteOptionalWithCause;
+import org.roda.core.data.v2.disposal.confirmation.DestroyedSelectionState;
+import org.roda.core.data.v2.disposal.confirmation.DisposalConfirmationAIPEntry;
+import org.roda.core.data.v2.disposal.hold.DisposalHold;
+import org.roda.core.data.v2.disposal.metadata.DisposalConfirmationAIPMetadata;
+import org.roda.core.data.v2.disposal.schedule.DisposalActionCode;
+import org.roda.core.data.v2.disposal.schedule.DisposalSchedule;
 import org.roda.core.data.v2.index.filter.Filter;
 import org.roda.core.data.v2.index.filter.SimpleFilterParameter;
 import org.roda.core.data.v2.ip.AIP;
 import org.roda.core.data.v2.ip.IndexedAIP;
-import org.roda.core.data.v2.ip.disposal.DestroyedSelectionState;
-import org.roda.core.data.v2.ip.disposal.DisposalActionCode;
-import org.roda.core.data.v2.ip.disposal.DisposalConfirmationAIPEntry;
-import org.roda.core.data.v2.ip.disposal.DisposalHold;
-import org.roda.core.data.v2.ip.disposal.DisposalSchedule;
-import org.roda.core.data.v2.ip.disposal.aipMetadata.DisposalConfirmationAIPMetadata;
 import org.roda.core.data.v2.jobs.Job;
 import org.roda.core.data.v2.jobs.PluginParameter;
 import org.roda.core.data.v2.jobs.PluginState;
@@ -54,10 +54,9 @@ import org.roda.core.model.ModelService;
 import org.roda.core.plugins.AbstractPlugin;
 import org.roda.core.plugins.Plugin;
 import org.roda.core.plugins.PluginException;
+import org.roda.core.plugins.PluginHelper;
 import org.roda.core.plugins.RODAObjectsProcessingLogic;
 import org.roda.core.plugins.orchestrate.JobPluginInfo;
-import org.roda.core.plugins.PluginHelper;
-import org.roda.core.storage.StorageService;
 import org.roda.core.storage.fs.FSUtils;
 import org.roda.core.util.IdUtils;
 import org.slf4j.Logger;
@@ -69,24 +68,31 @@ import org.slf4j.LoggerFactory;
 public class CreateDisposalConfirmationPlugin extends AbstractPlugin<AIP> {
   private static final Logger LOGGER = LoggerFactory.getLogger(CreateDisposalConfirmationPlugin.class);
   private static final String EVENT_DESCRIPTION = "Disposal confirmation assign";
+  private static final Map<String, PluginParameter> pluginParameters = new HashMap<>();
+
+  static {
+    pluginParameters.put(PLUGIN_PARAMS_DISPOSAL_CONFIRMATION_TITLE,
+      PluginParameter.getBuilder(PLUGIN_PARAMS_DISPOSAL_CONFIRMATION_TITLE, "Disposal confirmation title",
+        PluginParameter.PluginParameterType.STRING).withDescription("Disposal confirmation report title").build());
+    pluginParameters.put(PLUGIN_PARAMS_DISPOSAL_CONFIRMATION_EXTRA_INFO,
+      PluginParameter.getBuilder(PLUGIN_PARAMS_DISPOSAL_CONFIRMATION_EXTRA_INFO, "Disposal confirmation information",
+        PluginParameter.PluginParameterType.STRING).withDefaultValue("Disposal confirmation information").build());
+  }
 
   private final Set<String> disposalSchedules = new HashSet<>();
   private final Set<String> disposalHolds = new HashSet<>();
   private final Set<String> disposalHoldTransitives = new HashSet<>();
   private long storageSize = 0L;
   private int aipCounter = 0;
-
   private String title;
   private Map<String, String> extraInformation;
 
-  private static final Map<String, PluginParameter> pluginParameters = new HashMap<>();
-  static {
-    pluginParameters.put(PLUGIN_PARAMS_DISPOSAL_CONFIRMATION_TITLE,
-      new PluginParameter(PLUGIN_PARAMS_DISPOSAL_CONFIRMATION_TITLE, "Disposal confirmation title",
-        PluginParameter.PluginParameterType.STRING, "", true, false, "Disposal confirmation report title"));
-    pluginParameters.put(PLUGIN_PARAMS_DISPOSAL_CONFIRMATION_EXTRA_INFO,
-      new PluginParameter(PLUGIN_PARAMS_DISPOSAL_CONFIRMATION_EXTRA_INFO, "Disposal confirmation information",
-        PluginParameter.PluginParameterType.STRING, "", true, false, "Disposal confirmation information"));
+  public static String getStaticName() {
+    return "Create disposal confirmation report";
+  }
+
+  public static String getStaticDescription() {
+    return "";
   }
 
   @Override
@@ -115,17 +121,9 @@ public class CreateDisposalConfirmationPlugin extends AbstractPlugin<AIP> {
     return "1.0";
   }
 
-  public static String getStaticName() {
-    return "Create disposal confirmation report";
-  }
-
   @Override
   public String getName() {
     return getStaticName();
-  }
-
-  public static String getStaticDescription() {
-    return "";
   }
 
   @Override
@@ -159,19 +157,18 @@ public class CreateDisposalConfirmationPlugin extends AbstractPlugin<AIP> {
   }
 
   @Override
-  public Report beforeAllExecute(IndexService index, ModelService model, StorageService storage)
-    throws PluginException {
+  public Report beforeAllExecute(IndexService index, ModelService model) throws PluginException {
     // do nothing
     return null;
   }
 
   @Override
-  public Report execute(IndexService index, ModelService model, StorageService storage,
-    List<LiteOptionalWithCause> liteList) throws PluginException {
+  public Report execute(IndexService index, ModelService model, List<LiteOptionalWithCause> liteList)
+    throws PluginException {
     return PluginHelper.processObjects(this,
-      (RODAObjectsProcessingLogic<AIP>) (indexService, modelService, storageService, report, cachedJob, jobPluginInfo,
-        plugin, objects) -> processAIP(modelService, indexService, report, jobPluginInfo, cachedJob, objects),
-      index, model, storage, liteList);
+      (RODAObjectsProcessingLogic<AIP>) (indexService, modelService, report, cachedJob, jobPluginInfo, plugin,
+        objects) -> processAIP(modelService, indexService, report, jobPluginInfo, cachedJob, objects),
+      index, model, liteList);
   }
 
   private void processAIP(ModelService model, IndexService index, Report report, JobPluginInfo jobPluginInfo,
@@ -280,7 +277,7 @@ public class CreateDisposalConfirmationPlugin extends AbstractPlugin<AIP> {
       PluginHelper.updatePartialJobReport(this, model, reportItem, true, cachedJob);
 
       model.createUpdateAIPEvent(aip.getId(), null, null, null, RodaConstants.PreservationEventType.UPDATE,
-        EVENT_DESCRIPTION, state, outcomeText, "", cachedJob.getUsername(), true);
+        EVENT_DESCRIPTION, state, outcomeText, "", cachedJob.getUsername(), true, null);
 
       if (processChildren) {
         processAIPChildren(aip, confirmationId, index, model, cachedJob);
@@ -334,7 +331,7 @@ public class CreateDisposalConfirmationPlugin extends AbstractPlugin<AIP> {
           storageSize, disposalHolds, disposalSchedules, aipCounter, extraInformation), cachedJob.getUsername());
 
         model.createRepositoryEvent(getPreservationEventType(), getPreservationEventDescription(), PluginState.SUCCESS,
-          getPreservationEventSuccessMessage(), confirmationId, cachedJob.getUsername(), true);
+          getPreservationEventSuccessMessage(), confirmationId, cachedJob.getUsername(), true, null);
       } catch (RequestNotValidException | NotFoundException | GenericException | AlreadyExistsException
         | AuthorizationDeniedException e) {
         LOGGER.error("Failed to create disposal confirmation metadata file", e);
@@ -342,7 +339,7 @@ public class CreateDisposalConfirmationPlugin extends AbstractPlugin<AIP> {
           .setPluginDetails("Failed to create disposal confirmation metadata file: " + e.getMessage());
 
         model.createRepositoryEvent(getPreservationEventType(), getPreservationEventDescription(), PluginState.FAILURE,
-          getPreservationEventFailureMessage(), confirmationId, cachedJob.getUsername(), true);
+          getPreservationEventFailureMessage(), confirmationId, cachedJob.getUsername(), true, null);
       }
     }
   }
@@ -421,11 +418,11 @@ public class CreateDisposalConfirmationPlugin extends AbstractPlugin<AIP> {
     }
 
     model.createUpdateAIPEvent(child.getId(), null, null, null, RodaConstants.PreservationEventType.UPDATE,
-      EVENT_DESCRIPTION, state, outcomeText, "", cachedJob.getUsername(), true);
+      EVENT_DESCRIPTION, state, outcomeText, "", cachedJob.getUsername(), true, null);
   }
 
   @Override
-  public Report afterAllExecute(IndexService index, ModelService model, StorageService storage) throws PluginException {
+  public Report afterAllExecute(IndexService index, ModelService model) throws PluginException {
     // do nothing
     return null;
   }

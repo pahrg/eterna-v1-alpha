@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
+
 import org.apache.commons.io.IOUtils;
 import org.roda.core.common.iterables.CloseableIterable;
 import org.roda.core.common.tools.ZipEntryInfo;
@@ -24,6 +25,8 @@ import org.roda.core.data.exceptions.AuthorizationDeniedException;
 import org.roda.core.data.exceptions.GenericException;
 import org.roda.core.data.exceptions.NotFoundException;
 import org.roda.core.data.exceptions.RequestNotValidException;
+import org.roda.core.data.v2.ConsumesOutputStream;
+import org.roda.core.data.v2.StreamResponse;
 import org.roda.core.data.v2.ip.StoragePath;
 import org.roda.core.storage.Binary;
 import org.roda.core.storage.BinaryConsumesOutputStream;
@@ -32,106 +35,15 @@ import org.roda.core.storage.StorageService;
 
 public class DownloadUtils {
 
-  private static final String ZIP_MEDIA_TYPE = "application/zip";
-  private static final String ZIP_FILE_NAME_EXTENSION = ".zip";
-  private static final String ZIP_PATH_DELIMITER = "/";
+  public static final String ZIP_MEDIA_TYPE = "application/zip";
+  public static final String ZIP_FILE_NAME_EXTENSION = ".zip";
+  public static final String ZIP_PATH_DELIMITER = "/";
 
   private DownloadUtils() {
     // do nothing
   }
 
-  public static ConsumesOutputStream download(final StorageService storage, final Resource resource)
-    throws GenericException, RequestNotValidException, NotFoundException, AuthorizationDeniedException {
-    return download(storage, resource, null, false);
-  }
-
-  public static ConsumesOutputStream download(final StorageService storage, final Resource resource, String name)
-    throws GenericException, RequestNotValidException, NotFoundException, AuthorizationDeniedException {
-    return download(storage, resource, name, false);
-  }
-
-  public static ConsumesOutputStream download(final StorageService storage, final Resource resource, String name,
-    boolean addTopDirectory)
-    throws GenericException, RequestNotValidException, NotFoundException, AuthorizationDeniedException {
-    ConsumesOutputStream stream;
-    final StoragePath storagePath = resource.getStoragePath();
-
-    if (resource.isDirectory()) {
-      // send zip with directory contents
-      final String fileName = name == null ? storagePath.getName() : name;
-
-      stream = new ConsumesOutputStream() {
-
-        @Override
-        public void consumeOutputStream(OutputStream out) throws IOException {
-
-          try (BufferedOutputStream bos = new BufferedOutputStream(out);
-            ZipOutputStream zos = new ZipOutputStream(bos);
-            CloseableIterable<Resource> resources = storage.listResourcesUnderDirectory(storagePath, true);) {
-            int basePathSize = storagePath.asList().size();
-
-            for (Resource r : resources) {
-              List<String> pathAsList = r.getStoragePath().asList();
-              List<String> relativePathAsList = pathAsList.subList(basePathSize, pathAsList.size());
-              String entryPath = relativePathAsList.stream().collect(Collectors.joining(ZIP_PATH_DELIMITER));
-              String entryDirectoryPath;
-              if (addTopDirectory) {
-                entryDirectoryPath = storagePath.getName() + ZIP_PATH_DELIMITER + entryPath;
-              } else {
-                entryDirectoryPath = entryPath;
-              }
-              if (r.isDirectory()) {
-                // adding a directory
-                entryDirectoryPath += ZIP_PATH_DELIMITER;
-                zos.putNextEntry(new ZipEntry(entryDirectoryPath));
-                zos.closeEntry();
-              } else {
-                // adding a file
-                ZipEntry entry = new ZipEntry(entryDirectoryPath);
-                zos.putNextEntry(entry);
-                Binary binary = storage.getBinary(r.getStoragePath());
-                try (InputStream inputStream = binary.getContent().createInputStream()) {
-                  IOUtils.copy(inputStream, zos);
-                }
-                zos.closeEntry();
-              }
-            }
-          } catch (GenericException | RequestNotValidException | NotFoundException | AuthorizationDeniedException e) {
-            throw new IOException(e);
-          }
-        }
-
-        @Override
-        public String getFileName() {
-          return fileName + ZIP_FILE_NAME_EXTENSION;
-        }
-
-        @Override
-        public String getMediaType() {
-          return ZIP_MEDIA_TYPE;
-        }
-
-        @Override
-        public Date getLastModified() {
-          return null;
-        }
-
-        @Override
-        public long getSize() {
-          return -1;
-        }
-      };
-
-    } else {
-      // send the one file
-      stream = new BinaryConsumesOutputStream(storage.getBinary(storagePath));
-    }
-
-    return stream;
-  }
-
   public static StreamResponse createZipStreamResponse(List<ZipEntryInfo> zipEntries, String zipName) {
-
     final ConsumesOutputStream stream = new ConsumesOutputStream() {
 
       @Override

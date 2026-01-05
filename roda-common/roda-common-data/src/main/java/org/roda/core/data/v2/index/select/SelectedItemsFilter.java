@@ -7,11 +7,16 @@
  */
 package org.roda.core.data.v2.index.select;
 
+import java.io.Serial;
+
 import org.roda.core.data.v2.index.IsIndexed;
 import org.roda.core.data.v2.index.filter.Filter;
 
+import com.fasterxml.jackson.annotation.JsonTypeName;
+
 public class SelectedItemsFilter<T extends IsIndexed> implements SelectedItems<T> {
 
+  @Serial
   private static final long serialVersionUID = 975693329806484985L;
 
   private Filter filter;

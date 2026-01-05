@@ -17,6 +17,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.google.common.collect.Lists;
 import org.roda.core.RodaCoreFactory;
 import org.roda.core.TestsHelper;
 import org.roda.core.common.PremisV3Utils;
@@ -53,6 +54,7 @@ import org.roda.core.index.utils.IterableIndexResult;
 import org.roda.core.model.ModelService;
 import org.roda.core.plugins.base.ingest.v2.MinimalIngestPlugin;
 import org.roda.core.plugins.base.preservation.AppraisalPlugin;
+import org.roda.core.security.LdapUtilityTestHelper;
 import org.roda.core.storage.Binary;
 import org.roda.core.storage.fs.FSUtils;
 import org.slf4j.Logger;
@@ -66,7 +68,6 @@ import org.testng.annotations.Test;
 import com.google.common.collect.Iterables;
 
 import gov.loc.premis.v3.EventComplexType;
-import jersey.repackaged.com.google.common.collect.Lists;
 
 @Test(groups = {RodaConstants.TEST_GROUP_ALL, RodaConstants.TEST_GROUP_DEV, RodaConstants.TEST_GROUP_TRAVIS})
 public class MinimalIngestPluginTest {
@@ -78,12 +79,14 @@ public class MinimalIngestPluginTest {
 
   private ModelService model;
   private IndexService index;
+  private static LdapUtilityTestHelper ldapUtilityTestHelper;
 
   private Path corporaPath;
 
   @BeforeClass
   public void setUp() throws Exception {
     basePath = TestsHelper.createBaseTempDir(getClass(), true);
+    ldapUtilityTestHelper = new LdapUtilityTestHelper();
 
     boolean deploySolr = true;
     boolean deployLdap = true;
@@ -92,7 +95,7 @@ public class MinimalIngestPluginTest {
     boolean deployPluginManager = true;
     boolean deployDefaultResources = false;
     RodaCoreFactory.instantiateTest(deploySolr, deployLdap, deployFolderMonitor, deployOrchestrator,
-      deployPluginManager, deployDefaultResources, false);
+      deployPluginManager, deployDefaultResources, false, ldapUtilityTestHelper.getLdapUtility());
     model = RodaCoreFactory.getModelService();
     index = RodaCoreFactory.getIndexService();
 
@@ -105,6 +108,7 @@ public class MinimalIngestPluginTest {
   @AfterClass
   public void tearDown() throws Exception {
     IndexTestUtils.resetIndex();
+    ldapUtilityTestHelper.shutdown();
     RodaCoreFactory.shutdown();
     FSUtils.deletePath(basePath);
   }
@@ -336,7 +340,7 @@ public class MinimalIngestPluginTest {
 
     String parentId = null;
     String aipType = RodaConstants.AIP_TYPE_MIXED;
-    AIP root = model.createAIP(parentId, aipType, new Permissions(), RodaConstants.ADMIN);
+    AIP root = model.createAIP(parentId, aipType, new Permissions(), RodaConstants.ADMIN, null);
 
     HashMap<String, String> parameters = new HashMap<>();
     parameters.put(RodaConstants.PLUGIN_PARAMS_PARENT_ID, root.getId());

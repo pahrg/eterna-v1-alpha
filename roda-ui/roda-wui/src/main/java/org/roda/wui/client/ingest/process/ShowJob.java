@@ -35,15 +35,14 @@ import org.roda.core.data.v2.ip.IndexedAIP;
 import org.roda.core.data.v2.ip.IndexedFile;
 import org.roda.core.data.v2.ip.IndexedRepresentation;
 import org.roda.core.data.v2.ip.Representation;
+import org.roda.core.data.v2.jobs.IndexedJob;
 import org.roda.core.data.v2.jobs.IndexedReport;
 import org.roda.core.data.v2.jobs.Job;
 import org.roda.core.data.v2.jobs.PluginInfo;
+import org.roda.core.data.v2.jobs.PluginInfoRequest;
 import org.roda.core.data.v2.jobs.PluginParameter;
 import org.roda.core.data.v2.jobs.PluginParameter.PluginParameterType;
 import org.roda.core.data.v2.jobs.PluginType;
-import org.roda.core.data.v2.synchronization.central.DistributedInstance;
-import org.roda.core.data.v2.synchronization.local.LocalInstance;
-import org.roda.wui.client.browse.BrowserService;
 import org.roda.wui.client.common.NoAsyncCallback;
 import org.roda.wui.client.common.UserLogin;
 import org.roda.wui.client.common.actions.Actionable;
@@ -63,6 +62,9 @@ import org.roda.wui.client.common.utils.JavascriptUtils;
 import org.roda.wui.client.common.utils.SidebarUtils;
 import org.roda.wui.client.management.distributed.ShowDistributedInstance;
 import org.roda.wui.client.process.Process;
+import org.roda.wui.client.services.ConfigurationRestService;
+import org.roda.wui.client.services.DistributedInstancesRestService;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.HistoryResolver;
 import org.roda.wui.common.client.tools.ConfigurationManager;
 import org.roda.wui.common.client.tools.DescriptionLevelUtils;
@@ -113,41 +115,36 @@ public class ShowJob extends Composite {
 
     @Override
     public void resolve(List<String> historyTokens, final AsyncCallback<Widget> callback) {
-      if (historyTokens.size() > 1 && historyTokens.get(0).equals(ShowJobReport.RESOLVER.getHistoryToken())) {
-        ShowJobReport.RESOLVER.resolve(HistoryUtils.tail(historyTokens), callback);
-      } else if (historyTokens.size() >= 1) {
+      if (historyTokens.size() > 1 && historyTokens.get(1).equals(ShowJobReport.RESOLVER.getHistoryToken())) {
+        ShowJobReport.RESOLVER.resolve(historyTokens, callback);
+      } else if (!historyTokens.isEmpty()) {
         String jobId = historyTokens.get(0);
-        BrowserService.Util.getInstance().retrieveJobBundle(jobId, new ArrayList<>(), new AsyncCallback<JobBundle>() {
-
-          @Override
-          public void onFailure(Throwable caught) {
-            if (caught instanceof NotFoundException) {
-              Toast.showError(messages.notFoundError(), messages.jobNotFound());
-              HistoryUtils.newHistory(Process.RESOLVER);
-            } else {
-              AsyncCallbackUtils.defaultFailureTreatment(caught);
-            }
-          }
-
-          @Override
-          public void onSuccess(JobBundle jobBundle) {
-            Map<String, PluginInfo> pluginsInfo = new HashMap<>();
-            for (PluginInfo pluginInfo : jobBundle.getPluginsInfo()) {
-              pluginsInfo.put(pluginInfo.getId(), pluginInfo);
-            }
-
-            List<FilterParameter> reportFilterParameters = new ArrayList<>();
-            for (int i = 1; i < historyTokens.size() - 1; i += 2) {
-              String key = historyTokens.get(i);
-              String value = historyTokens.get(i + 1);
-              reportFilterParameters.add(new SimpleFilterParameter(key, value));
-            }
-
-            ShowJob showJob = new ShowJob(jobBundle.getJob(), pluginsInfo, reportFilterParameters);
-            callback.onSuccess(showJob);
-          }
-
-        });
+        Services services = new Services("Get job plugin info", "get");
+        services.jobsResource(s -> s.findByUuid(jobId, LocaleInfo.getCurrentLocale().getLocaleName())).thenCompose(
+          retrievedJob -> services.jobsResource(s -> s.getJobPluginInfo(new PluginInfoRequest(retrievedJob)))
+            .whenComplete((pluginInfoList, error) -> {
+              if (error != null) {
+                if (error.getCause() instanceof NotFoundException) {
+                  Toast.showError(messages.notFoundError(), messages.jobNotFound());
+                  HistoryUtils.newHistory(Process.RESOLVER);
+                } else {
+                  AsyncCallbackUtils.defaultFailureTreatment(error.getCause());
+                }
+              } else {
+                Map<String, PluginInfo> pluginsInfoMap = new HashMap<>();
+                for (PluginInfo pluginInfo : pluginInfoList) {
+                  pluginsInfoMap.put(pluginInfo.getId(), pluginInfo);
+                }
+                List<FilterParameter> reportFilterParameters = new ArrayList<>();
+                for (int i = 1; i < historyTokens.size() - 1; i += 2) {
+                  String key = historyTokens.get(i);
+                  String value = historyTokens.get(i + 1);
+                  reportFilterParameters.add(new SimpleFilterParameter(key, value));
+                }
+                ShowJob showJob = new ShowJob(retrievedJob, pluginsInfoMap, reportFilterParameters);
+                callback.onSuccess(showJob);
+              }
+            }));
       } else {
         HistoryUtils.newHistory(Process.RESOLVER);
         callback.onSuccess(null);
@@ -231,12 +228,13 @@ public class ShowJob extends Composite {
   FlowPanel content;
 
   // SIDEBAR
-  private Job job;
+  private IndexedJob job;
   private Map<String, PluginInfo> pluginsInfo;
   private Timer autoUpdateTimer = null;
   private int autoUpdateTimerPeriod = 0;
 
-  public ShowJob(Job job, Map<String, PluginInfo> pluginsInfo, List<FilterParameter> extraReportFilterParameters) {
+  public ShowJob(IndexedJob job, Map<String, PluginInfo> pluginsInfo,
+    List<FilterParameter> extraReportFilterParameters) {
     this.job = job;
     this.pluginsInfo = pluginsInfo;
     boolean isIngest = job.getPluginType().equals(PluginType.INGEST);
@@ -277,22 +275,17 @@ public class ShowJob extends Composite {
       String distributedMode = ConfigurationManager.getStringWithDefault(
         RodaConstants.DEFAULT_DISTRIBUTED_MODE_TYPE.name(), RodaConstants.DISTRIBUTED_MODE_TYPE_PROPERTY);
       if (distributedMode.equals(RodaConstants.DistributedModeType.CENTRAL.name())) {
-        BrowserService.Util.getInstance().retrieveDistributedInstance(job.getInstanceId(),
-          new AsyncCallback<DistributedInstance>() {
-            @Override
-            public void onFailure(Throwable caught) {
-              BrowserService.Util.getInstance().retrieveLocalInstance(new NoAsyncCallback<LocalInstance>() {
-                @Override
-                public void onSuccess(LocalInstance localInstance) {
+        Services services = new Services("Retrieve distributed instance", "retrieve");
+        services.distributedInstanceResource(s -> s.getDistributedInstance(job.getInstanceId()))
+          .whenComplete((distributedInstance, throwable) -> {
+            if (throwable != null) {
+              services.distributedInstanceResource(DistributedInstancesRestService::getLocalInstance)
+                .whenComplete((localInstance, throwable1) -> {
                   Label instanceNameLabel = new Label(localInstance.getName());
                   instanceNameLabel.addStyleName("value");
                   instancePanel.add(instanceNameLabel);
-                }
-              });
-            }
-
-            @Override
-            public void onSuccess(DistributedInstance distributedInstance) {
+                });
+            } else {
               Anchor anchor = new Anchor();
               anchor.setHref(HistoryUtils.createHistoryHashLink(ShowDistributedInstance.RESOLVER, job.getInstanceId()));
               anchor.setText(distributedInstance.getName());
@@ -316,14 +309,20 @@ public class ShowJob extends Composite {
     dateStarted.setText(Humanize.formatDateTime(job.getStartDate()));
     update();
 
-    SelectedItems<?> selected = job.getSourceObjects();
-    selectedListPanel.setVisible(true);
-
-    if (isIngest) {
-      showIngestSourceObjects(selected);
-    } else {
-      showActionSourceObjects(selected);
-    }
+    Services services = new Services("get job from model", "get");
+    services.jobsResource(s -> s.getJobFromModel(job.getId())).whenComplete((modelJob, error) -> {
+      if (modelJob != null) {
+        SelectedItems<?> selected = modelJob.getSourceObjects();
+        if (isIngest) {
+          showIngestSourceObjects(selected);
+        } else {
+          showActionSourceObjects(selected);
+        }
+      } else if (error != null) {
+        selectedListPanel.setVisible(false);
+        AsyncCallbackUtils.defaultFailureTreatment(error);
+      }
+    });
 
     showAttachments(job.getAttachmentsList());
 
@@ -368,12 +367,14 @@ public class ShowJob extends Composite {
       .withActionCallback(new NoAsyncCallback<Actionable.ActionImpact>() {
         @Override
         public void onSuccess(Actionable.ActionImpact result) {
-          BrowserService.Util.getInstance().retrieve(Job.class.getName(), job.getId(), fieldsToReturn,
-            new NoAsyncCallback<Job>() {
-              @Override
-              public void onSuccess(Job updatedJob) {
+          Services services = new Services("refresh sidebar", "refresh");
+          services.jobsResource(s -> s.findByUuid(job.getId(), LocaleInfo.getCurrentLocale().getLocaleName()))
+            .whenComplete((updatedJob, error) -> {
+              if (updatedJob != null) {
                 ShowJob.this.job = updatedJob;
                 update();
+              } else if (error != null) {
+                AsyncCallbackUtils.defaultFailureTreatment(error);
               }
             });
         }
@@ -450,20 +451,18 @@ public class ShowJob extends Composite {
         button.addClickHandler(new ClickHandler() {
           @Override
           public void onClick(ClickEvent event) {
-            BrowserService.Util.getInstance().getExportLimit(new AsyncCallback<Integer>() {
-
-              @Override
-              public void onFailure(Throwable caught) {
-                AsyncCallbackUtils.defaultFailureTreatment(caught);
-              }
-
-              @Override
-              public void onSuccess(Integer result) {
-                Toast.showInfo(messages.exportListTitle(), messages.exportListMessage(result));
-                RestUtils.requestCSVExport(Job.class.getName(), filter, Sorter.NONE, new Sublist(0, result),
-                  Facets.NONE, true, false, "job.csv");
-              }
-            });
+            Services services = new Services("Retrieve export limit", "retrieve");
+            services.configurationsResource(ConfigurationRestService::retrieveExportLimit)
+              .whenComplete((longResponse, throwable) -> {
+                if (throwable != null) {
+                  AsyncCallbackUtils.defaultFailureTreatment(throwable);
+                } else {
+                  Toast.showInfo(messages.exportListTitle(),
+                    messages.exportListMessage(longResponse.getResult().intValue()));
+                  RestUtils.requestCSVExport(IndexedJob.class, filter, Sorter.NONE,
+                    new Sublist(0, longResponse.getResult().intValue()), Facets.NONE, true, false, "job.csv");
+                }
+              });
           }
         });
 
@@ -501,24 +500,19 @@ public class ShowJob extends Composite {
 
           Button button = new Button(messages.downloadButton());
           button.addStyleName("btn btn-separator-left btn-link");
-          button.addClickHandler(new ClickHandler() {
-            @Override
-            public void onClick(ClickEvent event) {
-              BrowserService.Util.getInstance().getExportLimit(new AsyncCallback<Integer>() {
-
-                @Override
-                public void onFailure(Throwable caught) {
-                  AsyncCallbackUtils.defaultFailureTreatment(caught);
-                }
-
-                @Override
-                public void onSuccess(Integer result) {
-                  Toast.showInfo(messages.exportListTitle(), messages.exportListMessage(result));
-                  RestUtils.requestCSVExport(Job.class.getName(), filter, Sorter.NONE, new Sublist(0, result),
-                    Facets.NONE, true, false, "job.csv");
+          button.addClickHandler(event -> {
+            Services services = new Services("Retrieve export limit", "retrieve");
+            services.configurationsResource(ConfigurationRestService::retrieveExportLimit)
+              .whenComplete((longResponse, throwable) -> {
+                if (throwable != null) {
+                  AsyncCallbackUtils.defaultFailureTreatment(throwable);
+                } else {
+                  Toast.showInfo(messages.exportListTitle(),
+                    messages.exportListMessage(longResponse.getResult().intValue()));
+                  RestUtils.requestCSVExport(IndexedJob.class, filter, Sorter.NONE,
+                    new Sublist(0, longResponse.getResult().intValue()), Facets.NONE, true, false, "job.csv");
                 }
               });
-            }
           });
 
           selectedList.add(button);
@@ -596,7 +590,7 @@ public class ShowJob extends Composite {
     duration.setText(Humanize.durationInDHMS(job.getStartDate(), job.getEndDate(), DHMSFormat.LONG));
 
     // set state
-    status.setHTML(HtmlSnippetUtils.getJobStateHtml(job));
+    status.setHTML(HtmlSnippetUtils.getJobStateHtml(job.getState(), job.getJobStats()));
 
     scheduleInfoLabel.setVisible(false);
     scheduleInfo.setVisible(false);
@@ -604,26 +598,22 @@ public class ShowJob extends Composite {
     String distributedMode = ConfigurationManager.getStringWithDefault(
       RodaConstants.DEFAULT_DISTRIBUTED_MODE_TYPE.name(), RodaConstants.DISTRIBUTED_MODE_TYPE_PROPERTY);
 
-    if (distributedMode.equals(RodaConstants.DistributedModeType.LOCAL.name())) {
-      if (Job.JOB_STATE.SCHEDULED.equals(job.getState())) {
-        BrowserService.Util.getInstance().getCrontabValue(LocaleInfo.getCurrentLocale().getLocaleName(),
-          new AsyncCallback<String>() {
-            @Override
-            public void onFailure(Throwable throwable) {
-              // do nothing
+    if (distributedMode.equals(RodaConstants.DistributedModeType.LOCAL.name())
+      && Job.JOB_STATE.SCHEDULED.equals(job.getState())) {
+      Services services = new Services("Retrieve job schedule info", "retrieve");
+      services.configurationsResource(s -> s.retrieveCronValue(LocaleInfo.getCurrentLocale().getLocaleName()))
+        .whenComplete((stringResponse, throwable) -> {
+          if (throwable != null) {
+            AsyncCallbackUtils.defaultFailureTreatment(throwable);
+          } else {
+            String description = stringResponse.getValue();
+            if (StringUtils.isNotBlank(description)) {
+              scheduleInfoLabel.setVisible(true);
+              scheduleInfo.setVisible(true);
+              scheduleInfo.setText(description);
             }
-
-            @Override
-            public void onSuccess(String description) {
-              if (StringUtils.isNotBlank(description)) {
-                scheduleInfoLabel.setVisible(true);
-                scheduleInfo.setVisible(true);
-                scheduleInfo.setText(description);
-              }
-            }
-          });
-
-      }
+          }
+        });
     }
 
     // set state details
@@ -686,25 +676,24 @@ public class ShowJob extends Composite {
   }
 
   private void refreshJobPluginInfo() {
-    BrowserService.Util.getInstance().retrieveJobBundle(job.getId(), new ArrayList<>(), new AsyncCallback<JobBundle>() {
-      @Override
-      public void onFailure(Throwable caught) {
-        if (caught instanceof NotFoundException) {
-          Toast.showError(messages.notFoundError(), messages.jobNotFound());
-          HistoryUtils.newHistory(Process.RESOLVER);
-        } else {
-          AsyncCallbackUtils.defaultFailureTreatment(caught);
+    Services services = new Services("Refresh job plugin info", "update");
+    services.jobsResource(s -> s.findByUuid(job.getId(), LocaleInfo.getCurrentLocale().getLocaleName()))
+      .thenCompose(updateJob -> services.jobsResource(s -> s.getJobPluginInfo(new PluginInfoRequest(updateJob))))
+      .whenComplete((pluginsInfoList, error) -> {
+        if (pluginsInfoList != null) {
+          pluginsInfo = new HashMap<>();
+          for (PluginInfo pluginInfo : pluginsInfoList) {
+            pluginsInfo.put(pluginInfo.getId(), pluginInfo);
+          }
+        } else if (error != null) {
+          if (error instanceof NotFoundException) {
+            Toast.showError(messages.notFoundError(), messages.jobNotFound());
+            HistoryUtils.newHistory(Process.RESOLVER);
+          } else {
+            AsyncCallbackUtils.defaultFailureTreatment(error);
+          }
         }
-      }
-
-      @Override
-      public void onSuccess(JobBundle jobBundle) {
-        pluginsInfo = new HashMap<>();
-        for (PluginInfo pluginInfo : jobBundle.getPluginsInfo()) {
-          pluginsInfo.put(pluginInfo.getId(), pluginInfo);
-        }
-      }
-    });
+      });
   }
 
   private void scheduleUpdateStatus() {
@@ -714,19 +703,15 @@ public class ShowJob extends Composite {
 
           @Override
           public void run() {
-            BrowserService.Util.getInstance().retrieve(Job.class.getName(), job.getId(), fieldsToReturn,
-              new AsyncCallback<Job>() {
-
-                @Override
-                public void onFailure(Throwable caught) {
-                  AsyncCallbackUtils.defaultFailureTreatment(caught);
-                }
-
-                @Override
-                public void onSuccess(Job updatedJob) {
+            Services services = new Services("Update job status", "update");
+            services.jobsResource(s -> s.findByUuid(job.getId(), LocaleInfo.getCurrentLocale().getLocaleName()))
+              .whenComplete((updatedJob, error) -> {
+                if (updatedJob != null) {
                   ShowJob.this.job = updatedJob;
                   update();
                   scheduleUpdateStatus();
+                } else if (error != null) {
+                  AsyncCallbackUtils.defaultFailureTreatment(error);
                 }
               });
           }
@@ -744,27 +729,23 @@ public class ShowJob extends Composite {
       : parameter.getDefaultValue();
 
     if (value != null && !value.isEmpty()) {
-      BrowserService.Util.getInstance().retrieve(IndexedAIP.class.getName(), value, aipFieldsToReturn,
-        new AsyncCallback<IndexedAIP>() {
-
-          @Override
-          public void onFailure(Throwable caught) {
-            if (caught instanceof NotFoundException) {
+      Services services = new Services("Retrieve AIP", "get");
+      services.aipResource(s -> s.findByUuid(value, LocaleInfo.getCurrentLocale().getLocaleName()))
+        .whenComplete((indexedAIP, throwable) -> {
+          if (throwable != null) {
+            if (throwable.getCause() instanceof NotFoundException) {
               Label itemTitle = new Label(value);
               itemTitle.addStyleName("itemText");
               aipPanel.clear();
               aipPanel.add(itemTitle);
             } else {
-              AsyncCallbackUtils.defaultFailureTreatment(caught);
+              AsyncCallbackUtils.defaultFailureTreatment(throwable.getCause());
             }
-          }
-
-          @Override
-          public void onSuccess(IndexedAIP aip) {
+          } else {
             Label itemTitle = new Label();
-            HTMLPanel itemIconHtmlPanel = DescriptionLevelUtils.getElementLevelIconHTMLPanel(aip.getLevel());
+            HTMLPanel itemIconHtmlPanel = DescriptionLevelUtils.getElementLevelIconHTMLPanel(indexedAIP.getLevel());
             itemIconHtmlPanel.addStyleName("itemIcon");
-            itemTitle.setText(aip.getTitle() != null ? aip.getTitle() : aip.getId());
+            itemTitle.setText(indexedAIP.getTitle() != null ? indexedAIP.getTitle() : indexedAIP.getId());
             itemTitle.addStyleName("itemText");
 
             aipPanel.clear();

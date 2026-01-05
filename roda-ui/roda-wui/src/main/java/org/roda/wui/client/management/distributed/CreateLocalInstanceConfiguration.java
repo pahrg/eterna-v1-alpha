@@ -9,13 +9,10 @@ package org.roda.wui.client.management.distributed;
 
 import java.util.List;
 
-import com.google.gwt.user.client.ui.FlowPanel;
-import org.roda.core.data.v2.synchronization.central.DistributedInstance;
+import org.roda.core.data.v2.synchronization.central.CreateLocalInstanceRequest;
 import org.roda.core.data.v2.synchronization.local.LocalInstance;
-import org.roda.wui.client.browse.BrowserService;
-import org.roda.wui.client.common.NoAsyncCallback;
 import org.roda.wui.client.common.UserLogin;
-import org.roda.wui.client.common.utils.JavascriptUtils;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.HistoryResolver;
 import org.roda.wui.common.client.tools.HistoryUtils;
 import org.roda.wui.common.client.tools.ListUtils;
@@ -28,15 +25,15 @@ import com.google.gwt.uibinder.client.UiField;
 import com.google.gwt.uibinder.client.UiHandler;
 import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.google.gwt.user.client.ui.Composite;
+import com.google.gwt.user.client.ui.FlowPanel;
 import com.google.gwt.user.client.ui.Widget;
-
-import config.i18n.client.ClientMessages;
 
 /**
  * @author Gabriel Barros <gbarros@keep.pt>
  */
 public class CreateLocalInstanceConfiguration extends Composite {
-  private static MyUiBinder uiBinder = GWT.create(MyUiBinder.class);  public static final HistoryResolver RESOLVER = new HistoryResolver() {
+  private static MyUiBinder uiBinder = GWT.create(MyUiBinder.class);
+  public static final HistoryResolver RESOLVER = new HistoryResolver() {
 
     @Override
     public void resolve(List<String> historyTokens, AsyncCallback<Widget> callback) {
@@ -76,20 +73,17 @@ public class CreateLocalInstanceConfiguration extends Composite {
     this.description.add(new HTMLWidgetWrapper(("LocalInstanceDescription.html")));
   }
 
-  @Override
-  protected void onLoad() {
-    super.onLoad();
-    JavascriptUtils.stickSidebar();
-  }
-
   @UiHandler("buttonSave")
   void buttonApplyHandler(ClickEvent e) {
     if (localInstanceConfigurationDataPanel.isValid()) {
       LocalInstance localInstanceReturned = localInstanceConfigurationDataPanel.getLocalInstance();
-      BrowserService.Util.getInstance().createLocalInstance(localInstanceReturned,
-        new NoAsyncCallback<DistributedInstance>() {
-          @Override
-          public void onSuccess(DistributedInstance distributedInstance) {
+      CreateLocalInstanceRequest createLocalInstanceRequest = new CreateLocalInstanceRequest(
+        localInstanceReturned.getId(), localInstanceReturned.getAccessKey(),
+        localInstanceReturned.getCentralInstanceURL());
+      Services services = new Services("Create local instance", "create");
+      services.distributedInstanceResource(s -> s.createLocalInstance(createLocalInstanceRequest))
+        .whenComplete((createdLocalInstance, error) -> {
+          if (createdLocalInstance != null) {
             HistoryUtils.newHistory(LocalInstanceManagement.RESOLVER);
           }
         });
@@ -107,6 +101,5 @@ public class CreateLocalInstanceConfiguration extends Composite {
 
   interface MyUiBinder extends UiBinder<Widget, CreateLocalInstanceConfiguration> {
   }
-
 
 }

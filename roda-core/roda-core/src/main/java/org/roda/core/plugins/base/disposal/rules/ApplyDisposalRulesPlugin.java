@@ -23,10 +23,10 @@ import org.roda.core.data.exceptions.InvalidParameterException;
 import org.roda.core.data.exceptions.NotFoundException;
 import org.roda.core.data.exceptions.RequestNotValidException;
 import org.roda.core.data.v2.LiteOptionalWithCause;
+import org.roda.core.data.v2.disposal.rule.DisposalRule;
+import org.roda.core.data.v2.disposal.rule.DisposalRules;
 import org.roda.core.data.v2.ip.AIP;
 import org.roda.core.data.v2.ip.AIPDisposalScheduleAssociationType;
-import org.roda.core.data.v2.ip.disposal.DisposalRule;
-import org.roda.core.data.v2.ip.disposal.DisposalRules;
 import org.roda.core.data.v2.jobs.Job;
 import org.roda.core.data.v2.jobs.PluginParameter;
 import org.roda.core.data.v2.jobs.PluginState;
@@ -38,10 +38,9 @@ import org.roda.core.model.ModelService;
 import org.roda.core.plugins.AbstractPlugin;
 import org.roda.core.plugins.Plugin;
 import org.roda.core.plugins.PluginException;
+import org.roda.core.plugins.PluginHelper;
 import org.roda.core.plugins.RODAObjectsProcessingLogic;
 import org.roda.core.plugins.orchestrate.JobPluginInfo;
-import org.roda.core.plugins.PluginHelper;
-import org.roda.core.storage.StorageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,16 +49,24 @@ import org.slf4j.LoggerFactory;
  */
 public class ApplyDisposalRulesPlugin extends AbstractPlugin<AIP> {
   private static final Logger LOGGER = LoggerFactory.getLogger(ApplyDisposalRulesPlugin.class);
-
-  private boolean overrideManualAssociations = false;
-
   private static final Map<String, PluginParameter> pluginParameters = new HashMap<>();
 
   static {
     pluginParameters.put(RodaConstants.PLUGIN_PARAMS_DISPOSAL_SCHEDULE_OVERWRITE_MANUAL,
-      new PluginParameter(RodaConstants.PLUGIN_PARAMS_DISPOSAL_SCHEDULE_OVERWRITE_MANUAL, "Override disposal schedule",
-        PluginParameter.PluginParameterType.BOOLEAN, "false", true, false,
-        "Overrides disposal schedules manually associated"));
+      PluginParameter
+        .getBuilder(RodaConstants.PLUGIN_PARAMS_DISPOSAL_SCHEDULE_OVERWRITE_MANUAL, "Override disposal schedule",
+          PluginParameter.PluginParameterType.BOOLEAN)
+        .withDefaultValue("false").withDescription("Overrides manually associated disposal schedules.").build());
+  }
+
+  private boolean overrideManualAssociations = false;
+
+  public static String getStaticName() {
+    return "Disposal schedule association via disposal rule";
+  }
+
+  public static String getStaticDescription() {
+    return "Associates a disposal schedule to an AIP via rules previously defined for the repository.";
   }
 
   @Override
@@ -83,17 +90,9 @@ public class ApplyDisposalRulesPlugin extends AbstractPlugin<AIP> {
     return "1.0";
   }
 
-  public static String getStaticName() {
-    return "Disposal schedule association via disposal rule";
-  }
-
   @Override
   public String getName() {
     return getStaticName();
-  }
-
-  public static String getStaticDescription() {
-    return "Associates a disposal schedule to an AIP via rules previously defined for the repository.";
   }
 
   @Override
@@ -132,22 +131,21 @@ public class ApplyDisposalRulesPlugin extends AbstractPlugin<AIP> {
   }
 
   @Override
-  public Report beforeAllExecute(IndexService index, ModelService model, StorageService storage)
-    throws PluginException {
+  public Report beforeAllExecute(IndexService index, ModelService model) throws PluginException {
     // do nothing
     return null;
   }
 
   @Override
-  public Report execute(IndexService index, ModelService model, StorageService storage,
-    List<LiteOptionalWithCause> liteList) throws PluginException {
+  public Report execute(IndexService index, ModelService model, List<LiteOptionalWithCause> liteList)
+    throws PluginException {
     return PluginHelper.processObjects(this, new RODAObjectsProcessingLogic<AIP>() {
       @Override
-      public void process(IndexService index, ModelService model, StorageService storage, Report report, Job cachedJob,
+      public void process(IndexService index, ModelService model, Report report, Job cachedJob,
         JobPluginInfo jobPluginInfo, Plugin<AIP> plugin, List<AIP> objects) {
         processAIP(objects, index, model, report, cachedJob, jobPluginInfo);
       }
-    }, index, model, storage, liteList);
+    }, index, model, liteList);
   }
 
   private void processAIP(List<AIP> aips, IndexService index, ModelService model, Report report, Job cachedJob,
@@ -258,7 +256,7 @@ public class ApplyDisposalRulesPlugin extends AbstractPlugin<AIP> {
   }
 
   @Override
-  public Report afterAllExecute(IndexService index, ModelService model, StorageService storage) throws PluginException {
+  public Report afterAllExecute(IndexService index, ModelService model) throws PluginException {
     // do nothing
     return new Report();
   }

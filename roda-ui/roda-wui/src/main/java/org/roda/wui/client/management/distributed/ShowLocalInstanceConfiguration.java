@@ -9,10 +9,9 @@ package org.roda.wui.client.management.distributed;
 
 import java.util.List;
 
-import org.roda.core.data.v2.jobs.Job;
 import org.roda.core.data.v2.synchronization.SynchronizingStatus;
 import org.roda.core.data.v2.synchronization.local.LocalInstance;
-import org.roda.wui.client.browse.BrowserService;
+import org.roda.wui.client.browse.BrowseTop;
 import org.roda.wui.client.common.NoAsyncCallback;
 import org.roda.wui.client.common.UserLogin;
 import org.roda.wui.client.common.dialogs.Dialogs;
@@ -20,6 +19,8 @@ import org.roda.wui.client.common.utils.AsyncCallbackUtils;
 import org.roda.wui.client.common.utils.HtmlSnippetUtils;
 import org.roda.wui.client.ingest.process.ShowJob;
 import org.roda.wui.client.process.InternalProcess;
+import org.roda.wui.client.services.DistributedInstancesRestService;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.HistoryResolver;
 import org.roda.wui.common.client.tools.HistoryUtils;
 import org.roda.wui.common.client.tools.ListUtils;
@@ -46,16 +47,14 @@ public class ShowLocalInstanceConfiguration extends Composite {
 
     @Override
     public void resolve(List<String> historyTokens, AsyncCallback<Widget> callback) {
-      BrowserService.Util.getInstance().retrieveLocalInstance(new NoAsyncCallback<LocalInstance>() {
-        @Override
-        public void onSuccess(LocalInstance localInstance) {
-          if (localInstance != null) {
-            ShowLocalInstanceConfiguration showLocalInstanceConfiguration = new ShowLocalInstanceConfiguration(
-              localInstance);
-            callback.onSuccess(showLocalInstanceConfiguration);
-          } else {
-            HistoryUtils.newHistory(CreateLocalInstanceConfiguration.RESOLVER);
-          }
+      Services services = new Services("Get local instance", "get");
+      services.distributedInstanceResource(s -> s.getLocalInstance()).whenComplete((localInstance, error) -> {
+        if (!localInstance.equals(new LocalInstance())) {
+          ShowLocalInstanceConfiguration showLocalInstanceConfiguration = new ShowLocalInstanceConfiguration(
+            localInstance);
+          callback.onSuccess(showLocalInstanceConfiguration);
+        } else {
+          HistoryUtils.newHistory(CreateLocalInstanceConfiguration.RESOLVER);
         }
       });
     }
@@ -136,15 +135,15 @@ public class ShowLocalInstanceConfiguration extends Composite {
         @Override
         public void onSuccess(Boolean result) {
           if (result) {
-            BrowserService.Util.getInstance().subscribeLocalInstance(localInstance,
-              new NoAsyncCallback<LocalInstance>() {
-                @Override
-                public void onSuccess(LocalInstance result) {
+            Services services = new Services("Subscribe local instance", "subscribe");
+            services.distributedInstanceResource(s -> s.subscribeLocalInstance(localInstance))
+              .whenComplete((subscribedLocalInstance, error) -> {
+                if (subscribedLocalInstance != null) {
                   buttonSubscribe.setVisible(false);
                   Dialogs.showJobRedirectDialog(messages.jobCreatedMessage(), new AsyncCallback<Void>() {
                     @Override
                     public void onFailure(Throwable caught) {
-                      initElements(result);
+                      initElements(subscribedLocalInstance);
                       Toast.showInfo(messages.runningInBackgroundTitle(), messages.runningInBackgroundDescription());
                     }
 
@@ -163,20 +162,13 @@ public class ShowLocalInstanceConfiguration extends Composite {
 
   @UiHandler("buttonSynchronize")
   void buttonSynchronizeHandler(ClickEvent e) {
-    BrowserService.Util.getInstance().synchronizeBundle(localInstance, new NoAsyncCallback<Job>() {
-      @Override
-      public void onSuccess(Job job) {
+    Services services = new Services("Synchronize", "synchronize");
+    services.distributedInstanceResource(s -> s.synchronize(localInstance)).whenComplete((job, error) -> {
+      if (job != null) {
         Toast.showInfo("Create Job", "Success");
         HistoryUtils.newHistory(ShowJob.RESOLVER, job.getId());
       }
-
-      @Override
-      public void onFailure(Throwable caught) {
-        super.onFailure(caught);
-      }
-
     });
-
   }
 
   @UiHandler("buttonUnsubscribe")
@@ -197,15 +189,17 @@ public class ShowLocalInstanceConfiguration extends Composite {
       public void onSuccess(Boolean result) {
         super.onSuccess(result);
         if (result) {
-          BrowserService.Util.getInstance().deleteLocalInstanceConfiguration(new NoAsyncCallback<Void>() {
-            @Override
-            public void onSuccess(Void unused) {
-              super.onSuccess(unused);
-              Dialogs.showConfirmDialog(messages.removeInstanceIdFromRepository(),
-                messages.removeInstanceIdFromRepositoryMessage(), messages.dialogNo(), messages.dialogYes(),
-                confirmRemoveInstanceIdentifier());
-            }
-          });
+          Services services = new Services("Delete local instance configuration", "delete");
+          services.distributedInstanceResource(DistributedInstancesRestService::unsubscribeLocalInstance)
+            .whenComplete((res, error) -> {
+              if (error == null) {
+                super.onSuccess(true);
+                Toast.showInfo(messages.successfullyUnsubscribedTitle(), messages.successfullyUnsubscribedMessage());
+                HistoryUtils.newHistory(BrowseTop.RESOLVER);
+              } else {
+                AsyncCallbackUtils.defaultFailureTreatment(error);
+              }
+            });
         }
       }
     };
@@ -217,28 +211,26 @@ public class ShowLocalInstanceConfiguration extends Composite {
       public void onSuccess(Boolean result) {
         super.onSuccess(result);
         if (result) {
-          BrowserService.Util.getInstance().removeLocalConfiguration(new LocalInstance(), new AsyncCallback<Job>() {
-            @Override
-            public void onFailure(Throwable caught) {
-              AsyncCallbackUtils.defaultFailureTreatment(caught);
-              HistoryUtils.newHistory(InternalProcess.RESOLVER);
-            }
+          Services services = new Services("Delete local configuration", "delete");
+          services.distributedInstanceResource(DistributedInstancesRestService::deleteLocalConfiguration)
+            .whenComplete((res, error) -> {
+              if (error == null) {
+                Dialogs.showJobRedirectDialog(messages.jobCreatedMessage(), new AsyncCallback<Void>() {
+                  @Override
+                  public void onFailure(Throwable caught) {
+                    Toast.showInfo(messages.runningInBackgroundTitle(), messages.runningInBackgroundDescription());
+                  }
 
-            @Override
-            public void onSuccess(Job job) {
-              Dialogs.showJobRedirectDialog(messages.jobCreatedMessage(), new AsyncCallback<Void>() {
-                @Override
-                public void onFailure(Throwable caught) {
-                  Toast.showInfo(messages.runningInBackgroundTitle(), messages.runningInBackgroundDescription());
-                }
-
-                @Override
-                public void onSuccess(final Void nothing) {
-                  HistoryUtils.newHistory(InternalProcess.RESOLVER);
-                }
-              });
-            }
-          });
+                  @Override
+                  public void onSuccess(final Void nothing) {
+                    HistoryUtils.newHistory(InternalProcess.RESOLVER);
+                  }
+                });
+              } else {
+                AsyncCallbackUtils.defaultFailureTreatment(error);
+                HistoryUtils.newHistory(InternalProcess.RESOLVER);
+              }
+            });
         }
       }
     };

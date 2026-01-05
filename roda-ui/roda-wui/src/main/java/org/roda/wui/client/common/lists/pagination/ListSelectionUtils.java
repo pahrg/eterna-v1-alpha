@@ -7,30 +7,29 @@
  */
 package org.roda.wui.client.common.lists.pagination;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import com.github.nmorel.gwtjackson.client.exception.JsonSerializationException;
 import org.roda.core.data.exceptions.NotFoundException;
 import org.roda.core.data.v2.common.Pair;
-import org.roda.core.data.v2.index.IndexResult;
+import org.roda.core.data.v2.index.CountRequest;
+import org.roda.core.data.v2.index.FindRequest;
 import org.roda.core.data.v2.index.IsIndexed;
 import org.roda.core.data.v2.index.facet.Facets;
 import org.roda.core.data.v2.index.filter.Filter;
 import org.roda.core.data.v2.index.sort.Sorter;
 import org.roda.core.data.v2.index.sublist.Sublist;
-import org.roda.wui.client.browse.BrowserService;
-import org.roda.wui.client.common.UserLogin;
 import org.roda.wui.client.common.lists.utils.AsyncTableCell;
 import org.roda.wui.client.common.utils.AsyncCallbackUtils;
 import org.roda.wui.client.common.utils.HtmlSnippetUtils;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.ClientLogger;
 import org.roda.wui.common.client.tools.HistoryUtils;
 import org.roda.wui.common.client.widgets.Toast;
 
 import com.github.nmorel.gwtjackson.client.exception.JsonDeserializationException;
+import com.github.nmorel.gwtjackson.client.exception.JsonSerializationException;
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.core.client.JavaScriptException;
 import com.google.gwt.dom.client.NativeEvent;
@@ -109,19 +108,18 @@ public class ListSelectionUtils {
     final AsyncCallback<ListSelectionState<T>> callback, final ProcessRelativeItem<T> processor) {
     final int newIndex = state.getIndex() + relativeIndex;
     if (newIndex >= 0) {
-      BrowserService.Util.getInstance().find(state.getSelected().getClass().getName(), state.getFilter(),
-        state.getSorter(), new Sublist(newIndex, 1), state.getFacets(), LocaleInfo.getCurrentLocale().getLocaleName(),
-        state.getJustActive(), new ArrayList<>(), new AsyncCallback<IndexResult<T>>() {
 
-          @Override
-          public void onFailure(Throwable caught) {
-            callback.onFailure(caught);
-          }
-
-          @Override
-          public void onSuccess(IndexResult<T> result) {
-            if (!result.getResults().isEmpty()) {
-              T first = result.getResults().get(0);
+      Services services = new Services("Find relatives", "get");
+      FindRequest request = FindRequest
+        .getBuilder(state.getFilter(), state.getJustActive())
+        .withSorter(state.getSorter()).withSublist(new Sublist(newIndex, 1)).withFacets(state.getFacets()).build();
+      services.rodaEntityRestService(s -> s.find(request, LocaleInfo.getCurrentLocale().getLocaleName()),
+        state.getSelected().getClass()).whenComplete((indexResult, throwable) -> {
+          if (throwable != null) {
+            callback.onFailure(throwable);
+          } else {
+            if (!indexResult.getResults().isEmpty()) {
+              T first = (T) indexResult.getResults().get(0);
 
               // if we are jumping to the same file, try the next one
               if (first.getUUID().equals(state.getSelected().getUUID())) {
@@ -129,7 +127,7 @@ public class ListSelectionUtils {
               } else {
                 processor.process(first);
                 callback.onSuccess(ListSelectionUtils.create(first, state.getFilter(), state.getJustActive(),
-                  state.getFacets(), state.getSorter(), newIndex, result.getTotalCount()));
+                  state.getFacets(), state.getSorter(), newIndex, indexResult.getTotalCount()));
               }
             } else {
               callback.onFailure(new NotFoundException("No items were found"));
@@ -234,23 +232,18 @@ public class ListSelectionUtils {
       final ListSelectionState<T> last = last(objectClass);
       if (last != null) {
         if (last.getSelected().getUUID().equals(object.getUUID())) {
-
-          BrowserService.Util.getInstance().count(objectClass.getName(), last.getFilter(), last.getJustActive(),
-            new AsyncCallback<Long>() {
-
-              @Override
-              public void onFailure(Throwable caught) {
-                callback.onFailure(caught);
-              }
-
-              @Override
-              public void onSuccess(Long totalCount) {
-                Integer lastIndex = last.getIndex();
-                Boolean hasPrevious = lastIndex > 0;
-                Boolean hasNext = lastIndex < totalCount - 1;
-                callback.onSuccess(Pair.of(hasPrevious, hasNext));
-              }
-            });
+          Services services = new Services("Count indexed objects", "count");
+          CountRequest request = new CountRequest(last.getFilter(), last.getJustActive());
+          services.rodaEntityRestService(s -> s.count(request), objectClass).whenComplete((longResponse, throwable) -> {
+            if (throwable != null) {
+              callback.onFailure(throwable);
+            } else {
+              Integer lastIndex = last.getIndex();
+              Boolean hasPrevious = lastIndex > 0;
+              Boolean hasNext = lastIndex < longResponse.getResult() - 1;
+              callback.onSuccess(Pair.of(hasPrevious, hasNext));
+            }
+          });
         } else {
           callback.onSuccess(Pair.of(Boolean.FALSE, Boolean.FALSE));
         }

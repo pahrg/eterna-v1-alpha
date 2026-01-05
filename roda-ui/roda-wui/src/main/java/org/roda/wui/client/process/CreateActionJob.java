@@ -13,6 +13,7 @@ package org.roda.wui.client.process;
 import java.util.List;
 
 import org.roda.core.data.common.RodaConstants;
+import org.roda.core.data.utils.SelectedItemsUtils;
 import org.roda.core.data.v2.index.IsIndexed;
 import org.roda.core.data.v2.index.filter.AllFilterParameter;
 import org.roda.core.data.v2.index.filter.Filter;
@@ -20,23 +21,24 @@ import org.roda.core.data.v2.index.filter.OneOfManyFilterParameter;
 import org.roda.core.data.v2.index.select.SelectedItems;
 import org.roda.core.data.v2.index.select.SelectedItemsFilter;
 import org.roda.core.data.v2.index.select.SelectedItemsList;
+import org.roda.core.data.v2.jobs.CreateJobRequest;
 import org.roda.core.data.v2.jobs.Job;
 import org.roda.core.data.v2.jobs.PluginType;
-import org.roda.wui.client.browse.BrowserService;
 import org.roda.wui.client.common.LastSelectedItemsSingleton;
 import org.roda.wui.client.common.dialogs.Dialogs;
 import org.roda.wui.client.common.lists.utils.ListBuilder;
 import org.roda.wui.client.common.lists.utils.ListFactory;
 import org.roda.wui.client.common.search.SearchWrapper;
 import org.roda.wui.client.common.utils.AsyncCallbackUtils;
+import org.roda.wui.client.common.utils.JobUtils;
 import org.roda.wui.client.common.utils.PluginUtils;
 import org.roda.wui.client.search.Search;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.tools.HistoryUtils;
 import org.roda.wui.common.client.widgets.Toast;
 
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.event.dom.client.ClickEvent;
-import com.google.gwt.user.client.rpc.AsyncCallback;
 
 import config.i18n.client.ClientMessages;
 
@@ -95,41 +97,42 @@ public class CreateActionJob extends CreateSelectedJob<IsIndexed> {
     getButtonCreate().setEnabled(false);
     String jobName = getName().getText();
 
-    BrowserService.Util.getInstance().createProcess(jobName, getJobPriority(), getJobParallelism(), getSelected(),
-      getSelectedPlugin().getId(), getWorkflowOptions().getValue(), getSelectedClass(), new AsyncCallback<Job>() {
+    CreateJobRequest jobRequest = new CreateJobRequest();
+    jobRequest.setName(jobName);
+    jobRequest.setPlugin(getSelectedPlugin().getId());
+    jobRequest.setPluginParameters(getWorkflowOptions().getValue());
+    jobRequest.setSourceObjects(SelectedItemsUtils.convertToRESTRequest(getSelected()));
+    jobRequest.setPriority(getJobPriority().name());
+    jobRequest.setParallelism(getJobParallelism().name());
+    jobRequest.setSourceObjectsClass(getSelected().getSelectedClass());
 
-        @Override
-        public void onFailure(Throwable caught) {
-          AsyncCallbackUtils.defaultFailureTreatment(caught);
-          getButtonCreate().setEnabled(true);
-        }
-
-        @Override
-        public void onSuccess(Job job) {
-          Toast.showInfo(messages.dialogDone(), messages.processCreated());
-          HistoryUtils.newHistory(ActionProcess.RESOLVER);
-        }
-
-      });
+    Services services = new Services("Create job", "create");
+    services.jobsResource(s -> s.createJob(jobRequest)).whenComplete((job1, throwable) -> {
+      if (throwable != null) {
+        getButtonCreate().setEnabled(true);
+        AsyncCallbackUtils.defaultFailureTreatment(throwable);
+      } else {
+        Toast.showInfo(messages.dialogDone(), messages.processCreated());
+        HistoryUtils.newHistory(ActionProcess.RESOLVER);
+      }
+    });
   }
 
   @Override
   public void buttonObtainCommandHandler(ClickEvent e) {
     String jobName = getName().getText();
 
-    BrowserService.Util.getInstance().createProcessJson(jobName, getJobPriority(), getJobParallelism(), getSelected(),
-      getSelectedPlugin().getId(), getWorkflowOptions().getValue(), getSelectedClass(), new AsyncCallback<String>() {
+    Services services = new Services("Obtain cURL command", "get");
+    Job job = JobUtils.createJob(jobName, getJobPriority(), getJobParallelism(), getSelected(),
+      getSelectedPlugin().getId(), getWorkflowOptions().getValue());
 
-        @Override
-        public void onFailure(Throwable caught) {
-          AsyncCallbackUtils.defaultFailureTreatment(caught);
-        }
-
-        @Override
-        public void onSuccess(String result) {
-          Dialogs.showInformationDialog(messages.createJobCurlCommand(), result, messages.closeButton(), true);
-        }
-      });
+    services.jobsResource(s -> s.obtainJobCommand(job)).whenComplete((result, throwable) -> {
+      if (throwable != null) {
+        AsyncCallbackUtils.defaultFailureTreatment(throwable.getCause());
+      } else {
+        Dialogs.showInformationDialog(messages.createJobCurlCommand(), result.getValue(), messages.closeButton(), true);
+      }
+    });
   }
 
   @Override

@@ -16,12 +16,11 @@ import org.roda.core.data.common.RodaConstants.PreservationEventType;
 import org.roda.core.data.exceptions.AlreadyExistsException;
 import org.roda.core.data.exceptions.AuthorizationDeniedException;
 import org.roda.core.data.exceptions.GenericException;
-import org.roda.core.data.exceptions.IllegalOperationException;
 import org.roda.core.data.exceptions.NotFoundException;
 import org.roda.core.data.exceptions.RequestNotValidException;
 import org.roda.core.data.v2.LiteOptionalWithCause;
+import org.roda.core.data.v2.disposal.schedule.DisposalSchedule;
 import org.roda.core.data.v2.ip.AIP;
-import org.roda.core.data.v2.ip.disposal.DisposalSchedule;
 import org.roda.core.data.v2.jobs.Job;
 import org.roda.core.data.v2.jobs.PluginState;
 import org.roda.core.data.v2.jobs.PluginType;
@@ -32,10 +31,9 @@ import org.roda.core.model.ModelService;
 import org.roda.core.plugins.AbstractPlugin;
 import org.roda.core.plugins.Plugin;
 import org.roda.core.plugins.PluginException;
+import org.roda.core.plugins.PluginHelper;
 import org.roda.core.plugins.RODAObjectsProcessingLogic;
 import org.roda.core.plugins.orchestrate.JobPluginInfo;
-import org.roda.core.plugins.PluginHelper;
-import org.roda.core.storage.StorageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,22 +43,22 @@ import org.slf4j.LoggerFactory;
 public class DisassociateDisposalScheduleToAIPPlugin extends AbstractPlugin<AIP> {
   private static final Logger LOGGER = LoggerFactory.getLogger(DisassociateDisposalScheduleToAIPPlugin.class);
 
+  public static String getStaticName() {
+    return "Disassociate disposal schedule";
+  }
+
+  public static String getStaticDescription() {
+    return "";
+  }
+
   @Override
   public String getVersionImpl() {
     return "1.0";
   }
 
-  public static String getStaticName() {
-    return "Disassociate disposal schedule";
-  }
-
   @Override
   public String getName() {
     return getStaticName();
-  }
-
-  public static String getStaticDescription() {
-    return "";
   }
 
   @Override
@@ -94,19 +92,18 @@ public class DisassociateDisposalScheduleToAIPPlugin extends AbstractPlugin<AIP>
   }
 
   @Override
-  public Report beforeAllExecute(IndexService index, ModelService model, StorageService storage)
-    throws PluginException {
+  public Report beforeAllExecute(IndexService index, ModelService model) throws PluginException {
     // do nothing
     return null;
   }
 
   @Override
-  public Report execute(IndexService index, ModelService model, StorageService storage,
-    List<LiteOptionalWithCause> liteList) throws PluginException {
-    return PluginHelper.processObjects(this, (RODAObjectsProcessingLogic<AIP>) (index1, model1, storage1, report,
-      cachedJob, jobPluginInfo, plugin, objects) -> {
-      processAIP(model1, index1, report, jobPluginInfo, cachedJob, objects);
-    }, index, model, storage, liteList);
+  public Report execute(IndexService index, ModelService model, List<LiteOptionalWithCause> liteList)
+    throws PluginException {
+    return PluginHelper.processObjects(this,
+      (RODAObjectsProcessingLogic<AIP>) (index1, model1, report, cachedJob, jobPluginInfo, plugin, objects) -> {
+        processAIP(model1, index1, report, jobPluginInfo, cachedJob, objects);
+      }, index, model, liteList);
   }
 
   private void processAIP(ModelService model, IndexService index, Report report, JobPluginInfo jobPluginInfo,
@@ -148,7 +145,6 @@ public class DisassociateDisposalScheduleToAIPPlugin extends AbstractPlugin<AIP>
             disposalSchedule = model.retrieveDisposalSchedule(aip.getDisposalScheduleId());
             if (aip.getDisposal() != null) {
               aip.getDisposal().setSchedule(null);
-              model.updateDisposalSchedule(disposalSchedule, cachedJob.getUsername());
               model.updateAIP(aip, cachedJob.getUsername());
               reportItem.setPluginState(state).setPluginDetails(
                 "Disposal schedule '" + aip.getDisposalScheduleId() + "' was successfully disassociated from AIP");
@@ -163,8 +159,7 @@ public class DisassociateDisposalScheduleToAIPPlugin extends AbstractPlugin<AIP>
                 disposalSchedule.getId(), disposalSchedule.getTitle());
             }
             jobPluginInfo.incrementObjectsProcessedWithSuccess();
-          } catch (RequestNotValidException | GenericException | NotFoundException | AuthorizationDeniedException
-            | IllegalOperationException e) {
+          } catch (RequestNotValidException | GenericException | NotFoundException | AuthorizationDeniedException e) {
             LOGGER.error("Error disassociating disposal schedule {} from AIP {}: {}", aip.getDisposalScheduleId(),
               aip.getId(), e.getMessage(), e);
             state = PluginState.FAILURE;
@@ -191,7 +186,7 @@ public class DisassociateDisposalScheduleToAIPPlugin extends AbstractPlugin<AIP>
   }
 
   @Override
-  public Report afterAllExecute(IndexService index, ModelService model, StorageService storage) throws PluginException {
+  public Report afterAllExecute(IndexService index, ModelService model) throws PluginException {
     // do nothing
     return null;
   }

@@ -30,11 +30,11 @@ import org.roda.core.data.v2.ip.IndexedAIP;
 import org.roda.core.data.v2.ip.IndexedFile;
 import org.roda.core.data.v2.ip.IndexedRepresentation;
 import org.roda.core.data.v2.ip.Representation;
+import org.roda.core.data.v2.properties.ObjectClassFields;
 import org.roda.core.data.v2.ri.RelationObjectType;
 import org.roda.core.data.v2.ri.RepresentationInformation;
 import org.roda.core.data.v2.ri.RepresentationInformationRelation;
-import org.roda.wui.client.browse.BrowserService;
-import org.roda.wui.client.browse.bundle.RepresentationInformationFilterBundle;
+import org.roda.core.data.v2.ri.RepresentationInformationRelationOptions;
 import org.roda.wui.client.common.IncrementalList;
 import org.roda.wui.client.common.ValuedLabel;
 import org.roda.wui.client.common.lists.RepresentationInformationList;
@@ -46,7 +46,7 @@ import org.roda.wui.client.common.search.Dropdown;
 import org.roda.wui.client.common.search.SearchWrapper;
 import org.roda.wui.client.common.search.SelectedPanel;
 import org.roda.wui.client.common.utils.AsyncCallbackUtils;
-import org.roda.wui.client.planning.RelationTypeTranslationsBundle;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.tools.StringUtils;
 import org.roda.wui.common.client.widgets.HTMLWidgetWrapper;
 import org.roda.wui.common.client.widgets.Toast;
@@ -149,16 +149,12 @@ public class RepresentationInformationDialogs {
     final FlowPanel fieldsPanel = new FlowPanel();
     fieldsPanel.setStyleName("ri-content-group");
 
-    BrowserService.Util.getInstance().retrieveObjectClassFields(LocaleInfo.getCurrentLocale().getLocaleName(),
-      new AsyncCallback<RepresentationInformationFilterBundle>() {
-
-        @Override
-        public void onFailure(Throwable caught) {
-          AsyncCallbackUtils.defaultFailureTreatment(caught);
-        }
-
-        @Override
-        public void onSuccess(final RepresentationInformationFilterBundle result) {
+    Services services = new Services("Retrieves object class fields from configurations", "get");
+    services.configurationsResource(s -> s.retrieveObjectClassFields(LocaleInfo.getCurrentLocale().getLocaleName()))
+      .whenComplete((result, throwable) -> {
+        if (throwable != null) {
+          AsyncCallbackUtils.defaultFailureTreatment(throwable.getCause());
+        } else {
           relationFormPanel.add(dropDown);
           relationFormPanel.add(fieldsPanel);
 
@@ -307,7 +303,7 @@ public class RepresentationInformationDialogs {
   }
 
   private static void updateAssociationFields(FlowPanel fieldsPanel, Dropdown dropDown, List<String> appropriateFields,
-    RepresentationInformationFilterBundle result, RepresentationInformation ri, final Map<String, List<String>> values,
+    ObjectClassFields result, RepresentationInformation ri, final Map<String, List<String>> values,
     Button searchButton) {
     fieldsPanel.clear();
     String className = null;
@@ -379,16 +375,12 @@ public class RepresentationInformationDialogs {
     final FlowPanel layout = new FlowPanel();
     layout.addStyleName("wui-dialog-layout");
 
-    BrowserService.Util.getInstance().retrieveRelationTypeTranslations(LocaleInfo.getCurrentLocale().getLocaleName(),
-      new AsyncCallback<RelationTypeTranslationsBundle>() {
-
-        @Override
-        public void onFailure(Throwable caught) {
-          AsyncCallbackUtils.defaultFailureTreatment(caught);
-        }
-
-        @Override
-        public void onSuccess(final RelationTypeTranslationsBundle relationTypes) {
+    Services services = new Services("Retreive relation type options", "get");
+    services
+      .representationInformationResource(
+        s -> s.retrieveRepresentationInformationRelationOptions(LocaleInfo.getCurrentLocale().toString()))
+      .whenComplete((representationInformationRelationOptions, throwable) -> {
+        if (throwable == null) {
           final FlowPanel content = new FlowPanel();
           content.addStyleName("row skip_padding full_width content");
 
@@ -467,8 +459,8 @@ public class RepresentationInformationDialogs {
             }
           };
 
-          showAIPDescription(aipLabel, riLabel, txtLabel, webLabel, rightSide, relationTypes, ri, confirmButton,
-            clickHandlers, dialogBox, callback, centerDialogBox);
+          showAIPDescription(aipLabel, riLabel, txtLabel, webLabel, rightSide, representationInformationRelationOptions,
+            ri, confirmButton, clickHandlers, dialogBox, callback, centerDialogBox);
 
           dialogBox.center();
           dialogBox.show();
@@ -494,8 +486,9 @@ public class RepresentationInformationDialogs {
           aipLabel.addClickHandler(new ClickHandler() {
             @Override
             public void onClick(ClickEvent event) {
-              showAIPDescription(aipLabel, riLabel, txtLabel, webLabel, rightSide, relationTypes, ri, confirmButton,
-                clickHandlers, dialogBox, callback, centerDialogBox);
+              showAIPDescription(aipLabel, riLabel, txtLabel, webLabel, rightSide,
+                representationInformationRelationOptions, ri, confirmButton, clickHandlers, dialogBox, callback,
+                centerDialogBox);
             }
           });
 
@@ -520,8 +513,8 @@ public class RepresentationInformationDialogs {
 
               final ListBox select = new ListBox();
               select.addStyleName("form-listbox");
-              for (Entry<String, String> type : relationTypes.getTranslations()
-                .get(RelationObjectType.REPRESENTATION_INFORMATION).entrySet()) {
+              for (Entry<String, String> type : representationInformationRelationOptions.getRelationsTranslations()
+                .get(RelationObjectType.REPRESENTATION_INFORMATION.toString()).entrySet()) {
                 select.addItem(type.getValue(), type.getKey());
               }
               rightSide.add(select);
@@ -616,8 +609,8 @@ public class RepresentationInformationDialogs {
 
               final ListBox select = new ListBox();
               select.addStyleName("form-listbox");
-              for (Entry<String, String> type : relationTypes.getTranslations().get(RelationObjectType.TEXT)
-                .entrySet()) {
+              for (Entry<String, String> type : representationInformationRelationOptions.getRelationsTranslations()
+                .get(RelationObjectType.TEXT.toString()).entrySet()) {
                 select.addItem(type.getValue(), type.getKey());
               }
               rightSide.add(select);
@@ -673,8 +666,8 @@ public class RepresentationInformationDialogs {
 
               final ListBox select = new ListBox();
               select.addStyleName("form-listbox");
-              for (Entry<String, String> type : relationTypes.getTranslations().get(RelationObjectType.WEB)
-                .entrySet()) {
+              for (Entry<String, String> type : representationInformationRelationOptions.getRelationsTranslations()
+                .get(RelationObjectType.WEB.toString()).entrySet()) {
                 select.addItem(type.getValue(), type.getKey());
               }
               rightSide.add(select);
@@ -721,7 +714,7 @@ public class RepresentationInformationDialogs {
   }
 
   private static void showAIPDescription(Label aipLabel, Label riLabel, Label txtLabel, Label webLabel,
-    FlowPanel rightSide, RelationTypeTranslationsBundle relationTypes, RepresentationInformation ri,
+    FlowPanel rightSide, RepresentationInformationRelationOptions relationTypes, RepresentationInformation ri,
     Button confirmButton, List<HandlerRegistration> clickHandlers, DialogBox dialogBox,
     AsyncCallback<RepresentationInformationRelation> callback, AsyncCallback<Void> centerDialogBox) {
     aipLabel.addStyleName("dialog-left-item-selected");
@@ -743,7 +736,8 @@ public class RepresentationInformationDialogs {
     final ListBox select = new ListBox();
     select.addStyleName("form-listbox");
 
-    for (Entry<String, String> type : relationTypes.getTranslations().get(RelationObjectType.AIP).entrySet()) {
+    for (Entry<String, String> type : relationTypes.getRelationsTranslations().get(RelationObjectType.AIP.toString())
+      .entrySet()) {
       select.addItem(type.getValue(), type.getKey());
     }
     rightSide.add(select);

@@ -16,6 +16,8 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.FileTime;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -57,6 +59,7 @@ import org.roda.core.storage.ExternalFileManifestContentPayload;
 import org.roda.core.storage.Resource;
 import org.roda.core.storage.StorageService;
 import org.roda.core.storage.StorageServiceUtils;
+import org.roda.core.storage.StorageServiceWrapper;
 import org.roda.core.util.IdUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -196,11 +199,12 @@ public class FileStorageService implements StorageService {
   @Override
   public void deleteContainer(StoragePath storagePath) throws NotFoundException, GenericException {
     Path containerPath = FSUtils.getEntityPath(basePath, storagePath);
-    trash(containerPath);
+    if (FSUtils.exists(containerPath)) {
+      trash(containerPath);
 
-    // cleanup history
-    deleteAllBinaryVersionsUnder(storagePath);
-
+      // cleanup history
+      deleteAllBinaryVersionsUnder(storagePath);
+    }
   }
 
   private void trash(Path fromPath) throws GenericException, NotFoundException {
@@ -230,9 +234,9 @@ public class FileStorageService implements StorageService {
     throws NotFoundException, GenericException {
     Path path = FSUtils.getEntityPath(basePath, storagePath);
     if (recursive) {
-      return FSUtils.recursivelyListPath(basePath, path);
+      return FSUtils.recursivelyListPathResources(basePath, path);
     } else {
-      return FSUtils.listPath(basePath, path);
+      return FSUtils.listPathResources(basePath, path);
     }
   }
 
@@ -317,9 +321,9 @@ public class FileStorageService implements StorageService {
     throws NotFoundException, GenericException {
     Path directoryPath = FSUtils.getEntityPath(basePath, storagePath);
     if (recursive) {
-      return FSUtils.recursivelyListPath(basePath, directoryPath);
+      return FSUtils.recursivelyListPathResources(basePath, directoryPath);
     } else {
-      return FSUtils.listPath(basePath, directoryPath);
+      return FSUtils.listPathResources(basePath, directoryPath);
     }
   }
 
@@ -439,7 +443,8 @@ public class FileStorageService implements StorageService {
 
   @Override
   public Binary updateBinaryContent(StoragePath storagePath, ContentPayload payload, boolean asReference,
-    boolean createIfNotExists) throws GenericException, NotFoundException, RequestNotValidException {
+    boolean createIfNotExists, boolean snapshotCurrentVersion, Map<String, String> properties)
+    throws GenericException, NotFoundException, RequestNotValidException {
     if (asReference) {
       Path binaryPath = FSUtils.getEntityPath(basePath, storagePath);
       boolean fileExists = FSUtils.exists(binaryPath);
@@ -471,13 +476,22 @@ public class FileStorageService implements StorageService {
     } else {
       Path binaryPath = FSUtils.getEntityPath(basePath, storagePath);
       boolean fileExists = FSUtils.exists(binaryPath);
+      BinaryVersion previousBinaryVersion = null;
 
       if (!fileExists && !createIfNotExists) {
         throw new NotFoundException("Binary does not exist: " + binaryPath);
       } else if (fileExists && !FSUtils.isFile(binaryPath)) {
         throw new GenericException("Looking for a binary but found something else");
       } else {
+        if (snapshotCurrentVersion) {
+          try {
+            previousBinaryVersion = snapshotBinaryVersion(storagePath, properties);
+          } catch (RequestNotValidException | NotFoundException | GenericException e) {
+            LOGGER.warn("Could not create binary version for {}", storagePath, e);
+          }
+        }
         try {
+          Files.createDirectories(binaryPath.getParent());
           // ensuring parent exists when creating a new file
           binaryPath.getParent().toFile().mkdirs();
           payload.writeToPath(binaryPath);
@@ -488,7 +502,11 @@ public class FileStorageService implements StorageService {
 
       Resource resource = FSUtils.convertPathToResource(basePath, binaryPath);
       if (resource instanceof Binary) {
-        return (DefaultBinary) resource;
+        DefaultBinary ret = (DefaultBinary) resource;
+        if (previousBinaryVersion != null) {
+          ret.setPreviousVersionId(previousBinaryVersion.getId());
+        }
+        return ret;
       } else {
         throw new GenericException("Looking for a binary but found something else");
       }
@@ -557,8 +575,8 @@ public class FileStorageService implements StorageService {
   }
 
   @Override
-  public void copy(StorageService fromService, StoragePath fromStoragePath, Path toPath, String resource)
-    throws AlreadyExistsException, GenericException {
+  public void copy(StorageService fromService, StoragePath fromStoragePath, Path toPath, String resource,
+    boolean replaceExisting) throws AlreadyExistsException, GenericException {
     Path sourcePath = null;
     if (StringUtils.isNotBlank(resource)) {
       sourcePath = FSUtils.getEntityPath(basePath, fromStoragePath).resolve(resource);
@@ -566,7 +584,7 @@ public class FileStorageService implements StorageService {
       sourcePath = FSUtils.getEntityPath(basePath, fromStoragePath);
     }
     if (FSUtils.exists(sourcePath)) {
-      FSUtils.copy(sourcePath, toPath, false);
+      FSUtils.copy(sourcePath, toPath, replaceExisting);
     }
   }
 
@@ -587,11 +605,19 @@ public class FileStorageService implements StorageService {
   @Override
   public Class<? extends Entity> getEntity(StoragePath storagePath) throws NotFoundException {
     Path entity = FSUtils.getEntityPath(basePath, storagePath);
-    if (FSUtils.exists(entity)) {
-      return getEntityClass(storagePath, entity);
-    } else {
-      return getEntityExternalFile(storagePath);
+    if (!FSUtils.exists(entity)) {
+      try {
+        ShallowFile shallowFile = FSUtils.isResourcePresentOnManifestFile(entity);
+        if (shallowFile != null) {
+          return getEntityExternalFile(storagePath);
+        } else {
+          throw new NotFoundException("Entity was not found: " + storagePath);
+        }
+      } catch (GenericException e) {
+        throw new NotFoundException("Entity was not found: " + storagePath, e);
+      }
     }
+    return getEntityClass(storagePath, entity);
   }
 
   public Class<? extends Entity> getEntityExternalFile(StoragePath storagePath) throws NotFoundException {
@@ -634,6 +660,16 @@ public class FileStorageService implements StorageService {
         // for UNIX programs using user with read-only permissions
         // for Java programs using SecurityManager and Policy
         return FSUtils.getEntityPath(basePath, storagePath);
+      }
+
+      @Override
+      public boolean isDirectory() {
+        return FSUtils.isDirectory(getPath());
+      }
+
+      @Override
+      public boolean exists() {
+        return FSUtils.exists(getPath());
       }
 
       @Override
@@ -731,8 +767,7 @@ public class FileStorageService implements StorageService {
     return FSUtils.convertPathToBinaryVersion(historyDataPath, historyMetadataPath, binVersionPath);
   }
 
-  @Override
-  public BinaryVersion createBinaryVersion(StoragePath storagePath, Map<String, String> properties)
+  private BinaryVersion snapshotBinaryVersion(StoragePath storagePath, Map<String, String> properties)
     throws RequestNotValidException, NotFoundException, GenericException {
     if (historyDataPath == null) {
       throw new GenericException("Skipping create binary version because no history folder is defined!");
@@ -769,8 +804,8 @@ public class FileStorageService implements StorageService {
       // Creating metadata
       DefaultBinaryVersion b = new DefaultBinaryVersion();
       b.setId(id);
-      b.setProperties(properties);
       b.setCreatedDate(new Date());
+      b.setProperties(properties);
       Files.createDirectories(metadataPath.getParent());
       JsonUtils.writeObjectToFile(b, metadataPath);
 
@@ -782,14 +817,16 @@ public class FileStorageService implements StorageService {
   }
 
   @Override
-  public void revertBinaryVersion(StoragePath storagePath, String version)
+  public Binary revertBinaryVersion(StoragePath storagePath, String version, Map<String, String> properties)
     throws NotFoundException, RequestNotValidException, GenericException {
-    if (historyDataPath == null) {
-      LOGGER.warn("Skipping revert binary version because no history folder is defined!");
-      return;
-    }
 
     Path binPath = FSUtils.getEntityPath(basePath, storagePath);
+
+    if (historyDataPath == null) {
+      LOGGER.warn("Skipping revert binary version because no history folder is defined!");
+      return (DefaultBinary) FSUtils.convertPathToResource(basePath, binPath);
+    }
+
     Path binVersionPath = FSUtils.getEntityPath(historyDataPath, storagePath, version);
 
     if (!FSUtils.exists(binPath)) {
@@ -805,8 +842,22 @@ public class FileStorageService implements StorageService {
     }
 
     try {
+      // get binary
+      BinaryVersion previousBinaryVersion = null;
+      try {
+        previousBinaryVersion = snapshotBinaryVersion(storagePath, properties);
+      } catch (RequestNotValidException | NotFoundException | GenericException e) {
+        LOGGER.warn("Could not create binary version for {}", storagePath, e);
+      }
       // writing file
       Files.copy(binVersionPath, binPath, StandardCopyOption.REPLACE_EXISTING);
+      // get binary to return
+      Resource resource = FSUtils.convertPathToResource(basePath, binPath);
+      DefaultBinary ret = (DefaultBinary) resource;
+      if (previousBinaryVersion != null) {
+        ret.setPreviousVersionId(previousBinaryVersion.getId());
+      }
+      return ret;
     } catch (IOException e) {
       throw new GenericException("Could not create binary", e);
     }
@@ -997,4 +1048,51 @@ public class FileStorageService implements StorageService {
   
 
 
+
+  @Override
+  public Date getCreationDate(StoragePath storagePath) throws GenericException {
+    try {
+      Path entityPath = FSUtils.getEntityPath(basePath, storagePath);
+      BasicFileAttributes attr = Files.readAttributes(entityPath, BasicFileAttributes.class);
+      FileTime fileTime = attr.creationTime();
+      return new Date(fileTime.toMillis());
+    } catch (IOException e) {
+      throw new GenericException("Could not get creation date", e);
+    }
+  }
+
+  public Path getHistoryPath() {
+    return historyPath;
+  }
+
+  public Path getHistoryDataPath() {
+    return historyDataPath;
+  }
+
+  public Path getHistoryMetadataPath() {
+    return historyMetadataPath;
+  }
+
+  @Override
+  public void importBinaryVersion(StorageService fromService, StoragePath storagePath, String version)
+    throws AlreadyExistsException, GenericException, RequestNotValidException, AuthorizationDeniedException {
+    FileStorageService storageService;
+    if (fromService instanceof FileStorageService) {
+      storageService = (FileStorageService) fromService;
+    } else if (fromService instanceof StorageServiceWrapper) {
+      storageService = (FileStorageService) ((StorageServiceWrapper) fromService).getWrappedStorageService();
+    } else {
+      throw new GenericException("Cannot import binary version from " + fromService.getClass().getName());
+    }
+
+    Path sourceDataPath = FSUtils.getEntityPath(storageService.getHistoryDataPath(), storagePath, version);
+    Path targetDataPath = FSUtils.getEntityPath(historyDataPath, storagePath, version);
+    FSUtils.copy(sourceDataPath, targetDataPath, true);
+
+    Path sourceMetadataPath = FSUtils.getBinaryHistoryMetadataPath(storageService.getHistoryDataPath(),
+      storageService.getHistoryMetadataPath(), sourceDataPath);
+    Path targetMetadataPath = FSUtils.getBinaryHistoryMetadataPath(historyDataPath, historyMetadataPath,
+      targetDataPath);
+    FSUtils.copy(sourceMetadataPath, targetMetadataPath, true);
+  }
 }

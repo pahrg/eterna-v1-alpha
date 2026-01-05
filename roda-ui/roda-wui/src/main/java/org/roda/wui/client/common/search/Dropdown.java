@@ -39,11 +39,17 @@ public class Dropdown extends Composite implements HasValueChangeHandlers<String
   private PopupPanel popup;
   private VerticalPanel popupPanel;
   private boolean popupShowing = false;
+  private boolean disableOnSingleItem;
+  private boolean enabled;
 
   private Map<String, String> popupValues;
   private Map<String, String> popupIcons;
 
   public Dropdown() {
+    this(false);
+  }
+
+  public Dropdown(boolean disableOnSingleItem) {
     focusPanel = new FocusPanel();
     panel = new SimplePanel();
     iconAndLabelPanel = new FlowPanel();
@@ -53,8 +59,10 @@ public class Dropdown extends Composite implements HasValueChangeHandlers<String
     popupPanel = new VerticalPanel();
     popupValues = new HashMap<>();
     popupIcons = new HashMap<>();
+    this.disableOnSingleItem = disableOnSingleItem;
 
     iconAndLabelPanel.add(selectedIcon);
+    selectedIcon.setVisible(false);
     iconAndLabelPanel.add(selectedLabel);
     panel.add(iconAndLabelPanel);
     focusPanel.add(panel);
@@ -63,7 +71,9 @@ public class Dropdown extends Composite implements HasValueChangeHandlers<String
 
       @Override
       public void onClick(ClickEvent event) {
-        popup();
+        if (enabled) {
+          popup();
+        }
       }
     });
 
@@ -81,17 +91,30 @@ public class Dropdown extends Composite implements HasValueChangeHandlers<String
     panel.addStyleName("dropdown-panel");
     iconAndLabelPanel.addStyleName("dropdown-label");
     popup.addStyleName("dropdown-popup");
+
+    if (disableOnSingleItem) {
+      focusPanel.addStyleName("dropdown-disabled");
+      setEnabled(false);
+    } else {
+      setEnabled(true);
+    }
   }
 
   public void addItem(final String label, final String value, final String icon) {
     popupValues.put(label, value);
     popupIcons.put(label, icon);
 
+    if (disableOnSingleItem && popupValues.size() > 1) {
+      setEnabled(true);
+    }
+
     FlowPanel item = new FlowPanel();
 
-    InlineHTML iconPanel = new InlineHTML();
-    iconPanel.setHTML(createHtmlForIcon(icon));
-    item.add(iconPanel);
+    if (icon != null) {
+      InlineHTML iconPanel = new InlineHTML();
+      iconPanel.setHTML(createHtmlForIcon(icon));
+      item.add(iconPanel);
+    }
 
     Label labelWidget = new Label(label);
     item.addStyleName("dropdown-item");
@@ -101,7 +124,12 @@ public class Dropdown extends Composite implements HasValueChangeHandlers<String
       @Override
       public void onClick(ClickEvent event) {
         selectedLabel.setText(label);
-        selectedIcon.setHTML(createHtmlForIcon(icon));
+        if (icon != null) {
+          selectedIcon.setVisible(true);
+          selectedIcon.setHTML(createHtmlForIcon(icon));
+        } else {
+          selectedIcon.setVisible(false);
+        }
         onChange();
         popup();
       }
@@ -180,5 +208,14 @@ public class Dropdown extends Composite implements HasValueChangeHandlers<String
 
   private SafeHtml createHtmlForIcon(String icon) {
     return SafeHtmlUtils.fromSafeConstant("<i class=\"" + icon + "\"></i>");
+  }
+
+  private void setEnabled(boolean enabled) {
+    this.enabled = enabled;
+    if (enabled) {
+      focusPanel.removeStyleName("dropdown-disabled");
+    } else {
+      focusPanel.addStyleName("dropdown-disabled");
+    }
   }
 }

@@ -15,7 +15,7 @@ import java.util.List;
 import org.roda.core.data.exceptions.NotFoundException;
 import org.roda.core.data.v2.user.Group;
 import org.roda.wui.client.common.UserLogin;
-import org.roda.wui.client.common.utils.JavascriptUtils;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.HistoryResolver;
 import org.roda.wui.common.client.tools.HistoryUtils;
 import org.roda.wui.common.client.tools.ListUtils;
@@ -45,17 +45,13 @@ public class EditGroup extends Composite {
     public void resolve(List<String> historyTokens, final AsyncCallback<Widget> callback) {
       if (historyTokens.size() == 1) {
         String groupname = historyTokens.get(0);
-        UserManagementService.Util.getInstance().getGroup(groupname, new AsyncCallback<Group>() {
-
-          @Override
-          public void onFailure(Throwable caught) {
-            callback.onFailure(caught);
-          }
-
-          @Override
-          public void onSuccess(Group group) {
+        Services services = new Services("Get Group", "get");
+        services.membersResource(s -> s.getGroup(groupname)).whenComplete((group, error) -> {
+          if (group != null) {
             EditGroup editGroup = new EditGroup(group);
             callback.onSuccess(editGroup);
+          } else if (error != null) {
+            callback.onFailure(error);
           }
         });
       } else {
@@ -114,28 +110,17 @@ public class EditGroup extends Composite {
     initWidget(uiBinder.createAndBindUi(this));
   }
 
-  @Override
-  protected void onLoad() {
-    super.onLoad();
-    JavascriptUtils.stickSidebar();
-  }
-
   @UiHandler("buttonApply")
   void buttonApplyHandler(ClickEvent e) {
     if (groupDataPanel.isChanged()) {
       if (groupDataPanel.isValid()) {
         group = groupDataPanel.getGroup();
-
-        UserManagementService.Util.getInstance().updateGroup(group, new AsyncCallback<Void>() {
-
-          @Override
-          public void onSuccess(Void result) {
+        Services services = new Services("Update group", "update");
+        services.membersResource(s -> s.updateGroup(group)).whenComplete((res, error) -> {
+          if (error == null) {
             HistoryUtils.newHistory(MemberManagement.RESOLVER);
-          }
-
-          @Override
-          public void onFailure(Throwable caught) {
-            errorMessage(caught);
+          } else {
+            errorMessage(error);
           }
         });
       }
@@ -146,16 +131,12 @@ public class EditGroup extends Composite {
 
   @UiHandler("buttonRemove")
   void buttonRemoveHandler(ClickEvent e) {
-    UserManagementService.Util.getInstance().deleteGroup(group.getId(), new AsyncCallback<Void>() {
-
-      @Override
-      public void onSuccess(Void result) {
+    Services services = new Services("Delete group", "delete");
+    services.membersResource(s -> s.deleteGroup(group.getId())).whenComplete((res, error) -> {
+      if (error == null) {
         HistoryUtils.newHistory(MemberManagement.RESOLVER);
-      }
-
-      @Override
-      public void onFailure(Throwable caught) {
-        errorMessage(caught);
+      } else {
+        errorMessage(error);
       }
     });
   }

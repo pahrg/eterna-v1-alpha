@@ -37,6 +37,8 @@ public final class RodaConstants {
   public static final String CORE_STORAGE_FEDORA4_URL = "core.storage.fedora4.url";
   public static final String CORE_STORAGE_FEDORA4_USERNAME = "core.storage.fedora4.username";
   public static final String CORE_STORAGE_FEDORA4_PASSWORD = "core.storage.fedora4.password";
+
+  public static final String CORE_STAGING_STORAGE_PATH = "core.staging.storage.path";
   public static final String CORE_SOLR_TYPE = "core.solr.type";
   public static final String CORE_SOLR_HTTP_URL = "core.solr.http.url";
   public static final String CORE_SOLR_CLOUD_URLS = "core.solr.cloud.urls";
@@ -70,6 +72,15 @@ public final class RodaConstants {
   public static final String CORE_TRANSFERRED_RESOURCES_INGEST_MOVE_WHEN_AUTOACCEPT = "core.ingest.processed.move_when_autoaccept";
   public static final String CORE_TRANSFERRED_RESOURCES_DELETE_WHEN_SUCCESSFULLY_INGESTED = "core.ingest.delete_transfer_resource_after_successfully_ingested";
   public static final String CORE_INGEST_SKIP_FIX_PARENTS = "core.ingest.skip.fix.parents";
+
+  public static final String CORE_STORAGE_LEGACY_IMPLEMENTATION_ENABLED = "core.storage.legacy.implementation.enabled";
+
+  public static final String CORE_EXTERNAL_AUTH_GROUP_MAPPING_ENABLED = "core.authorization.external.group_mapping";
+  public static final String CORE_EXTERNAL_AUTH_GROUPS_ATTRIBUTE = "core.authorization.external.attribute";
+  public static final String CORE_EXTERNAL_AUTH_GROUP_MAPPINGS = "core.authorization.external.mappings[]";
+  public static final String CORE_EXTERNAL_AUTH_GROUP_MAPPING_PREFIX = "core.authorization.external.mapping";
+  public static final String CORE_EXTERNAL_AUTH_GROUP_MAPPING_INTERNAL_SUFFIX = "internal.groups[]";
+  public static final String CORE_EXTERNAL_AUTH_GROUP_MAPPING_EXTERNAL_SUFFIX = "external.group";
   /*
    * Misc
    */
@@ -94,7 +105,6 @@ public final class RodaConstants {
 
   public static final List<String> DEFAULT_ALGORITHMS = Arrays.asList(SHA256);
 
-
   public enum DateGranularity {
     YEAR, MONTH, DAY, HOUR, MINUTE, SECOND, MILLISECOND
   }
@@ -104,6 +114,7 @@ public final class RodaConstants {
   public static final String CROSSWALKS_DISSEMINATION_OTHER_PATH = "crosswalks/other/";
   public static final String UI_BROWSER_METADATA_DESCRIPTIVE_TYPES = "ui.browser.metadata.descriptive.types";
   public static final String I18N_UI_BROWSE_METADATA_DESCRIPTIVE_TYPE_PREFIX = "ui.browse.metadata.descriptive.type.";
+  public static final String I18N_UI_BROWSE_METADATA_TECHNICAL_TYPE_PREFIX = "ui.browse.metadata.technical.type.";
   public static final String I18N_CROSSWALKS_DISSEMINATION_HTML_PREFIX = "crosswalks.dissemination.html.";
   public static final String I18N_CROSSWALKS_DISSEMINATION_HTML_PREFIX_EVENT = "crosswalks.dissemination.html.event.";
   public static final String I18N_UI_FACETS_PREFIX = "ui.facets";
@@ -169,6 +180,8 @@ public final class RodaConstants {
   public static final String UI_SERVICE_REPORTING_URL = "ui.service.reporting.url";
   public static final String UI_SERVICE_REPORTING_ACTIVE = "ui.service.reporting.active";
   public static final String UI_SERVICE_CAS_ACTIVE = "ui.service.cas.active";
+  public static final String UI_SERVICE_MULTI_METHOD_AUTHENTICATION_ACTIVE = "ui.service.multi.method.authentication.active";
+  public static final String UI_SERVICE_MULTI_METHOD_AUTHENTICATION_LIST = "ui.service.multi.method.authentication.item[]";
   public static final String UI_SERVICE_DROPFOLDER_ACTIVE = "ui.service.dropfolder.active";
 
   public static final String UI_SERVICE_MONITORING_DEFAULT_URL = "https://www.roda-enterprise.com";
@@ -242,7 +255,7 @@ public final class RodaConstants {
   public static final String RODA_OBJECT_FILES = "files";
   public static final String RODA_OBJECT_DIPS = "dips";
   public static final String RODA_OBJECT_DIPFILES = "dip_files";
-  public static final String RODA_OBJECT_TRANSFERRED_RESOURCES = "transferred_resources";
+  public static final String RODA_OBJECT_TRANSFERRED_RESOURCES = "transferredResources";
   public static final String RODA_OBJECT_REPRESENTATION_INFORMATION_LIST = "representation_information_list";
 
   public static final String RODA_OBJECT_PERMISSION = "permission";
@@ -262,6 +275,8 @@ public final class RodaConstants {
   public static final String CORE_I18N_FOLDER = "i18n";
   public static final String CORE_DATA_FOLDER = "data";
   public static final String CORE_STORAGE_FOLDER = "storage";
+  public static final String CORE_STAGING_STORAGE_FOLDER = "staging-storage";
+  public static final String CORE_STAGING_TRANSACTIONS_LOG_BACKUP_FOLDER = "transactions-log-backup";
   public static final String CORE_STORAGE_HISTORY_FOLDER = "storage-history";
   public static final String CORE_INDEX_FOLDER = "index";
   public static final String CORE_CROSSWALKS_FOLDER = "crosswalks";
@@ -319,6 +334,7 @@ public final class RodaConstants {
 
   public static final String CORE_CROSSWALKS_INGEST = "crosswalks/ingest/";
   public static final String CORE_CROSSWALKS_INGEST_OTHER = "crosswalks/ingest/other/";
+  public static final String CORE_CROSSWALKS_TECHNICAL = "crosswalks/technical/";
   public static final String CORE_DISPOSAL_METADATA_TRANSFORMERS = "disposal/destruction/";
 
   public static final String PREMIS_METADATA_TYPE = "premis";
@@ -330,24 +346,97 @@ public final class RodaConstants {
   /*
    * API related
    */
-  public static final String API_BASE_PATH = "/api";
   public static final String API_SEP = "/";
   public static final String API_REST_V1_AIPS = "api/v1/aips/";
   public static final String API_REST_V1_REPRESENTATIONS = "api/v1/representations/";
   public static final String API_REST_V1_FILES = "api/v1/files/";
-  public static final String API_REST_V1_RESOURCES = "api/v1/transfers/";
-  public static final String API_REST_V1_THEME = "api/v1/theme/";
   public static final String API_REST_V1_INDEX = "api/v1/index/";
   public static final String API_REST_V1_DIPS = "api/v1/dips/";
   public static final String API_REST_V1_DIPFILES = "api/v1/dipfiles/";
-  public static final String API_REST_V1_EVENTS = "api/v1/events/";
-  public static final String API_REST_V1_AGENTS = "api/v1/agents/";
-  public static final String API_REST_V1_REPRESENTATION_INFORMATION = "api/v1/representation_information/";
-  public static final String API_REST_V1_AUTH = "api/v1/auth/";
   public static final String API_REST_V1_DISTRIBUTED_INSTANCE = "api/v1/distributed_instances/";
-  public static final String API_REST_V1_JOBS = "api/v1/jobs/";
 
   public static final String API_REST_V1_REPRESENTATION_OTHER_METADATA = "otherMetadata";
+
+  /**
+   * API related (Version 2)
+   */
+
+  // common
+  public static final String API_REST_V2_DOWNLOAD_HANDLER = "/download";
+  public static final String API_REST_V2_PREVIEW_HANDLER = "/preview";
+  public static final String API_REST_V2_REPRESENTATION_OTHER_METADATA = "/other-metadata";
+  public static final String API_REST_V2_REPRESENTATION_BINARY = "/binary";
+
+  // aips
+  public static final String API_REST_V2_AIPS = "api/v2/aips/";
+
+  // representations
+  public static final String API_REST_V2_REPRESENTATIONS_ENDPOINT = "api/v2/representations";
+  public static final String API_REST_V2_SUB_RESOURCE_REPRESENTATIONS = "representations";
+  public static final String API_REST_V2_SUB_RESOURCE_METADATA = "metadata";
+  public static final String API_REST_V2_SUB_RESOURCE_DESCRIPTIVE = "descriptive";
+  public static final String API_REST_V2_SUB_RESOURCE_DOWNLOAD = "download";
+
+  // files
+  public static final String API_REST_V2_FILES = "api/v2/files/";
+  public static final String API_REST_V2_FILES_TECHNICAL_METADATA_TYPE_HTML = "metadata/technical";
+  public static final String API_REST_V2_FILES_TECHNICAL_METADATA_TYPE_HTML_SUFFIX = "/html";
+  public static final String API_REST_V2_FILES_TECHNICAL_METADATA_HTML = "metadata/preservation/html";
+  public static final String API_REST_V2_FILES_TECHNICAL_METADATA_DOWNLOAD = "metadata/preservation/download";
+
+  // transferred resource
+  public static final String API_REST_V2_TRANSFERRED_RESOURCES = "api/v2/transfers/";
+  public static final String API_REST_V2_TRANSFERRED_RESOURCE_CREATE_RESOURCE = "create/resource";
+
+  // Report
+  public static final String API_REST_V2_JOB_REPORT = "api/v2/job-report/";
+
+  // jobs
+  public static final String API_REST_V2_JOBS = "api/v2/jobs/";
+
+  // audit logs
+  public static final String API_REST_V2_AUDIT_LOGS = "api/v2/audit-logs/";
+
+  // notifications
+  public static final String API_REST_V2_NOTIFICATIONS = "api/v2/notifications/";
+
+  // dips
+  public static final String API_REST_V2_DIPS = "api/v2/dips/";
+
+  // representation-information
+  public static final String API_REST_V2_REPRESENTATION_INFORMATION = "api/v2/representation-information/";
+
+  // risks
+  public static final String API_REST_V2_RISKS = "api/v2/risks/";
+
+  // preservation events
+  public static final String API_REST_V2_PRESERVATION_EVENTS = "api/v2/preservation/events/";
+  public static final String API_REST_V2_PRESERVATION_EVENTS_DETAILS_HTML = "/details/html";
+
+  // preservation agents
+  public static final String API_REST_V2_PRESERVATION_AGENTS = "api/v2/preservation/agents/";
+
+  // members
+  public static final String API_REST_V2_MEMBERS = "api/v2/members/";
+
+  // disposal confirmation
+  public static final String API_REST_V2_DISPOSAL_CONFIRMATION = "api/v2/disposal/confirmations/";
+  public static final String API_REST_V2_DISPOSAL_CONFIRMATION_REPORT = "report";
+  public static final String API_REST_V2_DISPOSAL_CONFIRMATION_REPORT_HTML = "html";
+  public static final String API_REST_V2_DISPOSAL_CONFIRMATION_QUERY_PARAM_TO_PRINT = "to-print";
+
+  // themes
+  public static final String API_REST_V2_THEME = "api/v2/themes";
+  public static final String API_V2_QUERY_PARAM_RESOURCE_ID = "resource-id";
+  public static final String API_V2_QUERY_PARAM_DEFAULT_RESOURCE_ID = "default-resource-id";
+  public static final String API_V2_QUERY_PARAM_RESOURCE_TYPE = "resource-type";
+
+  // distributed instances
+  public static final String API_REST_V2_DISTRIBUTED_INSTANCE = "api/v2/distributed-instances/";
+
+  /**
+   * END: API related (Version 2)
+   */
 
   // sub-resources strings
   public static final String API_DATA = "data";
@@ -376,6 +465,7 @@ public final class RodaConstants {
   public static final String API_QUERY_VALUE_ACCEPT_FORMAT_CSV = "csv";
   public static final String API_QUERY_VALUE_ACCEPT_FORMAT_JSONP = "jsonp";
   public static final String API_QUERY_KEY_LANG = "lang";
+  public static final String API_QUERY_KEY_VERSION_ID = "versionId";
   public static final String API_QUERY_VALUE_LANG_DEFAULT = RodaConstants.API_QUERY_VALUE_LANG_PT_PT;
   public static final String API_QUERY_VALUE_LANG_PT_PT = "pt_PT";
   public static final String API_QUERY_VALUE_LANG_EN_US = "en_US";
@@ -467,7 +557,8 @@ public final class RodaConstants {
   public static final String API_HTTP_HEADER_ACCEPT = "Accept";
   // job related params
   public static final String API_PATH_PARAM_JOB_ID = "jobId";
-  public static final String API_PATH_PARAM_JOB_JUST_FAILED = "jobJustFailed";
+  public static final String API_PATH_PARAM_JOB_REPORT_ID = "report-id";
+  public static final String API_PATH_PARAM_JOB_JUST_FAILED = "job-just-failed";
   public static final String API_PATH_PARAM_JOB_ATTACHMENT_ID = "attachmentId";
 
   public static final String API_DEFAULT_CSV_FILENAME = "export.csv";
@@ -614,6 +705,7 @@ public final class RodaConstants {
   public static final String CONTROLLER_DIP_PARAM = RODA_OBJECT_DIP;
   public static final String CONTROLLER_DIPS_PARAM = RODA_OBJECT_DIPS;
   public static final String CONTROLLER_DIP_ID_PARAM = "dipId";
+  public static final String CONTROLLER_DIP_UUID_PARAM = "dipUUID";
   public static final String CONTROLLER_DIP_FILE_ID_PARAM = "dipFileId";
   public static final String CONTROLLER_DIP_FILE_UUID_PARAM = "dipFileUUID";
   public static final String CONTROLLER_AGENT_ID_PARAM = "agentId";
@@ -635,7 +727,10 @@ public final class RodaConstants {
   public static final String CONTROLLER_DISPOSAL_CONFIRMATION_ID_PARAM = "disposalConfirmationId";
 
   public static final String CONTROLLER_DISTRIBUTED_INSTANCE_PARAM = RODA_OBJECT_DISTRIBUTED_INSTANCE;
+  public static final String CONTROLLER_DISTRIBUTED_INSTANCE_ID_PARAM = "distributedInstanceId";
+  public static final String CONTROLLER_DISTRIBUTED_INSTANCE_STATUS_PARAM = "activate";
   public static final String CONTROLLER_LOCAL_INSTANCE_PARAM = RODA_OBJECT_LOCAL_INSTANCE;
+  public static final String CONTROLLER_LOCAL_INSTANCE_ID_PARAM = "localInstanceId";
   public static final String CONTROLLER_ACCESS_KEY_PARAM = RODA_OBJECT_ACCESS_KEY;
 
   public static final String CONTROLLER_ID_OBJECT_PARAM = "transferred_resource_uuid, transferred_resource_path, sip, transferred_resource_original_name";
@@ -652,7 +747,12 @@ public final class RodaConstants {
   public static final String CONTROLLER_NOTIFICATION_ID_PARAM = "notificationId";
   public static final String CONTROLLER_NOTIFICATION_TOKEN_PARAM = "token";
   public static final String CONTROLLER_JOB_PARAM = "job";
+  public static final String CONTROLLER_JOB_CREATE_REQUEST = "createJobRequest";
   public static final String CONTROLLER_JOB_ID_PARAM = "jobId";
+  public static final String CONTROLLER_JOB_JUST_FAILED_PARAM = "justFailed";
+  public static final String CONTROLLER_JOB_REPORT_ID_PARAM = "jobReportId";
+  public static final String CONTROLLER_JOB_ATTACHMENT_ID_PARAM = "attachmentId";
+
   public static final String CONTROLLER_REPRESENTATION_INFORMATION_PARAM = RODA_OBJECT_REPRESENTATION_INFORMATION;
   public static final String CONTROLLER_REPRESENTATION_INFORMATION_ID_PARAM = "representationInformationId";
 
@@ -672,6 +772,7 @@ public final class RodaConstants {
   public static final String CONTROLLER_PARENT_PARAM = "parent";
   public static final String CONTROLLER_PARENT_ID_PARAM = "parentId";
   public static final String CONTROLLER_FOLDERNAME_PARAM = "folderName";
+  public static final String CONTROLLER_FORCE_COMMIT_PARAM = "forceCommit";
   public static final String CONTROLLER_FOLDER_RELATIVEPATH_PARAM = "folderRelativePath";
   public static final String CONTROLLER_FILENAME_PARAM = "filename";
   public static final String CONTROLLER_PATH_PARAM = "path";
@@ -705,6 +806,9 @@ public final class RodaConstants {
   public static final String CONTROLLER_REPRESENTATION_INFORMATION_FILTER_PARAM = "filter";
   public static final String CONTROLLER_ACTIVATE_PARAM = "activate";
   public static final String CONTROLLER_DETAILS_PARAM = "details";
+  public static final String CONTROLLER_REQUEST_METRICS_PARAM = "metricsToObtain";
+  public static final String CONTROLLER_LOGIN_METHOD_PARAM = "loginMethod";
+  public static final String CONTROLLER_TRANSACTION_ID_PARAM = "transactionID";
 
   /*
    * Core (storage, index, orchestrator, etc.)
@@ -767,6 +871,10 @@ public final class RodaConstants {
   public static final String ENVIRONMENT_COLLECT_VERSION = "roda.environment.collect.version";
   public static final String DEFAULT_ENVIRONMENT_COLLECT_VERSION = "true";
 
+  // Security Plugins
+  public static final String SECURITY_PLUGINS_ENABLE_PROPERTY = "core.plugins.external.security.enable";
+  public static final String SECURITY_PLUGINS_CONFIGURATIONS_PROPERTY = "core.plugins.external.security.configurations[]";
+
   public enum OrchestratorType {
     PEKKO, PEKKO_DISTRIBUTED
   }
@@ -777,10 +885,8 @@ public final class RodaConstants {
   public static final String CORE_ORCHESTRATOR_PROP_INTERNAL_JOBS_PRIORITY = "internal_jobs_priority";
   public static final String CORE_ORCHESTRATOR_PROP_INTERNAL_JOBS_PARALLELISM = "internal_jobs_parallelism";
 
+  public static final String CORE_LDAP_DEFAULT_URL = "ldap://localhost";
   public static final int CORE_LDAP_DEFAULT_PORT = 10389;
-  public static final String CORE_LDAP_BACKEND_JDBM = "JDBM";
-  public static final String CORE_LDAP_BACKEND_LDIF = "LDIF";
-  public static final String CORE_LDAP_BACKEND_MAVIBOT = "MAVIBOT";
 
   /*
    * Solr Retry
@@ -1113,6 +1219,9 @@ public final class RodaConstants {
   public static final String LOG_STATE = "state";
   public static final String LOG_FILE_ID = "fileID";
   public static final String LOG_LINE_NUMBER = "lineNumber";
+  public static final String LOG_REQUEST_HEADER_UUID = "requestHeaderUUID";
+  public static final String LOG_REQUEST_HEADER_REASON = "requestHeaderReason";
+  public static final String LOG_REQUEST_HEADER_TYPE = "requestHeaderType";
 
   // MEMBER: USER or GROUP
   public static final String MEMBERS_ID = "id";
@@ -1139,6 +1248,7 @@ public final class RodaConstants {
   public static final String TRANSFERRED_RESOURCE_LAST_SCAN_DATE = "lastScanDate";
   // REST
   public static final String TRANSFERRED_RESOURCE_DIRECTORY_NAME = "name";
+  public static final String TRANSFERRED_RESOURCE_REPLACE_EXISTING = "replace_existing";
   public static final String TRANSFERRED_RESOURCE_RESOURCE_ID = "resourceId";
 
   public static final String JOB_ID = "id";
@@ -1260,14 +1370,22 @@ public final class RodaConstants {
   public static final String PLUGIN_PARAMS_EVENT_DESCRIPTION = "parameter.event_description";
   public static final String PLUGIN_PARAMS_DELETE_OLDER_THAN_X_DAYS = "parameter.delete_older_than_x_days";
   public static final String PLUGIN_PARAMS_SIP_UPDATE_INFORMATION = "parameter.sip_update_information";
+  public static final String PLUGIN_PARAMS_SIEGFRIED_OVERWRITE_MANUAL = "parameter.siegfried_overwrite_manual";
   public static final String PLUGIN_PARAMS_REPRESENTATION_TYPE = "parameter.representation_type";
   public static final String PLUGIN_PARAMS_OUTCOMEOBJECTID_TO_SOURCEOBJECTID_MAP = "parameter.outcomeobjectid_to_sourceobjectid_map";
   public static final String PLUGIN_PARAMS_NEW_TYPE = "parameter.new_type";
+  public static final String PLUGIN_PARAMS_NEW_STATUS = "parameter.new_status";
   public static final String PLUGIN_PARAMS_ACCEPT = "parameter.accept";
   public static final String PLUGIN_PARAMS_REJECT_REASON = "parameter.reject_reason";
   public static final String PLUGIN_PARAMS_RECURSIVE = "parameter.recursive";
   public static final String PLUGIN_PARAMS_DONT_CHECK_RELATIVES = "parameter.dont_check_relatives";
   public static final String PLUGIN_PARAMS_REPRESENTATION_INFORMATION_FILTER = "parameter.representation_information_filter";
+  public static final String PLUGIN_PARAMS_RODA_MEMBER_ACTIVATE = "parameter.activate";
+
+  public static final String PLUGIN_PARAMS_VALIDATE_DESCRIPTIVE_METADATA = "parameter.validate_descriptive_metadata";
+  public static final String PLUGIN_PARAMS_DESCRIPTIVE_METADATA_TYPE = "parameter.metadata_type";
+  public static final String PLUGIN_PARAMS_DESCRIPTIVE_METADATA_VERSION = "parameter.metadata_version";
+  public static final String PLUGIN_PARAMS_DESCRIPTIVE_METADATA_FORCE_TYPE = "parameter.force_type";
 
   public static final String PLUGIN_PARAMS_INCLUDE_SELECTED_DESCRIPTIVE_METADATA = "parameter.include_selected_descriptive_metadata";
   public static final String PLUGIN_PARAMS_SELECTED_DESCRIPTIVE_METADATA = "parameter.selected_descriptive_metadata";
@@ -1325,6 +1443,16 @@ public final class RodaConstants {
   public static final String PLUGIN_PARAMS_DO_BUILD_SYNC_MANIFEST_PLUGIN = "parameter.do_build_sync_manifest";
   public static final String PLUGIN_PARAMS_DO_SEND_SYNC_BUNDLE_PLUGIN = "parameter.do_send_sync_bundle";
   public static final String PLUGIN_PARAMS_DO_REQUEST_SYNC_BUNDLE_PLUGIN = "parameter.do_request_sync_bundle";
+
+  // Edit File Format Plugin Parameters
+
+  public static final String PLUGIN_PARAMS_EXTENSION = "parameter.extension";
+  public static final String PLUGIN_PARAMS_MIMETYPE = "parameter.mime_type";
+  public static final String PLUGIN_PARAMS_FORMAT = "parameter.format";
+  public static final String PLUGIN_PARAMS_FORMAT_VERSION = "parameter.format_version";
+  public static final String PLUGIN_PARAMS_PRONOM = "parameter.pronom";
+  public static final String PLUGIN_PARAMS_CLEAR_INCIDENCES = "parameter.clear_incidences";
+
   public static final String PLUGIN_CATEGORY_CONVERSION = "conversion";
   public static final String PLUGIN_CATEGORY_CHARACTERIZATION = "characterization";
   public static final String PLUGIN_CATEGORY_RISK_MANAGEMENT = "risk_management";
@@ -1385,6 +1513,7 @@ public final class RodaConstants {
 
   public static final String FILE_PATH = "path";
   public static final String FILE_ANCESTORS_PATH = "ancestorsPath";
+  public static final String FILE_TECHNICAL_METADATA_ID = "technicalMetadataId";
   public static final String FILE_PARENT_UUID = "parentUUID";
   public static final String FILE_AIP_ID = "aipId";
   public static final String FILE_FORMAT_MIMETYPE = "formatMimetype";
@@ -1410,6 +1539,7 @@ public final class RodaConstants {
   public static final String FILE_HASH = "hash";
   public static final String FILE_FULLTEXT = "fulltext";
   public static final String FILE_ANCESTORS = "ancestors";
+  public static final String FILE_ANCESTORS_LIST = "ancestorsPath";
   public static final String FILE_FORMAT_DESIGNATION = "formatDesignation";
 
   public static final String FILE_CREATED_ON = "createdOn";
@@ -1473,6 +1603,9 @@ public final class RodaConstants {
   public static final String RISK_INCIDENCE_FILE_PATH_COMPUTED = "filePathComputed";
   public static final String RISK_INCIDENCE_FILE_PATH_COMPUTED_SEPARATOR = "/";
   public static final String RISK_INCIDENCE_FILE_EXTENSION = ".json";
+
+  /* Risk Ids */
+  public static final String RISK_ID_SIEGFRIED_IDENTIFICATION_WARNING = "urn:siegfried:r1";
 
   /* Representation information */
   public static final String REPRESENTATION_INFORMATION_ID = "id";
@@ -1602,6 +1735,20 @@ public final class RodaConstants {
   /* Disposal Confirmation */
   public static final String DISPOSAL_CONFIRMATION_ID = "id";
 
+  /* Siegfriend payload fields */
+  public static final String SIEGFRIED_PAYLOAD_MATCHES = "matches";
+  public static final String SIEGFRIED_PAYLOAD_MATCH_WARNING = "warning";
+  public static final String SIEGFRIED_PAYLOAD_MATCH_NS = "ns";
+  public static final String SIEGFRIED_PAYLOAD_MATCH_NS_PRONOM = "pronom";
+  public static final String SIEGFRIED_PAYLOAD_MATCH_MIMETYPE = "mime";
+  public static final String SIEGFRIED_PAYLOAD_MATCH_ID = "id";
+  public static final String SIEGFRIED_PAYLOAD_MATCH_FORMAT_DESIGNATION = "format";
+  public static final String SIEGFRIED_PAYLOAD_MATCH_FORMAT_VERSION = "version";
+
+  /* Preservation agents fields regex */
+  public static final String REGEX_PUID = "(?:fmt|x-fmt)\\/[a-z0-9]+";
+  public static final String REGEX_MIME = "\\w+\\/[-+.\\w]+";
+
   /* Preservation agents fields */
   public static final String PRESERVATION_AGENT_ID = "id";
   public static final String PRESERVATION_AGENT_NAME = "name";
@@ -1631,6 +1778,9 @@ public final class RodaConstants {
   public static final String PRESERVATION_LEVEL_BITLEVEL = "bitlevel";
   public static final String PRESERVATION_REGISTRY_PRONOM = "pronom";
   public static final String PRESERVATION_REGISTRY_MIME = "mime";
+
+  public static final String PRESERVATION_FORMAT_NOTE_MANUAL = "manual";
+  public static final String PRESERVATION_FORMAT_NOTE_SIEGFRIED_WARNING = "SIEGFRIED WARNING";
 
   public static final String PREMIS_RELATIONSHIP_TYPE_STRUCTURAL = "structural";
   public static final String PREMIS_RELATIONSHIP_SUBTYPE_HASPART = "hasPart";
@@ -1809,7 +1959,9 @@ public final class RodaConstants {
   public static final String VERIFICATION_EMAIL_TEMPLATE_SUBJECT_TRANSLATION = "email.verification.subject";
   public static final String VERIFICATION_EMAIL_TEMPLATE_FROM_TRANSLATION = "email.verification.from";
   public static final String RECOVER_LOGIN_EMAIL_TEMPLATE = "recoverlogin_html.vm";
+  public static final String SET_PASSWORD_TEMPLATE = "setpassword_html.vm";
   public static final String RECOVER_LOGIN_EMAIL_TEMPLATE_SUBJECT_TRANSLATION = "email.recoverlogin.subject";
+  public static final String SET_PASSWORD_EMAIL_TEMPLATE_SUBJECT_TRANSLATION = "email.setpassword.subject";
   public static final String RECOVER_LOGIN_EMAIL_TEMPLATE_FROM_TRANSLATION = "email.recoverlogin.from";
   public static final String NOTIFY_PRODUCER_EMAIL_TEMPLATE = "notifyproducer_html.vm";
   public static final String EMAIL_TEMPLATE_EXTENSION = ".vm";
@@ -1931,103 +2083,104 @@ public final class RodaConstants {
     RodaConstants.DIPFILE_ID, RodaConstants.DIPFILE_PATH, RodaConstants.DIPFILE_DIP_ID,
     RodaConstants.DIPFILE_IS_DIRECTORY);
 
-  public static final String PERMISSION_METHOD_FIND_AIP = "org.roda.wui.api.controllers.Browser.find(IndexedAIP)";
-  public static final String PERMISSION_METHOD_FIND_REPRESENTATION = "org.roda.wui.api.controllers.Browser.find(IndexedRepresentation)";
-  public static final String PERMISSION_METHOD_FIND_FILE = "org.roda.wui.api.controllers.Browser.find(IndexedFile)";
-  public static final String PERMISSION_METHOD_FIND_DIP = "org.roda.wui.api.controllers.Browser.find(IndexedDIP)";
-  public static final String PERMISSION_METHOD_FIND_RISK_INCIDENCE = "org.roda.wui.api.controllers.Browser.find(RiskIncidence)";
-  public static final String PERMISSION_METHOD_FIND_PRESERVATION_EVENT = "org.roda.wui.api.controllers.Browser.find(IndexedPreservationEvent)";
-  public static final String PERMISSION_METHOD_FIND_LOG_ENTRY = "org.roda.wui.api.controllers.Browser.find(LogEntry)";
-  public static final String PERMISSION_METHOD_FIND_REPRESENTATION_INFORMATION = "org.roda.wui.api.controllers.Browser.find(RepresentationInformation)";
-  public static final String PERMISSION_METHOD_FIND_RISK = "org.roda.wui.api.controllers.Browser.find(IndexedRisk)";
+  public static final String PERMISSION_METHOD_FIND_AIP = "org.roda.wui.api.v2.services.IndexService.find(IndexedAIP)";
+  public static final String PERMISSION_METHOD_FIND_REPRESENTATION = "org.roda.wui.api.v2.services.IndexService.find(IndexedRepresentation)";
+  public static final String PERMISSION_METHOD_FIND_FILE = "org.roda.wui.api.v2.services.IndexService.find(IndexedFile)";
+  public static final String PERMISSION_METHOD_FIND_DIP = "org.roda.wui.api.v2.services.IndexService.find(IndexedDIP)";
+  public static final String PERMISSION_METHOD_FIND_TRANSFERRED_RESOURCE = "org.roda.wui.api.v2.services.IndexService.find(TransferredResource)";
+  public static final String PERMISSION_METHOD_FIND_RODA_MEMBER = "org.roda.wui.api.v2.services.IndexService.find(RODAMember)";
+  public static final String PERMISSION_METHOD_FIND_JOB_REPORT = "org.roda.wui.api.v2.services.IndexService.find(IndexedReport)";
+  public static final String PERMISSION_METHOD_FIND_JOB = "org.roda.wui.api.v2.services.IndexService.find(Job)";
+  public static final String PERMISSION_METHOD_FIND_NOTIFICATION = "org.roda.wui.api.v2.services.IndexService.find(Notification)";
+  public static final String PERMISSION_METHOD_FIND_RISK_INCIDENCE = "org.roda.wui.api.v2.services.IndexService.find(RiskIncidence)";
+  public static final String PERMISSION_METHOD_FIND_PRESERVATION_EVENT = "org.roda.wui.api.v2.services.IndexService.find(IndexedPreservationEvent)";
+  public static final String PERMISSION_METHOD_FIND_PRESERVATION_AGENT = "org.roda.wui.api.v2.services.IndexService.find(IndexedPreservationAgent)";
+  public static final String PERMISSION_METHOD_FIND_LOG_ENTRY = "org.roda.wui.api.v2.services.IndexService.find(LogEntry)";
+  public static final String PERMISSION_METHOD_FIND_REPRESENTATION_INFORMATION = "org.roda.wui.api.v2.services.IndexService.find(RepresentationInformation)";
+  public static final String PERMISSION_METHOD_FIND_RISK = "org.roda.wui.api.v2.services.IndexService.find(IndexedRisk)";
 
-  public static final String PERMISSION_METHOD_DELETE_AIP = "org.roda.wui.api.controllers.Browser.delete(IndexedAIP)";
-  public static final String PERMISSION_METHOD_DELETE_DIP = "org.roda.wui.api.controllers.Browser.delete(IndexedDIP)";
-  public static final String PERMISSION_METHOD_DELETE_REPRESENTATION = "org.roda.wui.api.controllers.Browser.delete(IndexedRepresentation)";
-  public static final String PERMISSION_METHOD_DELETE_FILE = "org.roda.wui.api.controllers.Browser.delete(IndexedFile)";
-  public static final String PERMISSION_METHOD_DELETE_REPRESENTATION_INFORMATION = "org.roda.wui.api.controllers.Browser.delete(RepresentationInformation)";
-  public static final String PERMISSION_METHOD_DELETE_RISK = "org.roda.wui.api.controllers.Browser.delete(IndexedRisk)";
-  public static final String PERMISSION_METHOD_DELETE_RISK_INCIDENCE = "org.roda.wui.api.controllers.Browser.delete(RiskIncidence)";
-  public static final String PERMISSION_METHOD_DELETE_TRANSFERRED_RESOURCE = "org.roda.wui.api.controllers.Browser.delete(TransferredResource)";
+  public static final String PERMISSION_METHOD_DELETE_AIP = "org.roda.wui.api.v2.controller.AIPController.deleteAIPs";
+  public static final String PERMISSION_METHOD_DELETE_DIP = "org.roda.wui.api.v2.controller.DIPController.deleteIndexedDIPs";
+  public static final String PERMISSION_METHOD_DELETE_REPRESENTATION = "org.roda.wui.api.v2.controller.RepresentationController.deleteRepresentation";
+  public static final String PERMISSION_METHOD_DELETE_FILE = "org.roda.wui.api.v2.controller.FilesController.deleteFiles";
+  public static final String PERMISSION_METHOD_DELETE_REPRESENTATION_INFORMATION = "org.roda.wui.api.v2.controller.RepresentationInformationController.deleteMultipleRepresentationInformation";
+  public static final String PERMISSION_METHOD_DELETE_RISK = "org.roda.wui.api.v2.controller.RiskController.deleteRisk";
+  public static final String PERMISSION_METHOD_DELETE_RISK_INCIDENCE = "org.roda.wui.api.v2.controller.RiskIncidenceController.deleteRiskIncidences";
+  public static final String PERMISSION_METHOD_DELETE_TRANSFERRED_RESOURCE = "org.roda.wui.api.v2.controller.TransferredResourceController.deleteMultipleResources";
 
-  public static final String PERMISSION_METHOD_RETRIEVE_AIP = "org.roda.wui.api.controllers.Browser.retrieve(IndexedAIP)";
-  public static final String PERMISSION_METHOD_RETRIEVE_REPRESENTATION = "org.roda.wui.api.controllers.Browser.retrieve(IndexedRepresentation)";
-  public static final String PERMISSION_METHOD_RETRIEVE_FILE = "org.roda.wui.api.controllers.Browser.retrieve(IndexedFile)";
+  public static final String PERMISSION_METHOD_LIST_AIP_DESCRIPTIVE_METADATA = "org.roda.wui.api.v2.controller.AIPController.getDescriptiveMetadata";
 
-  public static final String PERMISSION_METHOD_LIST_AIP_DESCRIPTIVE_METADATA = "org.roda.wui.api.controllers.Browser.listAIPDescriptiveMetadata";
-  public static final String PERMISSION_METHOD_LIST_REPRESENTATION_DESCRIPTIVE_METADATA = "org.roda.wui.api.controllers.Browser.listRepresentationDescriptiveMetadata";
-  public static final String PERMISSION_METHOD_CREATE_AIP_BELOW = "org.roda.wui.api.controllers.Browser.createAIPBelow";
-  public static final String PERMISSION_METHOD_CREATE_AIP_TOP = "org.roda.wui.api.controllers.Browser.createAIPTop";
-  public static final String PERMISSION_METHOD_CREATE_REPRESENTATION = "org.roda.wui.api.controllers.Browser.createRepresentation";
-  public static final String PERMISSION_METHOD_MOVE_AIP_IN_HIERARCHY = "org.roda.wui.api.controllers.Browser.moveAIPInHierarchy";
-  public static final String PERMISSION_METHOD_UPDATE_AIP_PERMISSIONS = "org.roda.wui.api.controllers.Browser.updateAIPPermissions";
-  public static final String PERMISSION_METHOD_UPDATE_DIP_PERMISSIONS = "org.roda.wui.api.controllers.Browser.updateDIPPermissions";
-  public static final String PERMISSION_METHOD_CREATE_JOB = "org.roda.wui.api.controllers.Jobs.createJob";
-  public static final String PERMISSION_METHOD_APPRAISAL = "org.roda.wui.api.controllers.Browser.appraisal";
-  public static final String PERMISSION_METHOD_CHANGE_AIP_TYPE = "org.roda.wui.api.controllers.Browser.changeAIPType";
-  public static final String PERMISSION_METHOD_CHANGE_REPRESENTATION_TYPE = "org.roda.wui.api.controllers.Browser.changeRepresentationType";
-  public static final String PERMISSION_METHOD_RENAME_FOLDER = "org.roda.wui.api.controllers.Browser.renameFolder";
-  public static final String PERMISSION_METHOD_MOVE_FILES = "org.roda.wui.api.controllers.Browser.moveFiles";
-  public static final String PERMISSION_METHOD_CREATE_FILE = "org.roda.wui.api.controllers.Browser.createFile";
-  public static final String PERMISSION_METHOD_CHANGE_REPRESENTATION_STATES = "org.roda.wui.api.controllers.Browser.changeRepresentationStates";
-  public static final String PERMISSION_METHOD_CREATE_FOLDER = "org.roda.wui.api.controllers.Browser.createFolder";
-  public static final String PERMISSION_METHOD_CREATE_REPRESENTATION_INFORMATION = "org.roda.wui.api.controllers.Browser.createRepresentationInformation";
-  public static final String PERMISSION_METHOD_UPDATE_REPRESENTATION_INFORMATION = "org.roda.wui.api.controllers.Browser.updateRepresentationInformation";
-  public static final String PERMISSION_METHOD_CREATE_RISK = "org.roda.wui.api.controllers.Risks.createRisk";
-  public static final String PERMISSION_METHOD_UPDATE_RISK = "org.roda.wui.api.controllers.Browser.updateRisk";
-  public static final String PERMISSION_METHOD_RETRIEVE_RISK_VERSIONS = "org.roda.wui.api.controllers.Browser.retrieveRiskVersions";
-  public static final String PERMISSION_METHOD_UPDATE_RISK_INCIDENCE = "org.roda.wui.api.controllers.Browser.updateRiskIncidence";
-  public static final String PERMISSION_METHOD_RENAME_TRANSFERRED_RESOURCE = "org.roda.wui.api.controllers.Browser.renameTransferredResource";
-  public static final String PERMISSION_METHOD_MOVE_TRANSFERRED_RESOURCE = "org.roda.wui.api.controllers.Browser.moveTransferredResource";
-  public static final String PERMISSION_METHOD_CREATE_TRANSFERRED_RESOURCE_FILE = "org.roda.wui.api.controllers.Browser.createTransferredResourceFile";
-  public static final String PERMISSION_METHOD_CREATE_TRANSFERRED_RESOURCE_FOLDER = "org.roda.wui.api.controllers.Browser.createTransferredResourcesFolder";
-  public static final String PERMISSION_METHOD_REVERT_DESCRIPTIVE_METADATA_VERSION = "org.roda.wui.api.controllers.Browser.revertDescriptiveMetadataVersion";
-  public static final String PERMISSION_METHOD_DELETE_DESCRIPTIVE_METADATA_VERSION = "org.roda.wui.api.controllers.Browser.deleteDescriptiveMetadataVersion";
-  public static final String PERMISSION_METHOD_CREATE_DESCRIPTIVE_METADATA_FILE = "org.roda.wui.api.controllers.Browser.createDescriptiveMetadataFile";
-  public static final String PERMISSION_METHOD_UPDATE_DESCRIPTIVE_METADATA_FILE = "org.roda.wui.api.controllers.Browser.updateDescriptiveMetadataFile";
-  public static final String PERMISSION_METHOD_DELETE_DESCRIPTIVE_METADATA_FILE = "org.roda.wui.api.controllers.Browser.deleteDescriptiveMetadataFile";
-  public static final String PERMISSION_METHOD_RETRIEVE_DESCRIPTIVE_METADATA_VERSIONS_BUNDLE = "org.roda.wui.api.controllers.Browser.retrieveDescriptiveMetadataVersionsBundle";
-  public static final String PERMISSION_METHOD_LIST_USERS = "org.roda.wui.api.controllers.Browser.findAll(RODAMember)";
+  public static final String PERMISSION_METHOD_CREATE_AIP_BELOW = "org.roda.wui.api.v2.controller.AIPController.createAIPBelow";
+  public static final String PERMISSION_METHOD_CREATE_AIP_TOP = "org.roda.wui.api.v2.controller.AIPController.createAIPTop";
+  public static final String PERMISSION_METHOD_CREATE_REPRESENTATION = "org.roda.wui.api.v2.controller.RepresentationController.createRepresentation";
+  public static final String PERMISSION_METHOD_MOVE_AIP_IN_HIERARCHY = "org.roda.wui.api.v2.controller.AIPController.moveAIPInHierarchy";
+  public static final String PERMISSION_METHOD_UPDATE_AIP_PERMISSIONS = "org.roda.wui.api.v2.controller.AIPController.updatePermissions";
+  public static final String PERMISSION_METHOD_UPDATE_DIP_PERMISSIONS = "org.roda.wui.api.v2.controller.DIPController.updatePermissions";
+  public static final String PERMISSION_METHOD_CREATE_JOB = "org.roda.wui.api.v2.controller.JobsController.createJob";
+  public static final String PERMISSION_METHOD_APPRAISAL = "org.roda.wui.api.v2.controller.AIPController.appraisal";
+  public static final String PERMISSION_METHOD_CHANGE_AIP_TYPE = "org.roda.wui.api.v2.controller.AIPController.changeAIPType";
+  public static final String PERMISSION_METHOD_CHANGE_REPRESENTATION_TYPE = "org.roda.wui.api.v2.controller.RepresentationController.changeRepresentationType";
+  public static final String PERMISSION_METHOD_RENAME_FOLDER = "org.roda.wui.api.v2.controller.FilesController.renameFolder";
+  public static final String PERMISSION_METHOD_MOVE_FILES = "org.roda.wui.api.v2.controller.FilesController.moveFileToFolder";
+  public static final String PERMISSION_METHOD_CREATE_FILE = "org.roda.wui.api.v2.controller.FilesController.uploadFileResource";
+  public static final String PERMISSION_METHOD_CHANGE_REPRESENTATION_STATES = "org.roda.wui.api.v2.controller.RepresentationController.changeRepresentationStatus";
+  public static final String PERMISSION_METHOD_CREATE_FOLDER = "org.roda.wui.api.v2.controller.FilesController.createFolderUnderRepresentation";
+  public static final String PERMISSION_METHOD_CREATE_REPRESENTATION_INFORMATION = "org.roda.wui.api.v2.controller.RepresentationInformationController.createRepresentationInformation";
+  public static final String PERMISSION_METHOD_UPDATE_REPRESENTATION_INFORMATION = "org.roda.wui.api.v2.controller.RepresentationInformationController.updateRepresentationInformation";
+  public static final String PERMISSION_METHOD_CREATE_RISK = "org.roda.wui.api.v2.controller.RiskController.createRisk";
+  public static final String PERMISSION_METHOD_UPDATE_RISK = "org.roda.wui.api.v2.controller.RiskController.updateRisk";
+  public static final String PERMISSION_METHOD_RETRIEVE_RISK_VERSIONS = "org.roda.wui.api.v2.controller.RiskController.retrieveRiskVersions";
+  public static final String PERMISSION_METHOD_UPDATE_RISK_INCIDENCE = "org.roda.wui.api.v2.controller.RiskIncidenceController.updateRiskIncidence";
+  public static final String PERMISSION_METHOD_RENAME_TRANSFERRED_RESOURCE = "org.roda.wui.api.v2.controller.TransferredResourceController.renameTransferredResource";
+  public static final String PERMISSION_METHOD_MOVE_TRANSFERRED_RESOURCE = "org.roda.wui.api.v2.controller.TransferredResourceController.moveTransferredResources";
+  public static final String PERMISSION_METHOD_CREATE_TRANSFERRED_RESOURCE_FILE = "org.roda.wui.api.v2.controller.TransferredResourceController.createTransferredResource";
+  public static final String PERMISSION_METHOD_CREATE_TRANSFERRED_RESOURCE_FOLDER = "org.roda.wui.api.v2.controller.TransferredResourceController.createTransferredResourcesFolder";
+  public static final String PERMISSION_METHOD_REVERT_DESCRIPTIVE_METADATA_VERSION = "org.roda.wui.api.v2.controller.AIPController.revertDescriptiveMetadataVersion";
+  public static final String PERMISSION_METHOD_DELETE_DESCRIPTIVE_METADATA_VERSION = "org.roda.wui.api.v2.controller.AIPController.deleteDescriptiveMetadataVersion";
+  public static final String PERMISSION_METHOD_CREATE_DESCRIPTIVE_METADATA_FILE = "org.roda.wui.api.v2.controller.AIPController.createDescriptiveMetadataFile";
+  public static final String PERMISSION_METHOD_UPDATE_AIP_DESCRIPTIVE_METADATA_FILE = "org.roda.wui.api.v2.controller.AIPController.updateAIPDescriptiveMetadataFile";
 
-  public static final String PERMISSION_METHOD_CREATE_USER = "org.roda.wui.api.controllers.UserManagement.createUser";
-  public static final String PERMISSION_METHOD_CREATE_GROUP = "org.roda.wui.api.controllers.UserManagement.createGroup";
-  public static final String PERMISSION_METHOD_UPDATE_USER = "org.roda.wui.api.controllers.UserManagement.updateUser";
-  public static final String PERMISSION_METHOD_DELETE_USER = "org.roda.wui.api.controllers.UserManagement.deleteUser";
+  public static final String PERMISSION_METHOD_UPDATE_REPRESENTATION_DESCRIPTIVE_METADATA_FILE = "org.roda.wui.api.v2.controller.AIPController.updateRepresentationDescriptiveMetadataFile";
+  public static final String PERMISSION_METHOD_DELETE_DESCRIPTIVE_METADATA_FILE = "org.roda.wui.api.v2.controller.AIPController.deleteDescriptiveMetadataFile";
+  public static final String PERMISSION_METHOD_RETRIEVE_AIP_DESCRIPTIVE_METADATA_VERSIONS = "org.roda.wui.api.v2.controller.AIPController.retrieveDescriptiveMetadataVersions";
+  public static final String PERMISSION_METHOD_RETRIEVE_REPRESENTATION_DESCRIPTIVE_METADATA_VERSIONS = "org.roda.wui.api.v2.controller.AIPController.retrieveRepresentationDescriptiveMetadataVersions";
+  public static final String PERMISSION_METHOD_LIST_USERS = "org.roda.wui.api.v2.services.IndexService.find(RODAMember)";
 
-  public static final String PERMISSION_METHOD_CREATE_ACCESS_KEY = "org.roda.wui.api.controllers.ApplicationAuth.createAccessKey";
+  public static final String PERMISSION_METHOD_CREATE_USER = "org.roda.wui.api.v2.controller.MembersController.createUser";
+  public static final String PERMISSION_METHOD_CREATE_GROUP = "org.roda.wui.api.v2.controller.MembersController.createGroup";
+  public static final String PERMISSION_METHOD_UPDATE_USER = "org.roda.wui.api.v2.controller.MembersController.updateUser";
+  public static final String PERMISSION_METHOD_DELETE_USER = "org.roda.wui.api.v2.controller.MembersController.deleteUser";
 
-  public static final String PERMISSION_METHOD_CREATE_DISPOSAL_RULE = "org.roda.wui.api.controllers.Disposals.createDisposalRule";
-  public static final String PERMISSION_METHOD_UPDATE_DISPOSAL_RULE = "org.roda.wui.api.controllers.Disposals.updateDisposalRule";
-  public static final String PERMISSION_METHOD_DELETE_DISPOSAL_RULE = "org.roda.wui.api.controllers.Disposals.deleteDisposalRule";
+  public static final String PERMISSION_METHOD_CREATE_ACCESS_KEY = "org.roda.wui.api.v2.controller.MembersController.createAccessKey";
 
-  public static final String PERMISSION_METHOD_UPDATE_DISPOSAL_RULES = "org.roda.wui.api.controllers.Disposals.updateDisposalRules";
+  public static final String PERMISSION_METHOD_CREATE_DISPOSAL_RULE = "org.roda.wui.api.v2.controller.DisposalRuleController.createDisposalRule";
+  public static final String PERMISSION_METHOD_UPDATE_DISPOSAL_RULE = "org.roda.wui.api.v2.controller.DisposalRuleController.updateDisposalRule";
 
-  public static final String PERMISSION_METHOD_CREATE_DISPOSAL_SCHEDULE = "org.roda.wui.api.controllers.Disposals.createDisposalSchedule";
-  public static final String PERMISSION_METHOD_UPDATE_DISPOSAL_SCHEDULE = "org.roda.wui.api.controllers.Disposals.updateDisposalSchedule";
-  public static final String PERMISSION_METHOD_DELETE_DISPOSAL_SCHEDULE = "org.roda.wui.api.controllers.Disposals.deleteDisposalSchedule";
-  public static final String PERMISSION_METHOD_ASSOCIATE_DISPOSAL_SCHEDULE = "org.roda.wui.api.controllers.Disposals.associateDisposalSchedule";
+  public static final String PERMISSION_METHOD_CREATE_DISPOSAL_SCHEDULE = "org.roda.wui.api.v2.controller.DisposalScheduleController.createDisposalSchedule";
+  public static final String PERMISSION_METHOD_UPDATE_DISPOSAL_SCHEDULE = "org.roda.wui.api.v2.controller.DisposalScheduleController.updateDisposalSchedule";
+  public static final String PERMISSION_METHOD_DELETE_DISPOSAL_SCHEDULE = "org.roda.wui.api.v2.controller.DisposalScheduleController.deleteDisposalSchedule";
+  public static final String PERMISSION_METHOD_ASSOCIATE_DISPOSAL_SCHEDULE = "org.roda.wui.api.v2.controller.DisposalScheduleController.associatedDisposalSchedule";
 
-  public static final String PERMISSION_METHOD_CREATE_DISPOSAL_HOLD = "org.roda.wui.api.controllers.Disposals.createDisposalHold";
-  public static final String PERMISSION_METHOD_DELETE_DISPOSAL_HOLD = "org.roda.wui.api.controllers.Disposals.deleteDisposalHold";
-  public static final String PERMISSION_METHOD_UPDATE_DISPOSAL_HOLD = "org.roda.wui.api.controllers.Disposals.updateDisposalHold";
-  public static final String PERMISSION_METHOD_ASSOCIATE_DISPOSAL_HOLD = "org.roda.wui.api.controllers.Disposals.applyDisposalHold";
+  public static final String PERMISSION_METHOD_CREATE_DISPOSAL_HOLD = "org.roda.wui.api.v2.controller.DisposalHoldController.createDisposalHold";
+  public static final String PERMISSION_METHOD_UPDATE_DISPOSAL_HOLD = "org.roda.wui.api.v2.controller.DisposalHoldController.updateDisposalHold";
+  public static final String PERMISSION_METHOD_ASSOCIATE_DISPOSAL_HOLD = "org.roda.wui.api.v2.controller.DisposalHoldController.applyDisposalHold";
 
-  public static final String PERMISSION_METHOD_CREATE_DISPOSAL_CONFIRMATION = "org.roda.wui.api.controllers.Disposals.createDisposalConfirmation";
-  public static final String PERMISSION_METHOD_DELETE_DISPOSAL_CONFIRMATION = "org.roda.wui.api.controllers.Disposals.deleteDisposalConfirmation";
-  public static final String PERMISSION_METHOD_DESTROY_RECORDS_DISPOSAL_CONFIRMATION = "org.roda.wui.api.controllers.Disposals.destroyRecordsInDisposalConfirmationReport";
-  public static final String PERMISSION_METHOD_RESTORE_RECORDS_DISPOSAL_CONFIRMATION = "org.roda.wui.api.controllers.Disposals.restoreRecordsInDisposalConfirmationReport";
-  public static final String PERMISSION_METHOD_PERMANENTLY_DELETE_RECORDS_DISPOSAL_CONFIRMATION = "org.roda.wui.api.controllers.Disposals.permanentlyDeleteRecordsInDisposalConfirmationReport";
-  public static final String PERMISSION_METHOD_RETRIEVE_DISPOSAL_CONFIRMATION_REPORT = "org.roda.wui.api.controllers.Disposals.retrieveDisposalConfirmationReport";
+  public static final String PERMISSION_METHOD_CREATE_DISPOSAL_CONFIRMATION = "org.roda.wui.api.v2.controller.DisposalConfirmationController.createDisposalConfirmation";
+  public static final String PERMISSION_METHOD_DELETE_DISPOSAL_CONFIRMATION = "org.roda.wui.api.v2.controller.DisposalConfirmationController.deleteDisposalConfirmation";
+  public static final String PERMISSION_METHOD_DESTROY_RECORDS_DISPOSAL_CONFIRMATION = "org.roda.wui.api.v2.controller.DisposalConfirmationController.destroyRecordsInDisposalConfirmation";
+  public static final String PERMISSION_METHOD_RESTORE_RECORDS_DISPOSAL_CONFIRMATION = "org.roda.wui.api.v2.controller.DisposalConfirmationController.restoreDisposalConfirmation";
+  public static final String PERMISSION_METHOD_PERMANENTLY_DELETE_RECORDS_DISPOSAL_CONFIRMATION = "org.roda.wui.api.v2.controller.DisposalConfirmationController.permanentlyDeleteRecordsInDisposalConfirmation";
+  public static final String PERMISSION_METHOD_RETRIEVE_DISPOSAL_CONFIRMATION_REPORT = "org.roda.wui.api.v2.controller.DisposalConfirmationController.retrieveDisposalConfirmationReport";
 
-  public static final String PERMISSION_METHOD_LIST_DISPOSAL_RULES = "org.roda.wui.api.controllers.Browser.listDisposalRules";
-  public static final String PERMISSION_METHOD_LIST_DISPOSAL_SCHEDULES = "org.roda.wui.api.controllers.Browser.listDisposalSchedules";
-  public static final String PERMISSION_METHOD_LIST_DISPOSAL_HOLDS = "org.roda.wui.api.controllers.Browser.listDisposalHolds";
+  public static final String PERMISSION_METHOD_LIST_DISPOSAL_RULES = "org.roda.wui.api.v2.controller.DisposalRuleController.listDisposalRules";
+  public static final String PERMISSION_METHOD_LIST_DISPOSAL_SCHEDULES = "org.roda.wui.api.v2.controller.DisposalScheduleController.listDisposalSchedules";
+  public static final String PERMISSION_METHOD_LIST_DISPOSAL_HOLDS = "org.roda.wui.api.v2.controller.DisposalHoldController.listDisposalHolds";
 
-  public static final String PERMISSION_METHOD_STOP_JOB = "org.roda.wui.api.controllers.Jobs.stopJob";
+  public static final String PERMISSION_METHOD_STOP_JOB = "org.roda.wui.api.v2.controller.JobsController.stopJob";
 
-  public static final String PERMISSION_METHOD_APPROVE_JOB = "org.roda.wui.api.controllers.Jobs.approveJob";
+  public static final String PERMISSION_METHOD_APPROVE_JOB = "org.roda.wui.api.v2.controller.JobsController.approveJob";
 
-  public static final String PERMISSION_METHOD_REJECT_JOB = "org.roda.wui.api.controllers.Jobs.rejectJob";
+  public static final String PERMISSION_METHOD_REJECT_JOB = "org.roda.wui.api.v2.controller.JobsController.rejectJob";
 
   public static final String ENV_CONFIG_SYMBOLIC_LINKS_FORBIDDEN = "RODA_CONFIG_SYMBOLIC_LINKS_FORBIDDEN";
 
@@ -2047,7 +2200,9 @@ public final class RodaConstants {
 
   /* HTTP Response codes */
   public static final int HTTP_RESPONSE_CODE_SUCCESS = 200;
+  public static final int HTTP_RESPONSE_CODE_CREATED = 201;
   public static final int HTTP_RESPONSE_CODE_BAD_REQUEST = 400;
+  public static final int HTTP_RESPONSE_CODE_NO_CONTENT = 204;
   public static final int HTTP_RESPONSE_CODE_UNAUTHORIZED = 401;
   public static final int HTTP_RESPONSE_CODE_NOT_FOUND = 404;
   public static final int HTTP_RESPONSE_CODE_REQUEST_CONFLICT = 409;
@@ -2093,16 +2248,13 @@ public final class RodaConstants {
     + "instance because they were removed from local instance";
   public static final String SYNCHRONIZATION_REPORT_VALUE_ISSUES_DESCRIPTION = "An entity was found is central "
     + "instance but is not listed in local instance or is listed as being removed from local instance";
-
   public static final String SYNCHRONIZATION_REPORT_VALUE_STATUS_SUCCESS = "Successful Synchronization";
   public static final String SYNCHRONIZATION_REPORT_VALUE_STATUS_ERROR = "Synchronization with errors";
-
   public static final String SYNCHRONIZATION_ENTITY_SUMMARY_TYPE_REMOVED = "removed";
   public static final String SYNCHRONIZATION_ENTITY_SUMMARY_TYPE_UPDATED = "updated";
   public static final String SYNCHRONIZATION_ENTITY_SUMMARY_TYPE_ISSUE = "issue";
 
   public static final String PLUGIN_PARAMS_CONVERSION_REPRESENTATION = "rep";
-
   public static final String PLUGIN_PARAMS_CONVERSION_DISSEMINATION = "dip";
 
   /** Private empty constructor */

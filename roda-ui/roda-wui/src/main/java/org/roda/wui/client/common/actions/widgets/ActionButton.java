@@ -7,6 +7,7 @@
  */
 package org.roda.wui.client.common.actions.widgets;
 
+import com.google.gwt.user.client.ui.Button;
 import org.roda.core.data.v2.index.IsIndexed;
 import org.roda.wui.client.common.actions.model.ActionableButton;
 
@@ -14,54 +15,39 @@ import com.google.gwt.event.dom.client.ClickEvent;
 import com.google.gwt.event.dom.client.ClickHandler;
 import com.google.gwt.event.dom.client.HasClickHandlers;
 import com.google.gwt.event.shared.HandlerRegistration;
-import com.google.gwt.safehtml.shared.SafeHtmlUtils;
-import com.google.gwt.user.client.ui.Composite;
-import com.google.gwt.user.client.ui.FlowPanel;
-import com.google.gwt.user.client.ui.HTMLPanel;
 import com.google.gwt.user.client.ui.HasEnabled;
 import com.google.gwt.user.client.ui.HasText;
-import com.google.gwt.user.client.ui.Label;
 
 /**
  * @author Bruno Ferreira <bferreira@keep.pt>
  */
-public class ActionButton<T extends IsIndexed> extends Composite implements HasEnabled, HasClickHandlers, HasText {
+public class ActionButton<T extends IsIndexed> extends Button implements HasEnabled, HasClickHandlers, HasText {
   private final ActionableButton<T> actionButton;
-
-  private FlowPanel button;
-  private Label label;
 
   public ActionButton(ActionableButton<T> actionButton) {
     this.actionButton = actionButton;
-    button = new FlowPanel();
-
-    initWidget(button);
 
     setStylePrimaryName("actionable-button");
     addStyleDependentName(actionButton.getImpact().toString().toLowerCase());
     setEnabled(true);
 
-    String iconClass = null;
+    addStyleName("actionable-button-label");
+    setText(actionButton.getText());
+
+    boolean addedIcon = false;
     for (String possibleIcon : actionButton.getExtraCssClasses()) {
       if (possibleIcon.startsWith("btn-")) {
-        iconClass = possibleIcon.replaceFirst("btn-", "fa fa-");
-        break;
+        addStyleName(possibleIcon);
+        addedIcon = true;
       } else if (possibleIcon.startsWith("fas fa-") || possibleIcon.startsWith("far fa-")
         || possibleIcon.startsWith("fal fa-")) {
-        iconClass = possibleIcon;
-        break;
+        addStyleName(possibleIcon.replaceFirst("fa[srl] fa-", "btn-"));
+        addedIcon = true;
       }
     }
-
-    if (iconClass != null) { // Only add an icon if one was specified
-      HTMLPanel icon = new HTMLPanel(SafeHtmlUtils.fromSafeConstant("<i class='" + iconClass + "'></i>"));
-      icon.addStyleName("actionable-button-icon");
-      button.add(icon);
+    if (!addedIcon) {
+      addStyleName("btn-question-circle");
     }
-
-    label = new Label(actionButton.getText());
-    label.addStyleName("actionable-button-label");
-    button.add(label);
   }
 
   @Override
@@ -83,16 +69,6 @@ public class ActionButton<T extends IsIndexed> extends Composite implements HasE
     } else {
       removeStyleDependentName("disabled");
     }
-  }
-
-  @Override
-  public String getText() {
-    return label.getText();
-  }
-
-  @Override
-  public void setText(String text) {
-    label.setText(text);
   }
 
   /**

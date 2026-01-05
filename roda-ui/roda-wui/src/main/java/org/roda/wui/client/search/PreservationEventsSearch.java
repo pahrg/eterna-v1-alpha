@@ -12,7 +12,6 @@ import org.roda.core.data.v2.index.filter.AllFilterParameter;
 import org.roda.core.data.v2.index.filter.Filter;
 import org.roda.core.data.v2.index.filter.SimpleFilterParameter;
 import org.roda.core.data.v2.ip.metadata.IndexedPreservationEvent;
-import org.roda.wui.client.common.actions.PreservationEventActions;
 import org.roda.wui.client.common.lists.PreservationEventList;
 import org.roda.wui.client.common.lists.utils.AsyncTableCellOptions;
 import org.roda.wui.client.common.lists.utils.ListBuilder;
@@ -27,7 +26,7 @@ public class PreservationEventsSearch extends SimplePanel {
   private static final ClientMessages messages = GWT.create(ClientMessages.class);
 
   public PreservationEventsSearch(String eventsListId, String aipId, String representationUUID, String fileUUID) {
-    Filter filter = new Filter(new AllFilterParameter());;
+    Filter filter = new Filter(new AllFilterParameter());
     if (aipId != null) {
       filter.add(new SimpleFilterParameter(RodaConstants.PRESERVATION_EVENT_AIP_ID, aipId));
     }
@@ -40,8 +39,7 @@ public class PreservationEventsSearch extends SimplePanel {
     SearchWrapper searchWrapper = new SearchWrapper(false)
       .createListAndSearchPanel(new ListBuilder<>(() -> new PreservationEventList(),
         new AsyncTableCellOptions<>(IndexedPreservationEvent.class, eventsListId).withFilter(filter)
-          .withSummary(messages.searchResults()).bindOpener()
-          .withActionable(PreservationEventActions.get(aipId, representationUUID, fileUUID))));
+          .withSummary(messages.searchResults()).bindOpener()));
 
     setWidget(searchWrapper);
   }

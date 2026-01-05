@@ -9,8 +9,7 @@ package org.roda.core.migration.model;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Optional;
 
 import org.roda.core.common.PremisV3Utils;
 import org.roda.core.common.iterables.CloseableIterable;
@@ -19,19 +18,20 @@ import org.roda.core.data.exceptions.AlreadyExistsException;
 import org.roda.core.data.exceptions.AuthorizationDeniedException;
 import org.roda.core.data.exceptions.GenericException;
 import org.roda.core.data.exceptions.NotFoundException;
+import org.roda.core.data.exceptions.RODAException;
 import org.roda.core.data.exceptions.RequestNotValidException;
 import org.roda.core.data.utils.URNUtils;
-import org.roda.core.data.v2.ip.StoragePath;
+import org.roda.core.data.v2.LiteRODAObject;
+import org.roda.core.data.v2.common.OptionalWithCause;
+import org.roda.core.data.v2.ip.Representation;
 import org.roda.core.data.v2.ip.metadata.PreservationMetadata;
 import org.roda.core.data.v2.ip.metadata.PreservationMetadata.PreservationMetadataType;
 import org.roda.core.data.v2.validation.ValidationException;
 import org.roda.core.migration.MigrationAction;
-import org.roda.core.model.utils.ModelUtils;
+import org.roda.core.model.LiteRODAObjectFactory;
+import org.roda.core.model.ModelService;
 import org.roda.core.storage.Binary;
 import org.roda.core.storage.ContentPayload;
-import org.roda.core.storage.DefaultStoragePath;
-import org.roda.core.storage.Resource;
-import org.roda.core.storage.StorageService;
 import org.roda.core.storage.utils.RODAInstanceUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,47 +44,40 @@ public class PreservationMetadataFileToVersion2 implements MigrationAction<Prese
   private static final Logger LOGGER = LoggerFactory.getLogger(PreservationMetadataFileToVersion2.class);
 
   @Override
-  public void migrate(StorageService storage) {
-    try (
-      CloseableIterable<Resource> aips = storage.listResourcesUnderDirectory(ModelUtils.getAIPContainerPath(), false)) {
-
-      for (Resource aip : aips) {
-        try (CloseableIterable<Resource> representations = storage.listResourcesUnderDirectory(
-          ModelUtils.getRepresentationsContainerPath(aip.getStoragePath().getName()), false)) {
-
-          for (Resource representation : representations) {
-            StoragePath pmPath = DefaultStoragePath.parse(representation.getStoragePath(),
-              RodaConstants.STORAGE_DIRECTORY_METADATA, RodaConstants.STORAGE_DIRECTORY_PRESERVATION);
-
-            try (CloseableIterable<Resource> pms = storage.listResourcesUnderDirectory(pmPath, true)) {
-              for (Resource pm : pms) {
-                if (!pm.isDirectory() && pm instanceof Binary && pm.getStoragePath().getName().startsWith(URNUtils
+  public void migrate(ModelService model) {
+    try (CloseableIterable<OptionalWithCause<Representation>> representations = model.list(Representation.class)) {
+      for (OptionalWithCause<Representation> representation : representations) {
+        if (representation.isPresent()) {
+          try (CloseableIterable<OptionalWithCause<PreservationMetadata>> pms = model
+            .listPreservationMetadata(representation.get().getAipId(), representation.get().getId())) {
+            for (OptionalWithCause<PreservationMetadata> pm : pms) {
+              if (pm.isPresent()) {
+                if (!model.hasDirectory(pm.get()) && pm.get().getId().startsWith(URNUtils
                   .getPremisPrefix(PreservationMetadataType.FILE, RODAInstanceUtils.getLocalInstanceIdentifier()))) {
-                  Binary binary = (Binary) pm;
-                  migrate(storage, binary);
+                  Binary pmBinary = model.getBinary(pm.get());
+                  migrate(model, pmBinary, pm.get(), representation.get().getAipId(), representation.get().getId());
                 }
+              } else {
+                LOGGER.debug("Couldn't get preservation metadata", pm.getCause());
               }
-            } catch (NotFoundException | GenericException | AuthorizationDeniedException | RequestNotValidException
-              | IOException e) {
-              LOGGER.warn("Could not find preservation metadata files", e);
             }
+          } catch (NotFoundException | GenericException | AuthorizationDeniedException | RequestNotValidException
+            | IOException e) {
+            LOGGER.warn("Could not find preservation metadata files", e);
           }
-
-        } catch (NotFoundException | GenericException | AuthorizationDeniedException | RequestNotValidException
-          | IOException e) {
-          LOGGER.warn("Could not find representations", e);
+        } else {
+          LOGGER.warn("Couldn't get representation", representation.getCause());
         }
       }
-    } catch (NotFoundException | GenericException | AuthorizationDeniedException | RequestNotValidException
-      | IOException e) {
-      LOGGER.warn("Could not find AIPs", e);
+
+    } catch (IOException | RODAException e) {
+      LOGGER.warn("Could not find representations", e);
     }
   }
 
-  private void migrate(StorageService storage, Binary binary) {
+  private void migrate(ModelService model, Binary binary, PreservationMetadata oldPM, String aipId,
+    String representationId) {
     try (InputStream inputStream = binary.getContent().createInputStream()) {
-      StoragePath oldStoragePath = binary.getStoragePath();
-
       File file = PremisV3Utils.binaryToFile(inputStream);
       String originalName = file.getOriginalName().getValue();
       String value = null;
@@ -98,20 +91,21 @@ public class PreservationMetadataFileToVersion2 implements MigrationAction<Prese
         }
       }
 
-      List<String> pathList = new ArrayList<>(oldStoragePath.asList());
-
-      if (value != null) {
-        pathList.remove(pathList.size() - 1);
-        pathList.add(value + RodaConstants.PREMIS_SUFFIX);
+      Optional<LiteRODAObject> oldPMLite = LiteRODAObjectFactory.get(PreservationMetadata.class, aipId,
+        representationId, oldPM.getId());
+      Optional<LiteRODAObject> newPMLite = LiteRODAObjectFactory.get(PreservationMetadata.class, aipId,
+        representationId, value);
+      if (oldPMLite.isEmpty() || newPMLite.isEmpty()) {
+        throw new RequestNotValidException("Could not create new LITE for preservation metadata file " + oldPM.getId());
       }
-
-      StoragePath newStoragePath = DefaultStoragePath.parse(pathList);
-      storage.move(storage, oldStoragePath, newStoragePath);
+      model.moveObject(oldPMLite.get(), newPMLite.get());
 
       ContentPayload newPremis = PremisV3Utils.fileToBinary(file);
       boolean asReference = false;
       boolean createIfNotExists = false;
-      storage.updateBinaryContent(newStoragePath, newPremis, asReference, createIfNotExists);
+      boolean snapshotCurrentVersion = false;
+      model.updateBinaryContent(newPMLite.get(), newPremis, asReference, createIfNotExists, snapshotCurrentVersion,
+        null);
     } catch (GenericException | IOException | ValidationException | NotFoundException | RequestNotValidException
       | AuthorizationDeniedException | AlreadyExistsException e) {
       LOGGER.error("Could not migrate preservation metadata file {}", binary.getStoragePath(), e);

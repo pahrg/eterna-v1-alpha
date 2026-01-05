@@ -13,28 +13,26 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrInputDocument;
-import org.roda.core.RodaCoreFactory;
 import org.roda.core.data.common.RodaConstants;
 import org.roda.core.data.exceptions.AuthorizationDeniedException;
 import org.roda.core.data.exceptions.GenericException;
 import org.roda.core.data.exceptions.NotFoundException;
 import org.roda.core.data.exceptions.RequestNotValidException;
+import org.roda.core.data.v2.disposal.metadata.DisposalConfirmationAIPMetadata;
+import org.roda.core.data.v2.disposal.metadata.DisposalHoldAIPMetadata;
+import org.roda.core.data.v2.disposal.metadata.DisposalScheduleAIPMetadata;
+import org.roda.core.data.v2.disposal.metadata.DisposalTransitiveHoldAIPMetadata;
+import org.roda.core.data.v2.disposal.schedule.DisposalActionCode;
+import org.roda.core.data.v2.disposal.schedule.DisposalSchedule;
+import org.roda.core.data.v2.disposal.schedule.RetentionPeriodCalculation;
+import org.roda.core.data.v2.disposal.schedule.RetentionPeriodIntervalCode;
 import org.roda.core.data.v2.ip.AIP;
 import org.roda.core.data.v2.ip.AIPDisposalScheduleAssociationType;
 import org.roda.core.data.v2.ip.IndexedAIP;
 import org.roda.core.data.v2.ip.Representation;
-import org.roda.core.data.v2.ip.disposal.DisposalActionCode;
-import org.roda.core.data.v2.ip.disposal.DisposalSchedule;
-import org.roda.core.data.v2.ip.disposal.RetentionPeriodCalculation;
-import org.roda.core.data.v2.ip.disposal.RetentionPeriodIntervalCode;
-import org.roda.core.data.v2.ip.disposal.aipMetadata.DisposalConfirmationAIPMetadata;
-import org.roda.core.data.v2.ip.disposal.aipMetadata.DisposalHoldAIPMetadata;
-import org.roda.core.data.v2.ip.disposal.aipMetadata.DisposalScheduleAIPMetadata;
-import org.roda.core.data.v2.ip.disposal.aipMetadata.DisposalTransitiveHoldAIPMetadata;
 import org.roda.core.data.v2.ip.metadata.DescriptiveMetadata;
 import org.roda.core.index.IndexingAdditionalInfo;
 import org.roda.core.index.IndexingAdditionalInfo.Flags;
@@ -44,8 +42,6 @@ import org.roda.core.index.schema.Field;
 import org.roda.core.index.schema.SolrCollection;
 import org.roda.core.index.utils.SolrUtils;
 import org.roda.core.model.ModelService;
-import org.roda.core.storage.Directory;
-import org.roda.core.storage.StorageService;
 
 public class AIPCollection extends AbstractSolrCollection<IndexedAIP, AIP> {
 
@@ -145,10 +141,10 @@ public class AIPCollection extends AbstractSolrCollection<IndexedAIP, AIP> {
   }
 
   @Override
-  public SolrInputDocument toSolrDocument(AIP aip, IndexingAdditionalInfo info)
+  public SolrInputDocument toSolrDocument(ModelService model, AIP aip, IndexingAdditionalInfo info)
     throws RequestNotValidException, GenericException, NotFoundException, AuthorizationDeniedException {
     boolean safemode = info.getFlags().contains(Flags.SAFE_MODE_ON);
-    SolrInputDocument doc = super.toSolrDocument(aip, info);
+    SolrInputDocument doc = super.toSolrDocument(model, aip, info);
 
     doc.addField(RodaConstants.AIP_PARENT_ID, aip.getParentId());
     doc.addField(RodaConstants.AIP_TYPE, aip.getType());
@@ -167,14 +163,13 @@ public class AIPCollection extends AbstractSolrCollection<IndexedAIP, AIP> {
 
       if (aip.getDisposal().getHolds() != null) {
         List<DisposalHoldAIPMetadata> holds = aip.getDisposal().getHolds();
-        doc.addField(RodaConstants.AIP_DISPOSAL_HOLDS_ID,
-          holds.stream().map(DisposalHoldAIPMetadata::getId).collect(Collectors.toList()));
+        doc.addField(RodaConstants.AIP_DISPOSAL_HOLDS_ID, holds.stream().map(DisposalHoldAIPMetadata::getId).toList());
       }
 
       if (aip.getDisposal().getTransitiveHolds() != null) {
         List<DisposalTransitiveHoldAIPMetadata> transitiveHolds = aip.getDisposal().getTransitiveHolds();
         doc.addField(RodaConstants.AIP_TRANSITIVE_DISPOSAL_HOLDS_ID,
-          transitiveHolds.stream().map(DisposalTransitiveHoldAIPMetadata::getId).collect(Collectors.toList()));
+          transitiveHolds.stream().map(DisposalTransitiveHoldAIPMetadata::getId).toList());
       }
 
       if (aip.getDisposal().getConfirmation() != null) {
@@ -192,12 +187,11 @@ public class AIPCollection extends AbstractSolrCollection<IndexedAIP, AIP> {
     doc.addField(RodaConstants.INGEST_UPDATE_JOB_IDS, aip.getIngestUpdateJobIds());
 
     List<String> descriptiveMetadataIds = aip.getDescriptiveMetadata().stream().map(DescriptiveMetadata::getId)
-      .collect(Collectors.toList());
+      .toList();
 
     doc.addField(RodaConstants.AIP_DESCRIPTIVE_METADATA_ID, descriptiveMetadataIds);
 
-    List<String> representationIds = aip.getRepresentations().stream().map(Representation::getId)
-      .collect(Collectors.toList());
+    List<String> representationIds = aip.getRepresentations().stream().map(Representation::getId).toList();
     doc.addField(RodaConstants.AIP_REPRESENTATION_ID, representationIds);
     doc.addField(RodaConstants.AIP_HAS_REPRESENTATIONS, !representationIds.isEmpty());
 
@@ -205,35 +199,28 @@ public class AIPCollection extends AbstractSolrCollection<IndexedAIP, AIP> {
     doc.addField(RodaConstants.AIP_HAS_SHALLOW_FILES,
       aip.getHasShallowFiles() != null ? aip.getHasShallowFiles() : false);
 
-    ModelService model = RodaCoreFactory.getModelService();
     if (!safemode) {
-      SolrUtils.indexDescriptiveMetadataFields(RodaCoreFactory.getModelService(), aip.getId(), null,
-        aip.getDescriptiveMetadata(), doc);
+      SolrUtils.indexDescriptiveMetadataFields(model, aip.getId(), null, aip.getDescriptiveMetadata(), doc);
     }
 
     // Calculate number of documentation and schema files
-    StorageService storage = RodaCoreFactory.getStorageService();
-
     Long numberOfSubmissionFiles;
     try {
-      Directory submissionDirectory = model.getSubmissionDirectory(aip.getId());
-      numberOfSubmissionFiles = storage.countResourcesUnderDirectory(submissionDirectory.getStoragePath(), true);
+      numberOfSubmissionFiles = model.countSubmissionFiles(aip.getId());
     } catch (NotFoundException e) {
       numberOfSubmissionFiles = 0L;
     }
 
     Long numberOfDocumentationFiles;
     try {
-      Directory documentationDirectory = model.getDocumentationDirectory(aip.getId());
-      numberOfDocumentationFiles = storage.countResourcesUnderDirectory(documentationDirectory.getStoragePath(), true);
+      numberOfDocumentationFiles = model.countDocumentationFiles(aip.getId(), null);
     } catch (NotFoundException e) {
       numberOfDocumentationFiles = 0L;
     }
 
     Long numberOfSchemaFiles;
     try {
-      Directory schemasDirectory = model.getSchemasDirectory(aip.getId());
-      numberOfSchemaFiles = storage.countResourcesUnderDirectory(schemasDirectory.getStoragePath(), true);
+      numberOfSchemaFiles = model.countSchemaFiles(aip.getId(), null);
     } catch (NotFoundException e) {
       numberOfSchemaFiles = 0L;
     }
@@ -287,9 +274,8 @@ public class AIPCollection extends AbstractSolrCollection<IndexedAIP, AIP> {
 
     @Override
     public List<Flags> getFlags() {
-      return Arrays.asList(safeMode ? Flags.SAFE_MODE_ON : Flags.SAFE_MODE_OFF);
+      return List.of(safeMode ? Flags.SAFE_MODE_ON : Flags.SAFE_MODE_OFF);
     }
-
   }
 
   @Override
@@ -320,8 +306,8 @@ public class AIPCollection extends AbstractSolrCollection<IndexedAIP, AIP> {
     final Boolean hasShallowFiles = SolrUtils.objectToBoolean(doc.get(RodaConstants.AIP_HAS_SHALLOW_FILES),
       Boolean.FALSE);
 
-    final String title = titles.isEmpty() ? null : titles.get(0);
-    final String description = descriptions.isEmpty() ? null : descriptions.get(0);
+    final String title = titles.isEmpty() ? null : titles.getFirst();
+    final String description = descriptions.isEmpty() ? null : descriptions.getFirst();
 
     final Date createdOn = SolrUtils.objectToDate(doc.get(RodaConstants.AIP_CREATED_ON));
     final String createdBy = SolrUtils.objectToString(doc.get(RodaConstants.AIP_CREATED_BY), "");
@@ -358,7 +344,7 @@ public class AIPCollection extends AbstractSolrCollection<IndexedAIP, AIP> {
     if (ghost) {
       level = RodaConstants.AIP_GHOST;
     } else {
-      level = levels.isEmpty() ? null : levels.get(0);
+      level = levels.isEmpty() ? null : levels.getFirst();
     }
 
     ret.setType(type);
@@ -393,9 +379,8 @@ public class AIPCollection extends AbstractSolrCollection<IndexedAIP, AIP> {
     ret.setOverdueDate(overdueDate);
     ret.setOnHold(disposalHoldStatus);
     ret.setDisposalConfirmationId(disposalConfirmationId);
-    ret.setDisposalScheduleAssociationType(aipDisposalScheduleAssociationType);
+    ret.setScheduleAssociationType(aipDisposalScheduleAssociationType);
 
     return ret;
   }
-
 }

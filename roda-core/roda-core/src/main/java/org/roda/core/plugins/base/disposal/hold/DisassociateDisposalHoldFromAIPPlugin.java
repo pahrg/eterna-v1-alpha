@@ -13,7 +13,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.roda.core.data.common.RodaConstants;
 import org.roda.core.data.exceptions.AlreadyExistsException;
 import org.roda.core.data.exceptions.AuthorizationDeniedException;
@@ -23,11 +23,11 @@ import org.roda.core.data.exceptions.InvalidParameterException;
 import org.roda.core.data.exceptions.NotFoundException;
 import org.roda.core.data.exceptions.RequestNotValidException;
 import org.roda.core.data.v2.LiteOptionalWithCause;
+import org.roda.core.data.v2.common.Pair;
+import org.roda.core.data.v2.disposal.hold.DisposalHold;
+import org.roda.core.data.v2.disposal.hold.DisposalHoldState;
 import org.roda.core.data.v2.ip.AIP;
 import org.roda.core.data.v2.ip.IndexedAIP;
-import org.roda.core.data.v2.ip.disposal.DisposalHold;
-import org.roda.core.data.v2.ip.disposal.DisposalHoldState;
-import org.roda.core.data.v2.ip.disposal.aipMetadata.DisposalHoldAIPMetadata;
 import org.roda.core.data.v2.jobs.Job;
 import org.roda.core.data.v2.jobs.PluginParameter;
 import org.roda.core.data.v2.jobs.PluginState;
@@ -40,10 +40,9 @@ import org.roda.core.model.ModelService;
 import org.roda.core.plugins.AbstractPlugin;
 import org.roda.core.plugins.Plugin;
 import org.roda.core.plugins.PluginException;
+import org.roda.core.plugins.PluginHelper;
 import org.roda.core.plugins.RODAObjectsProcessingLogic;
 import org.roda.core.plugins.orchestrate.JobPluginInfo;
-import org.roda.core.plugins.PluginHelper;
-import org.roda.core.storage.StorageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,21 +51,38 @@ import org.slf4j.LoggerFactory;
  */
 public class DisassociateDisposalHoldFromAIPPlugin extends AbstractPlugin<AIP> {
   private static final Logger LOGGER = LoggerFactory.getLogger(DisassociateDisposalHoldFromAIPPlugin.class);
-
-  private String disposalHoldId;
-  private boolean clearAll;
-
   private static final Map<String, PluginParameter> pluginParameters = new HashMap<>();
 
   static {
     pluginParameters.put(RodaConstants.PLUGIN_PARAMS_DISPOSAL_HOLD_ID,
-      new PluginParameter(RodaConstants.PLUGIN_PARAMS_DISPOSAL_HOLD_ID, "Disposal hold id",
-        PluginParameter.PluginParameterType.STRING, "", true, false, "Disposal hold identifier"));
+      PluginParameter
+        .getBuilder(RodaConstants.PLUGIN_PARAMS_DISPOSAL_HOLD_ID, "Disposal hold id",
+          PluginParameter.PluginParameterType.STRING)
+        .isMandatory(true).isReadOnly(false).withDescription("Disposal hold identifier").build());
 
     pluginParameters.put(RodaConstants.PLUGIN_PARAMS_DISPOSAL_HOLD_DISASSOCIATE_ALL,
-      new PluginParameter(RodaConstants.PLUGIN_PARAMS_DISPOSAL_HOLD_DISASSOCIATE_ALL, "Disassociate all holds",
-        PluginParameter.PluginParameterType.BOOLEAN, "false", true, false,
-        "Disassociate all disposal holds associated to AIP"));
+      PluginParameter
+        .getBuilder(RodaConstants.PLUGIN_PARAMS_DISPOSAL_HOLD_DISASSOCIATE_ALL, "Disassociate all holds",
+          PluginParameter.PluginParameterType.BOOLEAN)
+        .withDefaultValue("false").isMandatory(true).isReadOnly(false)
+        .withDescription("Disassociate all disposal holds associated to AIP").build());
+
+    pluginParameters.put(RodaConstants.PLUGIN_PARAMS_DETAILS,
+      PluginParameter
+        .getBuilder(RodaConstants.PLUGIN_PARAMS_DETAILS, "Details", PluginParameter.PluginParameterType.STRING)
+        .isMandatory(false).withDescription("Details that will be used when creating event").build());
+  }
+
+  private String disposalHoldId;
+  private boolean clearAll;
+  private String details;
+
+  public static String getStaticName() {
+    return "Disassociate disposal hold from AIP";
+  }
+
+  public static String getStaticDescription() {
+    return "";
   }
 
   @Override
@@ -74,6 +90,7 @@ public class DisassociateDisposalHoldFromAIPPlugin extends AbstractPlugin<AIP> {
     ArrayList<PluginParameter> parameters = new ArrayList<>();
     parameters.add(pluginParameters.get(RodaConstants.PLUGIN_PARAMS_DISPOSAL_HOLD_ID));
     parameters.add(pluginParameters.get(RodaConstants.PLUGIN_PARAMS_DISPOSAL_HOLD_DISASSOCIATE_ALL));
+    parameters.add(pluginParameters.get(RodaConstants.PLUGIN_PARAMS_DETAILS));
     return parameters;
   }
 
@@ -88,6 +105,10 @@ public class DisassociateDisposalHoldFromAIPPlugin extends AbstractPlugin<AIP> {
     if (parameters.containsKey(RodaConstants.PLUGIN_PARAMS_DISPOSAL_HOLD_DISASSOCIATE_ALL)) {
       clearAll = Boolean.parseBoolean(parameters.get(RodaConstants.PLUGIN_PARAMS_DISPOSAL_HOLD_DISASSOCIATE_ALL));
     }
+
+    if (parameters.containsKey(RodaConstants.PLUGIN_PARAMS_DETAILS)) {
+      details = parameters.get(RodaConstants.PLUGIN_PARAMS_DETAILS);
+    }
   }
 
   @Override
@@ -95,17 +116,9 @@ public class DisassociateDisposalHoldFromAIPPlugin extends AbstractPlugin<AIP> {
     return "1.0";
   }
 
-  public static String getStaticName() {
-    return "Disassociate disposal hold from AIP";
-  }
-
   @Override
   public String getName() {
     return getStaticName();
-  }
-
-  public static String getStaticDescription() {
-    return "";
   }
 
   @Override
@@ -155,7 +168,7 @@ public class DisassociateDisposalHoldFromAIPPlugin extends AbstractPlugin<AIP> {
 
   @Override
   public void init() throws PluginException {
-
+    // do nothing
   }
 
   @Override
@@ -164,25 +177,26 @@ public class DisassociateDisposalHoldFromAIPPlugin extends AbstractPlugin<AIP> {
   }
 
   @Override
-  public Report beforeAllExecute(IndexService index, ModelService model, StorageService storage)
-    throws PluginException {
+  public Report beforeAllExecute(IndexService index, ModelService model) throws PluginException {
     return new Report();
   }
 
   @Override
-  public Report execute(IndexService index, ModelService model, StorageService storage,
-    List<LiteOptionalWithCause> liteList) throws PluginException {
+  public Report execute(IndexService index, ModelService model, List<LiteOptionalWithCause> liteList)
+    throws PluginException {
     return PluginHelper.processObjects(this, new RODAObjectsProcessingLogic<AIP>() {
       @Override
-      public void process(IndexService index, ModelService model, StorageService storage, Report report, Job cachedJob,
+      public void process(IndexService index, ModelService model, Report report, Job cachedJob,
         JobPluginInfo jobPluginInfo, Plugin<AIP> plugin, List<AIP> objects) {
         processAIP(index, model, report, cachedJob, jobPluginInfo, objects);
       }
-    }, index, model, storage, liteList);
+    }, index, model, liteList);
   }
 
   private void processAIP(IndexService index, ModelService model, Report report, Job cachedJob,
     JobPluginInfo jobPluginInfo, List<AIP> aips) {
+    report.addPluginDetails(details);
+
     for (AIP aip : aips) {
       String outcomeText;
       PluginState state = PluginState.SUCCESS;
@@ -194,12 +208,12 @@ public class DisassociateDisposalHoldFromAIPPlugin extends AbstractPlugin<AIP> {
         try {
           // lift disposal holds
           if (aip.getHolds() != null && !aip.getHolds().isEmpty()) {
-            List<DisposalHoldAIPMetadata> holds = new ArrayList<>(aip.getHolds());
             outcomeText = "Cannot found any active direct disposal hold for disassociate from AIP : " + aip.getId();
             boolean hasAtLeastOneDirectHold = false;
             for (DisposalHold hold : model.retrieveDirectActiveDisposalHolds(aip.getId())) {
               hasAtLeastOneDirectHold = true;
-              outcomeText = DisposalHoldPluginUtils.disassociateDisposalHoldFromAIP(hold.getId(), aip, reportItem);
+              outcomeText = DisposalHoldPluginUtils.disassociateDisposalHoldFromAIP(hold.getId(), aip, reportItem)
+                .getSecond();
               processTransitiveAIP(model, index, cachedJob, aip, hold.getId(), jobPluginInfo, report);
             }
 
@@ -209,7 +223,7 @@ public class DisassociateDisposalHoldFromAIPPlugin extends AbstractPlugin<AIP> {
               reportItem.setPluginState(state);
             } else {
               state = PluginState.SKIPPED;
-              LOGGER.info(outcomeText + " aip : " + aip.getId());
+              LOGGER.info("{} aip : {}", outcomeText, aip.getId());
               jobPluginInfo.incrementObjectsProcessed(state);
               reportItem.setPluginState(state).setPluginDetails(outcomeText);
             }
@@ -217,7 +231,7 @@ public class DisassociateDisposalHoldFromAIPPlugin extends AbstractPlugin<AIP> {
           } else {
             state = PluginState.SKIPPED;
             outcomeText = "There are no direct Disposal hold on this AIP";
-            LOGGER.info(outcomeText + " aip : " + aip.getId());
+            LOGGER.info("{} aip : {}", outcomeText, aip.getId());
             jobPluginInfo.incrementObjectsProcessed(state);
             reportItem.setPluginState(state).setPluginDetails(outcomeText + " aip : " + aip.getId());
           }
@@ -232,10 +246,17 @@ public class DisassociateDisposalHoldFromAIPPlugin extends AbstractPlugin<AIP> {
         }
       } else {
         try {
-          outcomeText = DisposalHoldPluginUtils.liftDisposalHoldFromAIP(aip, disposalHoldId, reportItem);
+          Pair<Boolean, String> outcome = DisposalHoldPluginUtils.disassociateDisposalHoldFromAIP(disposalHoldId, aip,
+            reportItem);
+          boolean lifted = outcome.getFirst();
+          outcomeText = outcome.getSecond();
           processTransitiveAIP(model, index, cachedJob, aip, disposalHoldId, jobPluginInfo, report);
           model.updateAIP(aip, cachedJob.getUsername());
-          jobPluginInfo.incrementObjectsProcessedWithSuccess();
+          if (lifted) {
+            jobPluginInfo.incrementObjectsProcessedWithSuccess();
+          } else {
+            jobPluginInfo.incrementObjectsProcessedWithSkipped();
+          }
           reportItem.setPluginState(state);
         } catch (GenericException | NotFoundException | RequestNotValidException | AuthorizationDeniedException e) {
           outcomeText = "Error lifting disposal hold" + disposalHoldId + " from AIP " + aip.getId();
@@ -257,17 +278,6 @@ public class DisassociateDisposalHoldFromAIPPlugin extends AbstractPlugin<AIP> {
       } catch (ValidationException | RequestNotValidException | NotFoundException | GenericException
         | AuthorizationDeniedException | AlreadyExistsException e) {
         LOGGER.error("Error creating event: {}", e.getMessage(), e);
-      }
-    }
-
-    if (StringUtils.isNotBlank(disposalHoldId)) {
-      try {
-        DisposalHold disposalHold = model.retrieveDisposalHold(disposalHoldId);
-        disposalHold.setState(DisposalHoldState.LIFTED);
-        model.updateDisposalHold(disposalHold, cachedJob.getUsername());
-      } catch (RequestNotValidException | NotFoundException | GenericException | AuthorizationDeniedException
-        | IllegalOperationException e) {
-        LOGGER.error("Unable to update disposal hold {}: {}", disposalHoldId, e.getMessage(), e);
       }
     }
   }
@@ -315,7 +325,7 @@ public class DisassociateDisposalHoldFromAIPPlugin extends AbstractPlugin<AIP> {
   }
 
   @Override
-  public Report afterAllExecute(IndexService index, ModelService model, StorageService storage) throws PluginException {
+  public Report afterAllExecute(IndexService index, ModelService model) throws PluginException {
     // do nothing
     return null;
   }

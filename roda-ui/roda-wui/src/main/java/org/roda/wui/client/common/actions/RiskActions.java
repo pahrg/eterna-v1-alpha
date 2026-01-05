@@ -13,24 +13,21 @@ import java.util.List;
 import java.util.Set;
 
 import org.roda.core.data.common.RodaConstants;
+import org.roda.core.data.utils.SelectedItemsUtils;
 import org.roda.core.data.v2.index.select.SelectedItems;
-import org.roda.core.data.v2.jobs.Job;
 import org.roda.core.data.v2.risks.IndexedRisk;
-import org.roda.wui.client.browse.BrowserService;
 import org.roda.wui.client.common.LastSelectedItemsSingleton;
-import org.roda.wui.client.common.actions.callbacks.ActionAsyncCallback;
 import org.roda.wui.client.common.actions.callbacks.ActionNoAsyncCallback;
 import org.roda.wui.client.common.actions.model.ActionableBundle;
 import org.roda.wui.client.common.actions.model.ActionableGroup;
 import org.roda.wui.client.common.dialogs.Dialogs;
 import org.roda.wui.client.common.lists.utils.ClientSelectedItemsUtils;
-import org.roda.wui.client.common.utils.AsyncCallbackUtils;
 import org.roda.wui.client.ingest.process.ShowJob;
 import org.roda.wui.client.planning.CreateRisk;
 import org.roda.wui.client.planning.EditRisk;
 import org.roda.wui.client.planning.RiskHistory;
 import org.roda.wui.client.process.CreateSelectedJob;
-import org.roda.wui.client.process.InternalProcess;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.tools.HistoryUtils;
 import org.roda.wui.common.client.widgets.Toast;
 
@@ -97,19 +94,43 @@ public class RiskActions extends AbstractActionable<IndexedRisk> {
   }
 
   @Override
-  public boolean canAct(Action<IndexedRisk> action) {
-    return hasPermissions(action) && POSSIBLE_ACTIONS_WITHOUT_RISK.contains(action);
+  public CanActResult userCanAct(Action<IndexedRisk> action) {
+    return new CanActResult(hasPermissions(action), CanActResult.Reason.USER, messages.reasonUserLacksPermission());
   }
 
   @Override
-  public boolean canAct(Action<IndexedRisk> action, IndexedRisk object) {
-    return hasPermissions(action)
-      && (POSSIBLE_ACTIONS_ON_SINGLE_RISK.contains(action) || (action.equals(IndexedRiskAction.HISTORY) && hasHistory));
+  public CanActResult contextCanAct(Action<IndexedRisk> action) {
+    return new CanActResult(POSSIBLE_ACTIONS_WITHOUT_RISK.contains(action), CanActResult.Reason.CONTEXT,
+      messages.reasonNoObjectSelected());
   }
 
   @Override
-  public boolean canAct(Action<IndexedRisk> action, SelectedItems<IndexedRisk> objects) {
-    return hasPermissions(action) && POSSIBLE_ACTIONS_ON_MULTIPLE_RISKS.contains(action);
+  public CanActResult userCanAct(Action<IndexedRisk> action, IndexedRisk object) {
+    return new CanActResult(hasPermissions(action), CanActResult.Reason.USER, messages.reasonUserLacksPermission());
+
+  }
+
+  @Override
+  public CanActResult contextCanAct(Action<IndexedRisk> action, IndexedRisk object) {
+    if (action.equals(IndexedRiskAction.HISTORY)) {
+      return new CanActResult(hasHistory, CanActResult.Reason.CONTEXT, messages.reasonRiskHasNoHistory());
+    } else {
+      return new CanActResult(
+        POSSIBLE_ACTIONS_ON_SINGLE_RISK.contains(action) || (action.equals(IndexedRiskAction.HISTORY) && hasHistory),
+        CanActResult.Reason.CONTEXT, messages.reasonCantActOnSingleObject());
+    }
+  }
+
+  @Override
+  public CanActResult userCanAct(Action<IndexedRisk> action, SelectedItems<IndexedRisk> objects) {
+    return new CanActResult(hasPermissions(action), CanActResult.Reason.USER, messages.reasonUserLacksPermission());
+
+  }
+
+  @Override
+  public CanActResult contextCanAct(Action<IndexedRisk> action, SelectedItems<IndexedRisk> objects) {
+    return new CanActResult(POSSIBLE_ACTIONS_ON_MULTIPLE_RISKS.contains(action), CanActResult.Reason.CONTEXT,
+      messages.reasonCantActOnMultipleObjects());
   }
 
   @Override
@@ -151,20 +172,14 @@ public class RiskActions extends AbstractActionable<IndexedRisk> {
   }
 
   private void refresh(AsyncCallback<ActionImpact> callback) {
-    BrowserService.Util.getInstance().updateRiskCounters(new ActionAsyncCallback<Void>(callback) {
+    Services service = new Services("Refresh risks", "refresh");
 
-      @Override
-      public void onFailure(Throwable caught) {
-        if (caught != null) {
-          AsyncCallbackUtils.defaultFailureTreatment(caught);
-        }
-        doActionCallbackUpdated();
-      }
-
-      @Override
-      public void onSuccess(Void result) {
+    service.riskResource(s -> s.refreshRisk()).whenComplete((unused, throwable) -> {
+      if (throwable != null) {
+        callback.onFailure(throwable);
+      } else {
         Toast.showInfo(messages.dialogRefresh(), messages.riskRefreshDone());
-        doActionCallbackUpdated();
+        callback.onSuccess(ActionImpact.UPDATED);
       }
     });
   }
@@ -184,6 +199,7 @@ public class RiskActions extends AbstractActionable<IndexedRisk> {
 
   private void remove(SelectedItems<IndexedRisk> objects, AsyncCallback<ActionImpact> callback) {
     ClientSelectedItemsUtils.size(IndexedRisk.class, objects, new ActionNoAsyncCallback<Long>(callback) {
+      Services service = new Services("Remove risks", "remove");
 
       @Override
       public void onSuccess(final Long size) {
@@ -194,39 +210,24 @@ public class RiskActions extends AbstractActionable<IndexedRisk> {
             @Override
             public void onSuccess(Boolean confirmed) {
               if (confirmed) {
-                BrowserService.Util.getInstance().deleteRisk(objects, new ActionAsyncCallback<Job>(callback) {
+                service.riskResource(s -> s.deleteRisk(SelectedItemsUtils.convertToRESTRequest(objects)))
+                  .whenComplete((value, error) -> {
+                    if (value != null) {
+                      doActionCallbackNone();
+                      HistoryUtils.newHistory(ShowJob.RESOLVER, value.getId());
+                    } else if (error != null) {
 
-                  @Override
-                  public void onFailure(Throwable caught) {
-                    callback.onFailure(caught);
-                    HistoryUtils.newHistory(InternalProcess.RESOLVER);
-                  }
+                      Timer timer = new Timer() {
+                        @Override
+                        public void run() {
+                          Toast.showInfo(messages.riskRemoveSuccessTitle(), messages.riskRemoveSuccessMessage(size));
+                          doActionCallbackDestroyed();
+                        }
+                      };
 
-                  @Override
-                  public void onSuccess(Job result) {
-                    Dialogs.showJobRedirectDialog(messages.removeJobCreatedMessage(), new AsyncCallback<Void>() {
-
-                      @Override
-                      public void onFailure(Throwable caught) {
-                        Timer timer = new Timer() {
-                          @Override
-                          public void run() {
-                            Toast.showInfo(messages.riskRemoveSuccessTitle(), messages.riskRemoveSuccessMessage(size));
-                            doActionCallbackDestroyed();
-                          }
-                        };
-
-                        timer.schedule(RodaConstants.ACTION_TIMEOUT);
-                      }
-
-                      @Override
-                      public void onSuccess(final Void nothing) {
-                        doActionCallbackNone();
-                        HistoryUtils.newHistory(ShowJob.RESOLVER, result.getId());
-                      }
-                    });
-                  }
-                });
+                      timer.schedule(RodaConstants.ACTION_TIMEOUT);
+                    }
+                  });
               } else {
                 doActionCallbackNone();
               }
@@ -254,10 +255,10 @@ public class RiskActions extends AbstractActionable<IndexedRisk> {
     ActionableGroup<IndexedRisk> managementGroup = new ActionableGroup<>(messages.sidebarActionsTitle());
     managementGroup.addButton(messages.riskHistoryButton(), IndexedRiskAction.HISTORY, ActionImpact.NONE,
       "btn-history");
-    managementGroup.addButton(messages.refreshButton(), IndexedRiskAction.REFRESH, ActionImpact.UPDATED, "btn-refresh");
     managementGroup.addButton(messages.newButton(), IndexedRiskAction.NEW, ActionImpact.UPDATED, "btn-plus-circle");
     managementGroup.addButton(messages.editButton(), IndexedRiskAction.EDIT, ActionImpact.UPDATED, "btn-edit");
     managementGroup.addButton(messages.removeButton(), IndexedRiskAction.REMOVE, ActionImpact.DESTROYED, "btn-ban");
+    managementGroup.addButton(messages.refreshButton(), IndexedRiskAction.REFRESH, ActionImpact.UPDATED, "btn-refresh");
 
     // PRESERVATION
     ActionableGroup<IndexedRisk> preservationGroup = new ActionableGroup<>(messages.preservationTitle());

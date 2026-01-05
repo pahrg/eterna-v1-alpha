@@ -11,9 +11,9 @@ import java.util.Date;
 import java.util.List;
 
 import org.roda.core.data.v2.accessKey.AccessKeyStatus;
+import org.roda.core.data.v2.disposal.confirmation.DisposalConfirmationState;
 import org.roda.core.data.v2.ip.AIPState;
 import org.roda.core.data.v2.ip.Permissions.PermissionType;
-import org.roda.core.data.v2.ip.disposal.DisposalConfirmationState;
 import org.roda.core.data.v2.jobs.CertificateInfo;
 import org.roda.core.data.v2.jobs.JobParallelism;
 import org.roda.core.data.v2.jobs.JobPriority;
@@ -84,6 +84,8 @@ public interface ClientMessages extends Messages {
 
   String historyDescriptiveMetadataTitle();
 
+  String catalogueTransferredResourceTitle();
+
   String catalogueItemTitle();
 
   String catalogueRepresentationTitle();
@@ -138,6 +140,10 @@ public interface ClientMessages extends Messages {
 
   String createFolderAlreadyExistsMessage();
 
+  String renameFolderAlreadyExistsTitle();
+
+  String renameFolderAlreadyExistsMessage();
+
   String outcomeDetailTitle();
 
   String outcomeDetailPlaceholder();
@@ -170,6 +176,10 @@ public interface ClientMessages extends Messages {
   SafeHtml descriptiveMetadataTransformToHTMLError();
 
   SafeHtml preservationEventDetailsTransformToHTMLError();
+
+  SafeHtml aipStillIngestingError();
+
+  String aipNotInStorageError();
 
   String notFoundError();
 
@@ -467,7 +477,6 @@ public interface ClientMessages extends Messages {
 
   String closeButton();
 
-
   String copyAndCloseButton();
 
   String selectButton();
@@ -519,6 +528,7 @@ public interface ClientMessages extends Messages {
   String viewTechnicalMetadata();
 
   String showTechnicalMetadata();
+
   String viewRepresentationInfoCreatingApplicationName();
 
   String viewRepresentationInfoCreatingApplicationVersion();
@@ -668,6 +678,28 @@ public interface ClientMessages extends Messages {
 
   String aipType();
 
+  String descriptiveMetadataTab();
+
+  String preservationEventsTab();
+
+  String auditLogsTab();
+
+  String risksTab();
+
+  String filesTab();
+
+  String dipsTab();
+
+  String disposalTab();
+
+  String permissionsTab();
+
+  String detailsTab();
+
+  String viewTab();
+
+  String technicalTab();
+
   /************* Search ****************/
   String searchDropdownLabels(@Select String objectClass);
 
@@ -743,9 +775,15 @@ public interface ClientMessages extends Messages {
 
   String representationFiles();
 
+  String representationFolders();
+
   String objectCreatedDate();
 
+  String objectCreatedDateShort();
+
   String objectLastModified();
+
+  String objectLastModifiedShort();
 
   /************* Preservation Event List ****************/
 
@@ -918,6 +956,14 @@ public interface ClientMessages extends Messages {
 
   String riskRemoveConfirmDialogTitle();
 
+  String riskHistoryRemoveConfirmDialogTitle();
+
+  String riskHistoryRemoveConfirmDialogMessage();
+
+  String riskHistoryRevertConfirmDialogTitle();
+
+  String riskHistoryRevertConfirmDialogMessage();
+
   String riskRemoveSelectedConfirmDialogMessage(Long size);
 
   String riskRemoveConfirmDialogCancel();
@@ -947,6 +993,42 @@ public interface ClientMessages extends Messages {
   String riskIncidenceRemoveConfirmDialogCancel();
 
   String riskIncidenceRemoveConfirmDialogOk();
+
+  String riskCreatedTitle();
+
+  String riskCreatedMessage();
+
+  /************* Details Tabs ****************/
+
+  String detailsAIP();
+
+  String detailsRepresentation();
+
+  String detailsFile();
+
+  String detailsIdentifier();
+
+  String detailsLevel();
+
+  String detailsType();
+
+  String detailsState();
+
+  String detailsCreatedOn();
+
+  String detailsCreatedBy();
+
+  String detailsModifiedOn();
+
+  String detailsModifiedBy();
+
+  String detailsIngest();
+
+  String sipIdentifier();
+
+  String sipDeleted();
+
+  String ingestIdentifier();
 
   /************* RepresentationInformation register ****************/
 
@@ -1243,6 +1325,14 @@ public interface ClientMessages extends Messages {
   String metadataFilename();
 
   /*** Browse ****/
+  String searchWithin();
+
+  String searchDescendants();
+
+  String searchPackage();
+
+  String manage();
+
   String appraisalTitle();
 
   String appraisalAccept();
@@ -1255,9 +1345,13 @@ public interface ClientMessages extends Messages {
 
   String newSublevel();
 
+  String sublevels();
+
   String moveArchivalPackage();
 
   String archivalPackagePermissions();
+
+  String editArchivalPackagePermissions();
 
   String archivalPackagePermissionsTitle();
 
@@ -1268,6 +1362,8 @@ public interface ClientMessages extends Messages {
   String preservationTitle();
 
   String newProcessPreservation();
+
+  String runAction();
 
   String preservationEvents();
 
@@ -1340,6 +1436,8 @@ public interface ClientMessages extends Messages {
   /***** Dissemination ****/
   String dissemination();
 
+  String disseminationFiles();
+
   /***** Dissemination File ****/
 
   String disseminationFile();
@@ -1384,6 +1482,8 @@ public interface ClientMessages extends Messages {
   /**** Activity log ****/
 
   String logEntryIdentifier();
+
+  String logEntryReason();
 
   String logEntryComponent();
 
@@ -1481,7 +1581,6 @@ public interface ClientMessages extends Messages {
 
   String casTitleText();
 
-
   // Login Dialog
 
   String loginDialogTitle();
@@ -1563,8 +1662,10 @@ public interface ClientMessages extends Messages {
   String editUserApply();
 
   String editUserAction();
+
   // Pre ingest panel
   String dropFolderInformationText();
+
   // User Data Panel
   String username();
 
@@ -1690,7 +1791,7 @@ public interface ClientMessages extends Messages {
   // Recover Login
   String recoverLoginTitle();
 
-  String recoverLoginUsernameOrEmail();
+  String recoverLoginEmail();
 
   String recoverLoginSubmit();
 
@@ -1707,6 +1808,8 @@ public interface ClientMessages extends Messages {
   // Reset Password
   String resetPasswordTitle();
 
+  String setPasswordTitle();
+
   String resetPasswordUsername();
 
   String resetPasswordToken();
@@ -1716,6 +1819,8 @@ public interface ClientMessages extends Messages {
   String resetPasswordRepeatPassword();
 
   String resetPasswordSubmit();
+
+  String setPasswordSubmit();
 
   String resetPasswordCancel();
 
@@ -1742,6 +1847,14 @@ public interface ClientMessages extends Messages {
   String editDescriptionMetadataWarning();
 
   String editDescriptiveMetadataFormLabel();
+
+  String descriptiveHistoryRemoveConfirmDialogTitle();
+
+  String descriptiveHistoryRemoveConfirmDialogMessage();
+
+  String descriptiveHistoryRevertConfirmDialogTitle();
+
+  String descriptiveHistoryRevertConfirmDialogMessage();
 
   /********************* SLIDER *************************/
 
@@ -1900,6 +2013,10 @@ public interface ClientMessages extends Messages {
   String dateRangeFieldFrom();
 
   String dateRangeFieldTo();
+
+  String genericRangeFieldFrom();
+
+  String genericRangeFieldTo();
 
   String inputStorageSizeList();
 
@@ -2093,9 +2210,15 @@ public interface ClientMessages extends Messages {
 
   String disposalHoldListAips();
 
+  String deleteDisposalSchedule(String title);
+
   String deleteConfirmationReportDialogTitle();
 
   String deleteConfirmationReportDialogMessage();
+
+  String destroyDisposalConfirmationContentDialogTitle();
+
+  String destroyDisposalConfirmationContentDialogMessage();
 
   String deleteConfirmationReportSuccessTitle();
 
@@ -2127,6 +2250,10 @@ public interface ClientMessages extends Messages {
   String clearDisposalHoldDialogTitle();
 
   String clearDisposalHoldDialogMessage(@PluralCount int size);
+
+  String liftDisposalHoldDialogTitle();
+
+  String liftDisposalHoldDialogMessage(@PluralCount int size);
 
   String disassociateDisposalHoldDialogTitle();
 
@@ -2189,6 +2316,8 @@ public interface ClientMessages extends Messages {
   String disposalPolicyHoldSummary();
 
   String disposalPolicyConfirmationSummary();
+
+  String disposalPolicyNoneSummary();
 
   String disposalPolicySummaryReady(String action);
 
@@ -2261,6 +2390,7 @@ public interface ClientMessages extends Messages {
   String searchPrefilterCreatedByJob(String jobName);
 
   String genericSearchWithPrefilterTitle();
+
   String saveSearchTitle();
 
   String saveSearchDescription();
@@ -2361,6 +2491,10 @@ public interface ClientMessages extends Messages {
 
   String removeLocalConfigurationMessage();
 
+  String successfullyUnsubscribedTitle();
+
+  String successfullyUnsubscribedMessage();
+
   String removeInstanceIdFromRepository();
 
   String removeInstanceIdFromRepositoryMessage();
@@ -2458,4 +2592,61 @@ public interface ClientMessages extends Messages {
 
   String conversionProfileDescription();
 
+  /* Audit logs */
+  String relatedAuditLogs();
+
+  /* Action permission reasons */
+  String reasonAffectedAIPUnderAppraisal();
+
+  String reasonAIPUnderAppraisal();
+
+  String reasonNoParentObject();
+
+  String reasonNoObjectSelected();
+
+  String reasonUserLacksPermission();
+
+  String reasonAIPProtectedByDisposalPolicy();
+
+  String reasonCantActOnSingleObject();
+
+  String reasonCantActOnMultipleObjects();
+
+  String reasonCantActOnFileDirectory();
+
+  String reasonCantActOnFileBitstream();
+
+  String reasonFilesAreOnSameRepresentation();
+
+  String reasonFilesAreOnDifferentRepresentations();
+
+  String reasonNoDisposalConfirmation();
+
+  String reasonDisposalConfirmationIsPending();
+
+  String reasonDisposalConfirmationIsApproved();
+
+  String reasonDisposalConfirmationIsRecovered();
+
+  String reasonDisposalConfirmationIsDeleted();
+
+  String reasonDisposalConfirmationExecutionFailed();
+
+  String reasonInvalidContext();
+
+  String reasonDisposalConfirmationHasRecords();
+
+  String reasonJobIsFinishedOrStopping();
+
+  String reasonJobNotPendingApproval();
+
+  String reasonJobDoesNotNeedAppraisal();
+
+  String reasonPluginIsNotIngest();
+
+  String reasonRiskHasNoHistory();
+
+  String reasonCantActOnUser();
+
+  String reasonCantActOnGroup();
 }

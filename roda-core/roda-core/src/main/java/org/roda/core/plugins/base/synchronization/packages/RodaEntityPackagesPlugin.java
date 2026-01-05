@@ -7,6 +7,7 @@
  */
 package org.roda.core.plugins.base.synchronization.packages;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
@@ -15,7 +16,12 @@ import java.util.List;
 import java.util.Map;
 
 import org.roda.core.data.common.RodaConstants;
-import org.roda.core.data.exceptions.*;
+import org.roda.core.data.exceptions.AlreadyExistsException;
+import org.roda.core.data.exceptions.AuthorizationDeniedException;
+import org.roda.core.data.exceptions.GenericException;
+import org.roda.core.data.exceptions.InvalidParameterException;
+import org.roda.core.data.exceptions.NotFoundException;
+import org.roda.core.data.exceptions.RequestNotValidException;
 import org.roda.core.data.utils.JsonUtils;
 import org.roda.core.data.v2.IsRODAObject;
 import org.roda.core.data.v2.LiteOptionalWithCause;
@@ -30,10 +36,9 @@ import org.roda.core.model.ModelService;
 import org.roda.core.plugins.AbstractPlugin;
 import org.roda.core.plugins.Plugin;
 import org.roda.core.plugins.PluginException;
+import org.roda.core.plugins.PluginHelper;
 import org.roda.core.plugins.RODAProcessingLogic;
 import org.roda.core.plugins.orchestrate.JobPluginInfo;
-import org.roda.core.plugins.PluginHelper;
-import org.roda.core.storage.StorageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -129,22 +134,22 @@ public abstract class RodaEntityPackagesPlugin<T extends IsRODAObject> extends A
   }
 
   @Override
-  public Report beforeAllExecute(IndexService index, ModelService model, StorageService storage)
+  public Report beforeAllExecute(IndexService index, ModelService model)
     throws PluginException {
     return null;
   }
 
   @Override
-  public Report execute(IndexService index, ModelService model, StorageService storage,
+  public Report execute(IndexService index, ModelService model,
     List<LiteOptionalWithCause> list) throws PluginException {
     return PluginHelper.processVoids(this, new RODAProcessingLogic<Void>() {
 
       @Override
-      public void process(IndexService index, ModelService model, StorageService storage, Report report, Job cachedJob,
+      public void process(IndexService index, ModelService model, Report report, Job cachedJob,
         JobPluginInfo jobPluginInfo, Plugin<Void> plugin) throws PluginException {
         processEntity(index, model, report, jobPluginInfo, cachedJob);
       }
-    }, index, model, storage);
+    }, index, model);
   }
 
   protected void processEntity(IndexService index, ModelService model, Report report, JobPluginInfo jobPluginInfo,
@@ -161,12 +166,11 @@ public abstract class RodaEntityPackagesPlugin<T extends IsRODAObject> extends A
         createPackage(index, model, indexResult);
       }
 
-      state = PluginState.SUCCESS;
       outcomeText = "Package created with " + totalCount + " item(s) of entity " + getEntity();
       jobPluginInfo.incrementObjectsProcessedWithSuccess();
     } catch (GenericException | AuthorizationDeniedException | RequestNotValidException | NotFoundException
-      | AlreadyExistsException e) {
-      LOGGER.error("Error on create package for entity " + getEntity(), e);
+      | AlreadyExistsException | IOException e) {
+      LOGGER.error("Error on create package for entity {}", getEntity(), e);
       state = PluginState.FAILURE;
       jobPluginInfo.incrementObjectsProcessedWithFailure();
       outcomeText = "Error on create package for entity " + getEntity();
@@ -192,10 +196,10 @@ public abstract class RodaEntityPackagesPlugin<T extends IsRODAObject> extends A
 
   protected abstract void createPackage(IndexService index, ModelService model, IterableIndexResult objectList)
     throws GenericException, AuthorizationDeniedException, RequestNotValidException, NotFoundException,
-    AlreadyExistsException;
+    AlreadyExistsException, IOException;
 
   @Override
-  public Report afterAllExecute(IndexService index, ModelService model, StorageService storage) throws PluginException {
+  public Report afterAllExecute(IndexService index, ModelService model) throws PluginException {
     return null;
   }
 

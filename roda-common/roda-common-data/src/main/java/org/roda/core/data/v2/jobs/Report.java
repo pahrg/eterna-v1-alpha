@@ -12,7 +12,6 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
-import org.roda.core.data.common.RodaConstants;
 import org.roda.core.data.v2.IsModelObject;
 import org.roda.core.data.v2.ip.AIPState;
 import org.roda.core.data.v2.ip.HasId;
@@ -20,12 +19,10 @@ import org.roda.core.data.v2.ip.HasInstanceID;
 import org.roda.core.data.v2.ip.SIPInformation;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
-@jakarta.xml.bind.annotation.XmlRootElement(name = RodaConstants.RODA_OBJECT_REPORT)
-@JsonInclude(JsonInclude.Include.ALWAYS)
-@JsonIgnoreProperties(ignoreUnknown = true)
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class Report implements IsModelObject, HasId, HasInstanceID {
   @Serial
   private static final long serialVersionUID = 4316398565678538090L;
@@ -61,6 +58,7 @@ public class Report implements IsModelObject, HasId, HasInstanceID {
   private boolean htmlPluginDetails = false;
 
   private String instanceId = null;
+  private String transactionId = null;
 
   @JsonIgnore
   private SIPInformation sipInformation = new SIPInformation();
@@ -105,6 +103,7 @@ public class Report implements IsModelObject, HasId, HasInstanceID {
     this.htmlPluginDetails = report.isHtmlPluginDetails();
     this.reports = new ArrayList<>();
     this.instanceId = report.getInstanceId();
+    this.transactionId = report.getTransactionId();
   }
 
   @JsonIgnore
@@ -351,14 +350,28 @@ public class Report implements IsModelObject, HasId, HasInstanceID {
     return this;
   }
 
-  public String getIngestType() { return ingestType; }
-  public void setIngestType(String status) { this.ingestType = status; }
+  public String getIngestType() {
+    return ingestType;
+  }
+
+  public void setIngestType(String status) {
+    this.ingestType = status;
+  }
+
   public String getInstanceId() {
     return instanceId;
   }
 
   public void setInstanceId(String instanceId) {
     this.instanceId = instanceId;
+  }
+
+  public String getTransactionId() {
+    return transactionId;
+  }
+
+  public void setTransactionId(String transactionId) {
+    this.transactionId = transactionId;
   }
 
   @JsonIgnore
@@ -441,6 +454,7 @@ public class Report implements IsModelObject, HasId, HasInstanceID {
     return this;
   }
 
+  @JsonProperty("lineSeparator")
   public void injectLineSeparator(String lineSeparator) {
     this.lineSeparator = lineSeparator;
   }
@@ -466,7 +480,8 @@ public class Report implements IsModelObject, HasId, HasInstanceID {
       + completionPercentage + ", stepsCompleted=" + stepsCompleted + ", totalSteps=" + totalSteps + ", plugin="
       + plugin + ", pluginName=" + pluginName + ", pluginVersion=" + pluginVersion + ", pluginState=" + pluginState
       + ", pluginIsMandatory=" + pluginIsMandatory + ", pluginDetails=" + pluginDetails + ", htmlPluginDetails="
-      + htmlPluginDetails + ", reports=" + reports + ", instanceId=" + instanceId + "]";
+      + htmlPluginDetails + ", reports=" + reports + ", instanceId=" + instanceId + ", transactionId=" + transactionId
+      + "]";
   }
 
 }

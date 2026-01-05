@@ -9,16 +9,15 @@ package org.roda.wui.client.planning;
 
 import java.util.List;
 
-import org.roda.core.data.common.RodaConstants;
 import org.roda.core.data.v2.risks.Risk;
-import org.roda.wui.client.browse.BrowserService;
 import org.roda.wui.client.common.UserLogin;
 import org.roda.wui.client.common.utils.AsyncCallbackUtils;
-import org.roda.wui.client.common.utils.JavascriptUtils;
 import org.roda.wui.client.management.MemberManagement;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.HistoryResolver;
 import org.roda.wui.common.client.tools.HistoryUtils;
 import org.roda.wui.common.client.tools.ListUtils;
+import org.roda.wui.common.client.widgets.Toast;
 
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.event.dom.client.ClickEvent;
@@ -30,7 +29,11 @@ import com.google.gwt.user.client.ui.Button;
 import com.google.gwt.user.client.ui.Composite;
 import com.google.gwt.user.client.ui.Widget;
 
+import config.i18n.client.ClientMessages;
+
 public class CreateRisk extends Composite {
+
+  private static final ClientMessages messages = GWT.create(ClientMessages.class);
 
   public static final HistoryResolver RESOLVER = new HistoryResolver() {
 
@@ -55,18 +58,11 @@ public class CreateRisk extends Composite {
       return "create_risk";
     }
   };
-
-  interface MyUiBinder extends UiBinder<Widget, CreateRisk> {
-  }
-
   private static MyUiBinder uiBinder = GWT.create(MyUiBinder.class);
-
   @UiField
   Button buttonApply;
-
   @UiField
   Button buttonCancel;
-
   @UiField(provided = true)
   RiskDataPanel riskDataPanel;
 
@@ -81,28 +77,18 @@ public class CreateRisk extends Composite {
     initWidget(uiBinder.createAndBindUi(this));
   }
 
-  @Override
-  protected void onLoad() {
-    super.onLoad();
-    JavascriptUtils.stickSidebar();
-  }
-
   @UiHandler("buttonApply")
   void buttonApplyHandler(ClickEvent e) {
     if (riskDataPanel.isValid()) {
       Risk risk = riskDataPanel.getRisk();
-      BrowserService.Util.getInstance().createRisk(risk, new AsyncCallback<Risk>() {
-
-        @Override
-        public void onFailure(Throwable caught) {
-          AsyncCallbackUtils.defaultFailureTreatment(caught);
+      Services services = new Services("Create a risk", "create");
+      services.riskResource(s -> s.createRisk(risk)).whenComplete((created, throwable) -> {
+        if (throwable != null) {
+          AsyncCallbackUtils.defaultFailureTreatment(throwable);
+        } else {
+          Toast.showInfo(messages.riskCreatedTitle(), messages.riskCreatedMessage());
+          HistoryUtils.newHistory(ShowRisk.RESOLVER, created.getUUID());
         }
-
-        @Override
-        public void onSuccess(Risk result) {
-          HistoryUtils.newHistory(RiskRegister.RESOLVER);
-        }
-
       });
     }
   }
@@ -114,6 +100,9 @@ public class CreateRisk extends Composite {
 
   private void cancel() {
     HistoryUtils.newHistory(RiskRegister.RESOLVER);
+  }
+
+  interface MyUiBinder extends UiBinder<Widget, CreateRisk> {
   }
 
 }

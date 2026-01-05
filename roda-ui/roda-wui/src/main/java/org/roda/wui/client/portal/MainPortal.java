@@ -11,14 +11,13 @@
 package org.roda.wui.client.portal;
 
 import java.util.List;
-import java.util.Map;
 
 import org.roda.core.data.common.RodaConstants;
-import org.roda.wui.client.browse.BrowserService;
 import org.roda.wui.client.common.resources.MyResources;
 import org.roda.wui.client.common.utils.JavascriptUtils;
 import org.roda.wui.client.main.GAnalyticsTracker;
 import org.roda.wui.client.main.Theme;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.ClientLogger;
 import org.roda.wui.common.client.tools.ConfigurationManager;
 import org.roda.wui.common.client.tools.HistoryUtils;
@@ -32,7 +31,6 @@ import com.google.gwt.uibinder.client.UiBinder;
 import com.google.gwt.uibinder.client.UiField;
 import com.google.gwt.user.client.DOM;
 import com.google.gwt.user.client.History;
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.google.gwt.user.client.ui.Composite;
 import com.google.gwt.user.client.ui.RootPanel;
 import com.google.gwt.user.client.ui.Widget;
@@ -49,20 +47,16 @@ public class MainPortal extends Composite implements EntryPoint {
     ClientLogger.setUncaughtExceptionHandler();
 
     // load shared properties before init
-    BrowserService.Util.getInstance().retrieveSharedProperties(LocaleInfo.getCurrentLocale().getLocaleName(),
-      new AsyncCallback<Map<String, List<String>>>() {
-        @Override
-        public void onFailure(Throwable caught) {
-          logger.error("Failed loading initial data", caught);
-        }
-
-        @Override
-        public void onSuccess(Map<String, List<String>> sharedProperties) {
-          ConfigurationManager.initialize(sharedProperties);
+    Services services = new Services("Retrieve shared properties", "get");
+    services.configurationsResource(s -> s.retrieveSharedProperties(LocaleInfo.getCurrentLocale().getLocaleName()))
+      .whenComplete((sharedProperties, throwable) -> {
+        if (throwable != null) {
+          logger.error("Failed loading initial data", throwable);
+        } else {
+          ConfigurationManager.initialize(sharedProperties.getProperties());
           init();
         }
       });
-
   }
 
   interface Binder extends UiBinder<Widget, MainPortal> {
@@ -115,13 +109,12 @@ public class MainPortal extends Composite implements EntryPoint {
   }
 
   private void onHistoryChanged(String historyToken) {
-    if (historyToken.length() == 0) {
+    if (historyToken.isEmpty()) {
       contentPanel.update(WelcomePortal.RESOLVER.getHistoryPath());
       HistoryUtils.newHistory(WelcomePortal.RESOLVER);
     } else {
       List<String> currentHistoryPath = HistoryUtils.getCurrentHistoryPath();
       contentPanel.update(currentHistoryPath);
-      GAnalyticsTracker.track(historyToken);
     }
   }
 }

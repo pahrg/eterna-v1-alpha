@@ -10,6 +10,7 @@ package org.roda.core.storage;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -302,7 +303,7 @@ public interface StorageService {
    * @throws AuthorizationDeniedException
    */
   Binary updateBinaryContent(StoragePath storagePath, ContentPayload payload, boolean asReference,
-    boolean createIfNotExists)
+    boolean createIfNotExists, boolean snapshotCurrentVersion, Map<String, String> snapshotProperties)
     throws GenericException, NotFoundException, RequestNotValidException, AuthorizationDeniedException;
 
   /**
@@ -348,7 +349,7 @@ public interface StorageService {
     throws AlreadyExistsException, GenericException, RequestNotValidException, NotFoundException,
     AuthorizationDeniedException;
 
-  void copy(StorageService fromService, StoragePath fromStoragePath, Path toPath, String resource)
+  void copy(StorageService fromService, StoragePath fromStoragePath, Path toPath, String resource, boolean replaceExisting)
     throws AlreadyExistsException, GenericException, AuthorizationDeniedException;
 
   /**
@@ -372,16 +373,18 @@ public interface StorageService {
 
   FileTime getCreationTime(StoragePath storagePath) throws IOException;
 
+  // TODO: gbarros, implement this
+  default DirectResourceAccess getDirectAccess(StoragePath storagePath, Boolean isReadOnly) {
+    return getDirectAccess(storagePath);
+  }
+
   CloseableIterable<BinaryVersion> listBinaryVersions(StoragePath storagePath)
     throws GenericException, RequestNotValidException, NotFoundException, AuthorizationDeniedException;
 
   BinaryVersion getBinaryVersion(StoragePath storagePath, String version)
     throws RequestNotValidException, NotFoundException, GenericException;
 
-  BinaryVersion createBinaryVersion(StoragePath storagePath, Map<String, String> properties)
-    throws RequestNotValidException, NotFoundException, GenericException, AuthorizationDeniedException;
-
-  void revertBinaryVersion(StoragePath storagePath, String version)
+  Binary revertBinaryVersion(StoragePath storagePath, String version, Map<String, String> properties)
     throws NotFoundException, RequestNotValidException, GenericException, AuthorizationDeniedException;
 
   void deleteBinaryVersion(StoragePath storagePath, String version)
@@ -395,4 +398,9 @@ public interface StorageService {
   List<StoragePath> getShallowFiles(StoragePath storagePath) throws NotFoundException, GenericException;
 
   Map<String, Object> getStorageStats() throws GenericException;
+
+  Date getCreationDate(StoragePath storagePath) throws GenericException;
+
+  void importBinaryVersion(StorageService fromService, StoragePath storagePath, String version)
+          throws AlreadyExistsException, GenericException, RequestNotValidException, AuthorizationDeniedException;
 }

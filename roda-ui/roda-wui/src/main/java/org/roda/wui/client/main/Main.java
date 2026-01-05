@@ -11,18 +11,17 @@
 package org.roda.wui.client.main;
 
 import java.util.List;
-import java.util.Map;
 
+import org.fusesource.restygwt.client.Defaults;
 import org.roda.core.data.common.RodaConstants;
-import org.roda.wui.client.browse.BrowserService;
 import org.roda.wui.client.common.resources.MyResources;
 import org.roda.wui.client.common.utils.JavascriptUtils;
+import org.roda.wui.client.services.RODADispatcher;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.client.welcome.Welcome;
 import org.roda.wui.common.client.ClientLogger;
 import org.roda.wui.common.client.tools.ConfigurationManager;
 import org.roda.wui.common.client.tools.HistoryUtils;
-import org.roda.wui.common.client.widgets.HTMLWidgetWrapper;
-import org.roda.wui.common.client.widgets.wcag.AccessibleFocusPanel;
 
 import com.google.gwt.core.client.EntryPoint;
 import com.google.gwt.core.client.GWT;
@@ -33,9 +32,7 @@ import com.google.gwt.uibinder.client.UiBinder;
 import com.google.gwt.uibinder.client.UiField;
 import com.google.gwt.user.client.DOM;
 import com.google.gwt.user.client.History;
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.google.gwt.user.client.ui.Composite;
-import com.google.gwt.user.client.ui.FlowPanel;
 import com.google.gwt.user.client.ui.RootPanel;
 import com.google.gwt.user.client.ui.Widget;
 
@@ -47,7 +44,7 @@ import config.i18n.client.ClientMessages;
  */
 public class Main extends Composite implements EntryPoint {
 
-  private ClientLogger logger = new ClientLogger(getClass().getName());
+  private final ClientLogger logger = new ClientLogger(getClass().getName());
   private static final ClientMessages messages = GWT.create(ClientMessages.class);
 
   @Override
@@ -59,33 +56,26 @@ public class Main extends Composite implements EntryPoint {
     JavascriptUtils.exportStaticMethod();
 
     // load shared properties before init
-    BrowserService.Util.getInstance().retrieveSharedProperties(LocaleInfo.getCurrentLocale().getLocaleName(),
-      new AsyncCallback<Map<String, List<String>>>() {
-        @Override
-        public void onFailure(Throwable caught) {
-          logger.error("Failed loading initial data", caught);
-        }
-
-        @Override
-        public void onSuccess(Map<String, List<String>> sharedProperties) {
-          ConfigurationManager.initialize(sharedProperties);
+    Services services = new Services("Retrieve shared properties", "get");
+    services.configurationsResource(s -> s.retrieveSharedProperties(LocaleInfo.getCurrentLocale().getLocaleName()))
+      .whenComplete((sharedProperties, throwable) -> {
+        if (throwable != null) {
+          logger.error("Failed loading initial data", throwable);
+        } else {
+          ConfigurationManager.initialize(sharedProperties.getProperties());
           init();
         }
       });
-
   }
 
   interface Binder extends UiBinder<Widget, Main> {
   }
 
-  @UiField
-  AccessibleFocusPanel homeLinkArea;
-
-  @UiField
-  FlowPanel bannerLogo;
+  @UiField(provided = true)
+  UserMenu userMenu;
 
   @UiField(provided = true)
-  Menu menu;
+  Header header;
 
   @UiField(provided = true)
   ContentPanel contentPanel;
@@ -96,7 +86,8 @@ public class Main extends Composite implements EntryPoint {
    * Create a new main
    */
   public Main() {
-    menu = new Menu();
+    userMenu = new UserMenu();
+    header = new Header();
     contentPanel = ContentPanel.getInstance();
     footer = new Footer();
 
@@ -109,6 +100,8 @@ public class Main extends Composite implements EntryPoint {
    */
   public void init() {
     MyResources.INSTANCE.css().ensureInjected();
+
+    Defaults.setDispatcher(RODADispatcher.INSTANCE);
 
     // Remove loading image
     RootPanel.getBodyElement().removeChild(DOM.getElementById("loading"));
@@ -126,16 +119,11 @@ public class Main extends Composite implements EntryPoint {
     RootPanel.get().addStyleName("roda");
 
     // Initialize
-    menu.init();
+    userMenu.init();
+    header.init();
     contentPanel.init();
     onHistoryChanged(History.getToken());
     History.addValueChangeHandler(event -> onHistoryChanged(event.getValue()));
-
-    bannerLogo.add(new HTMLWidgetWrapper("Banner.html"));
-
-    homeLinkArea.addClickHandler(event -> HistoryUtils.newHistory(Welcome.RESOLVER));
-
-    homeLinkArea.setTitle(messages.homeTitle());
 
     if (ConfigurationManager.getBoolean(false, RodaConstants.UI_COOKIES_ACTIVE_PROPERTY)) {
       JavascriptUtils.setCookieOptions(messages.cookiesMessage(), messages.cookiesDismisse(),
@@ -144,7 +132,8 @@ public class Main extends Composite implements EntryPoint {
 
     if (ConfigurationManager.getBoolean(true, RodaConstants.UI_EXPIRED_SESSION_DETECTOR_ACTIVE)) {
       ExpiredSessionDetector expiredSessionDetector = new ExpiredSessionDetector();
-      expiredSessionDetector.setScheduleTime(ConfigurationManager.getInt(RodaConstants.UI_EXPIRED_SESSION_DETECTOR_TIME));
+      expiredSessionDetector
+        .setScheduleTime(ConfigurationManager.getInt(RodaConstants.UI_EXPIRED_SESSION_DETECTOR_TIME));
     }
 
   }
@@ -156,7 +145,6 @@ public class Main extends Composite implements EntryPoint {
     } else {
       List<String> currentHistoryPath = HistoryUtils.getCurrentHistoryPath();
       contentPanel.update(currentHistoryPath);
-      GAnalyticsTracker.track(historyToken);
     }
   }
 }

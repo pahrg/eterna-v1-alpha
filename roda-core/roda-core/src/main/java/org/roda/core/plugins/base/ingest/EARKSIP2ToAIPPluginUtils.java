@@ -36,19 +36,16 @@ import org.roda.core.data.v2.ip.Permissions;
 import org.roda.core.data.v2.ip.Representation;
 import org.roda.core.data.v2.ip.ShallowFile;
 import org.roda.core.data.v2.ip.ShallowFiles;
-import org.roda.core.data.v2.ip.StoragePath;
 import org.roda.core.data.v2.ip.metadata.PreservationMetadata.PreservationMetadataType;
 import org.roda.core.data.v2.jobs.Report;
 import org.roda.core.data.v2.validation.ValidationException;
 import org.roda.core.model.ModelService;
-import org.roda.core.model.utils.ModelUtils;
 import org.roda.core.plugins.Plugin;
 import org.roda.core.plugins.PluginHelper;
 import org.roda.core.storage.ContentPayload;
 import org.roda.core.storage.ExternalFileManifestContentPayload;
 import org.roda.core.storage.StorageService;
 import org.roda.core.storage.fs.FSPathContentPayload;
-import org.roda.core.storage.utils.RODAInstanceUtils;
 import org.roda.core.util.IdUtils;
 import org.roda_project.commons_ip2.mets_v1_12.beans.FileType;
 import org.roda_project.commons_ip2.model.IPDescriptiveMetadata;
@@ -60,6 +57,10 @@ import org.roda_project.commons_ip2.model.RepresentationStatus;
 import org.roda_project.commons_ip2.model.SIP;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import gov.loc.premis.v3.AgentComplexType;
+import gov.loc.premis.v3.EventComplexType;
+import jakarta.xml.bind.JAXBElement;
 
 public class EARKSIP2ToAIPPluginUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(EARKSIP2ToAIPPluginUtils.class);
@@ -80,7 +81,7 @@ public class EARKSIP2ToAIPPluginUtils {
     String aipType = getType(sip);
 
     AIP aip = model.createAIP(state, parentId.orElse(null), aipType, permissions, ingestSIPUUID, ingestSIPIds,
-      ingestJobId, notify, username);
+      ingestJobId, notify, username, null);
 
     PluginHelper.acquireObjectLock(aip, plugin);
 
@@ -371,10 +372,12 @@ public class EARKSIP2ToAIPPluginUtils {
           hasShallowFile = true;
         } else {
           // this is an empty folder
-          final StoragePath emptyDirectoryStoragePath = ModelUtils.getDirectoryStoragePath(aipId,
-            representation.getId(), file.getRelativeFolders());
-          model.getStorage().createDirectory(emptyDirectoryStoragePath);
-          // TODO jgomes 2022-03-09: Create model service method to create empty directory
+          String[] pathPartials = new String[file.getRelativeFolders().size() + 1];
+          pathPartials[0] = RodaConstants.STORAGE_DIRECTORY_DATA;
+          for (int i = 0; i < file.getRelativeFolders().size(); i++) {
+            pathPartials[i + 1] = file.getRelativeFolders().get(i);
+          }
+          model.createDirectory(representation, pathPartials);
         }
 
       } else {

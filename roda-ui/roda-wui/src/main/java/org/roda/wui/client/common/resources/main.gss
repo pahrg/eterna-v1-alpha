@@ -28,17 +28,38 @@
 @def COLOR_SIDEBAR_BACKGROUND		eval('org.roda.wui.common.client.tools.ConfigurationManager.getString("ui.css.color.sidebar.background")');
 @def COLOR_TABLE_SIDEBAR_BACKGROUND	eval('org.roda.wui.common.client.tools.ConfigurationManager.getString("ui.css.color.table.sidebar.background")');
 
-@def COLOR_BANNER_BACKGROUND	eval('org.roda.wui.common.client.tools.ConfigurationManager.getString("ui.css.color.banner.background")');
-@def COLOR_BANNER_FOREGROUND	eval('org.roda.wui.common.client.tools.ConfigurationManager.getString("ui.css.color.banner.foreground")');
+@def COLOR_HEADER_USER_BACKGROUND eval('org.roda.wui.common.client.tools.ConfigurationManager.getString("ui.css.color.header.user.background")');
+@def COLOR_HEADER_USER_FOREGROUND eval('org.roda.wui.common.client.tools.ConfigurationManager.getString("ui.css.color.header.user.foreground")');
+
+@def COLOR_HEADER_NAVIGATION_BACKGROUND eval('org.roda.wui.common.client.tools.ConfigurationManager.getString("ui.css.color.header.navigation.background")');
+@def COLOR_HEADER_NAVIGATION_FOREGROUND eval('org.roda.wui.common.client.tools.ConfigurationManager.getString("ui.css.color.header.navigation.foreground")');
 
 @def COLOR_FOOTER_BACKGROUND	eval('org.roda.wui.common.client.tools.ConfigurationManager.getString("ui.css.color.footer.background")');
 @def COLOR_FOOTER_FOREGROUND	eval('org.roda.wui.common.client.tools.ConfigurationManager.getString("ui.css.color.footer.foreground")');
 
-@def FONT_PRIMARY "Ubuntu", "HelveticaNeue", "Helvetica Neue", Helvetica, Arial, sans-serif;
-@def FONT_MONOSPACED "UbuntuMono", "Lucida Console", Monaco, monospace;
+@def COLOR_SHADOW eval('org.roda.wui.common.client.tools.ConfigurationManager.getString("ui.css.color.shadow")');
+
+@def COLOR_GREY_DARK	eval('org.roda.wui.common.client.tools.ConfigurationManager.getString("ui.css.color.grey.dark")');
+@def COLOR_GREY_MEDIUM eval('org.roda.wui.common.client.tools.ConfigurationManager.getString("ui.css.color.grey.medium")');
+@def COLOR_GREY_LIGHT	eval('org.roda.wui.common.client.tools.ConfigurationManager.getString("ui.css.color.grey.light")');
+@def COLOR_GREY_VERYLIGHT	eval('org.roda.wui.common.client.tools.ConfigurationManager.getString("ui.css.color.grey.verylight")');
+@def COLOR_GREY_VERYLIGHTEST	eval('org.roda.wui.common.client.tools.ConfigurationManager.getString("ui.css.color.grey.lightest")');
+@def COLOR_GREY_BGDARKER eval('org.roda.wui.common.client.tools.ConfigurationManager.getString("ui.css.color.grey.bgdarker")');
+@def COLOR_GREY_BGLIGHT eval('org.roda.wui.common.client.tools.ConfigurationManager.getString("ui.css.color.grey.bglight")');
+
+@def COLOR_RED_LIGHT eval('org.roda.wui.common.client.tools.ConfigurationManager.getString("ui.css.color.red.light")');
+
+@def COLOR_YELLOW_LIGHT eval('org.roda.wui.common.client.tools.ConfigurationManager.getString("ui.css.color.yellow.light")');
+
+@def COLOR_BLUE_LIGHT eval('org.roda.wui.common.client.tools.ConfigurationManager.getString("ui.css.color.blue.light")');
+
+@def COLOR_GREEN eval('org.roda.wui.common.client.tools.ConfigurationManager.getString("ui.css.color.green")');
+
+@def FONT_PRIMARY "Inter", "Ubuntu", "HelveticaNeue", "Helvetica Neue", Helvetica, Arial, sans-serif;
+@def FONT_MONOSPACED "RobotoMono", "UbuntuMono", "Lucida Console", Monaco, monospace;
 
 @defmixin fontawesome() {
-	font-family: 'Font Awesome 5 Free';
+	font-family: 'MaterialIcons', 'Font Awesome 5 Free';
     text-rendering: auto;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -66,7 +87,10 @@
 }
 
 .roda {
+    display: flex;
+    flex-direction: column;
     background-color: COLOR_FOOTER_BACKGROUND;
+    min-height: 100vh;
 }
 
 a {
@@ -128,13 +152,21 @@ h4, .h4 {
 h5, .h5 {
     font-size: 1.8rem;
     line-height: 1.5;
-    letter-spacing: -.05rem;
+    font-weight: 600;
 }
 
 h6, .h6 {
     font-size: 1.5rem;
     line-height: 1.6;
     letter-spacing: 0;
+}
+
+.noMargin {
+    margin: 0px;
+}
+
+.rodaTitleHeader i {
+    margin-right: 8px;
 }
 
 ul {
@@ -377,6 +409,18 @@ div.inline {
     box-shadow: 0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23);
 }
 
+.cardInvisible {
+    background-color: transparent;
+    box-shadow: none;
+    transition: none;
+    border-radius: 0;
+    padding: 0;
+}
+
+.cardInvisible:hover {
+    box-shadow: none;
+}
+
 .card + .card {
     margin-top: 30px;
 }
@@ -415,7 +459,24 @@ div.inline {
     @mixin fontawesome();
     padding-right: 10px;
     color: COLOR_PRIMARY;
-    
+
+}
+
+.verticalDivider {
+    width: 1px;
+    background-color: COLOR_GREY_LIGHT;
+}
+
+.sidebarActionsDivider {
+  height: 1px;
+  background-color: #e5e5e5;
+  width: 75%;
+  margin-top: 10px;
+  margin-bottom: 20px;
+}
+
+.browse {
+    background-color: COLOR_GREY_VERYLIGHT;
 }
 
 .browse_top .aipChildrenCard {
@@ -430,6 +491,38 @@ div.inline {
 
 .browse_top .aipChildrenCard:hover {
 	box-shadow: none;
+}
+
+.browse_aip .aipChildrenCard {
+    box-shadow: none;
+    padding: 0;
+    transition: none;
+}
+
+.browse_aip .aipChildrenCard:hover {
+    box-shadow: none;
+}
+
+.browse_aip .row .content {
+    padding: 0!important;
+    width:100%;
+}
+
+.browse_aip .row .content .upperContent {
+    padding: 30px;
+}
+
+.browse_aip .row .content .lowerContent {
+    padding: 30px;
+    background-color: COLOR_GREY_BGDARKER;
+}
+
+.browse_aip .row .content .lowerContent .card {
+    background-color: transparent;
+}
+
+.browse_aip .row .content .lowerContent .card .searchWrapper .sidebar-facet-label.fade-out:after {
+    background: linear-gradient(-90deg, COLOR_GREY_BGDARKER 30%, rgba(255, 255, 255, 0) 100%);
 }
 
 .descriptiveMetadataCard {
@@ -499,15 +592,14 @@ div.inline {
 }
 
 .main {
-    flex-grow: 1;
-    display: flex;
-    flex-direction: column;
-    background-color: white;
+    flex: 1;
+    background-color: COLOR_GREY_VERYLIGHT;
 }
 
 .footer {
     background-color: COLOR_FOOTER_BACKGROUND;
     margin-top: 0;
+    max-width: none!important;
 }
 
 .footer .row {
@@ -532,6 +624,16 @@ div.inline {
 .footer ul li:hover,
 .footer ul li a:hover {
     color: white;
+}
+
+.footer .last {
+    display: flex;
+    flex-direction: row-reverse;
+}
+
+.footer .last {
+    display: flex;
+    flex-direction: row-reverse;
 }
 
 #whitered-logo {
@@ -621,9 +723,9 @@ pre code {
 }
 
 .error:before {
-    content: '\f071';
+    content: '\e002';
     @mixin fontawesome();
-    
+
     padding-left: 5px;
     margin-right: 5px;
 }
@@ -635,7 +737,7 @@ pre code {
 .success:before {
     content: '\f00c';
     @mixin fontawesome();
-    
+
     padding-left: 5px;
     margin-right: 5px;
 }
@@ -655,6 +757,7 @@ pre code {
 	color:red;
 	font-size: 0.8em;
 }
+
 .form-separator {
 	color: COLOR_PRIMARY;
 	font-size: 1.6rem;
@@ -709,13 +812,17 @@ pre code {
     border: 1px solid #ccc;
     border-radius: 1px;
     box-sizing: border-box;
-    background-color: #f5f5f5;
+    background-color: white;
     font-size: 1.5rem;
     font-family: FONT_PRIMARY;
     font-weight: 300;
 }
 
-.searchAdvancedPanel .fieldTextBox, .searchAdvancedPanel .form-textbox, .loginPanel .fieldTextBox, .dialog-right-side .form-textbox, .relation-form-panel .form-textbox {
+.panel-body .fieldTextBox, .panel-body .form-textbox, .form-selectbox {
+    background-color: #f5f5f5;
+}
+
+.loginPanel .fieldTextBox, .dialog-right-side .form-textbox, .relation-form-panel .form-textbox {
     border: 1px solid #ccc;
     background-color: #fff;
 }
@@ -738,6 +845,10 @@ pre code {
     margin-bottom: 5px;
 }
 
+.form-listbox-job.roda6Card {
+	display:block;
+}
+
 .form-listbox-job {
 	border: none !important;
     margin-bottom: 2em;
@@ -746,6 +857,7 @@ pre code {
 .form-checkbox-job {
 	margin-right: 1em;
 	display: inline-block;
+	width: 200px;
 }
 
 .form-checkbox {
@@ -844,7 +956,7 @@ pre code {
 }
 
 .btn {
-    border-radius: 2px;
+    border-radius: 4px;
     padding: 8px 27px 8px 10px;
     border: none;
     background-color: COLOR_PRIMARY;
@@ -866,7 +978,7 @@ pre code {
 	width: 100%;
 }
 
-.btn-block + .btn-block {
+.btn-block + .btn-block, .sidebar .actionable-button + .actionable-button {
 	margin-top: 10px;
 }
 
@@ -950,14 +1062,25 @@ pre code {
 
 .btn:after {
     display: inline-block;
-    
     @mixin fontawesome();
-    
-    line-height: 1;
+    line-height: 0.9;
     float: right;
-
     position: absolute;
-    right: 10px;
+    right: 5px;
+    font-size: 16px;
+}
+
+button:after {
+    @mixin fontawesome();
+    font-size: 15px;
+}
+
+.btn-disable-user:after {
+    content: "\e510";
+}
+
+.btn-enable-user:after {
+    content: "\e174";
 }
 
 .btn-link:after {
@@ -965,45 +1088,51 @@ pre code {
 }
 
 .btn-plus:after {
-    content: "\f055";
+    content: "\e148";
 }
 
+.btn-plus-circle:after {
+    content: "\e147";
+}
+
+.btn-calendar:after {
+    content: "\e935";
+}
+
+.btn-lock:after {
+    content: "\e897";
+}
 
 .btn-top:after {
-    content: "\f102";
+    content: "\eacf";
 }
 
-
 .btn-up:after {
-    content: "\f077";
+    content: "\eae6";
 }
 
 .btn-down:after {
-    content: "\f078";
+    content: "\e313";
 }
 
 .btn-bottom:after {
-    content: "\f103";
+    content: "\ead0";
 }
 
 .btn-envelope:after {
-    content: "\f0e0";
+    content: "\e928";
 }
 
 .btn-edit:after {
-    content: "\f14b";
+    content: "\e3c9";
 }
 
 .btn-key:after {
-    content: "\f084";
-}
-
-.btn-unlock:after {
-    content: "\f09c";
+    content: "\e73c";
 }
 
 .btn-lift-hold:after {
-    content: "\f3c1";
+    content: "\e898";
 }
 
 .btn-edit + .btn-edit {
@@ -1011,107 +1140,126 @@ pre code {
 }
 
 .btn-play:after {
-    content: "\f144";
+    content: "\e1c4";
+}
+
+.btn-assessment:after {
+    content: "\e85c";
 }
 
 .btn-download:after {
-    content: "\f019";
+    content: "\e2c4";
 }
 
 .btn-disposal-schedule:after {
-    content: "\f133";
-}
-
-.btn-view:after {
-    content: "\f01d";
+    content: "\e908";
 }
 
 .btn-clock:after {
-    content: "\f017";
+    content: "\e900";
 }
 
 .btn-history:after {
-    content: "\f1da";
+    content: "\e8b3";
 }
 
 .btn-info:after {
-    content: "\f05a";
+    content: "\e910";
 }
 
 .btn-upload:after {
-    content: "\f093";
+    content: "\e2c6";
 }
 
 .btn-print:after {
-    content: "\f02f";
+    content: "\e935";
 }
 
 .btn-refresh:after {
-    content: "\f021";
+    content: "\e5d5";
 }
 
 .btn-bookmark:after {
-  content: "\f02e";
+  content: "\e866";
 }
 
 .btn-times-circle:after {
-    content: "\f057";
+    content: "\e5c9";
 }
 
 .btn-check:after {
-    content: "\f058";
+    content: "\e86c";
+}
+
+.btn-check-circle:after {
+    content: "\e86c";
 }
 
 .btn-ban:after {
-    content: "\f05e";
+    content: "\e14b";
 }
 
 .btn-preview:after {
-  content: "\f06e";
+  content: "\e8f4";
 }
 
 .btn-th-list:after {
-    content: "\f00b";
+    content: "\e92a";
 }
 
 .btn-search:after {
-    content: "\f002";
+    content: "\e8b6";
 }
 
 .btn-chevron-left:after {
-    content: "\f053";
+    content: "\e5cb";
 }
 
 .btn-chevron-right:after {
-    content: "\f054";
+    content: "\e5cc";
 }
 
 .btn-stop:after{
-	content: "\f04d"
+	content: "\ef71"
 }
 
 .btn-back:after {
-    content: "\f0a8";
+    content: "\e93a";
 }
 
-.btn-next-file:after {
-    content: "\f0a9";
+.btn-cookie:after {
+    content: "\eaac";
+}
+
+/* settings_backup_restore */
+.btn-restore:after {
+    content: "\e8ba";
+}
+
+/* delete_forever */
+.btn-delete-forever:after {
+    content: "\e92b";
+}
+
+/* delete */
+.btn-trash-alt:after {
+    content: "\e872";
 }
 
 .btn-previous-file:after {
-    content: "\f0a8";
+    content: "\e93a";
 }
 
 .btn-exclamation-triangle:after {
-    content: "\f071";
+    content: "\e940";
 }
 
 .btn-archive:after {
-    content: "\f187";
+    content: "\e912";
 }
 
 .btn-sitemap:after {
-    content: "\f0e8";
+    content: "\e93f";
 }
 
 .btn-incremental-list-add {
@@ -1121,19 +1269,19 @@ pre code {
 }
 
 .btn-file-signature:after {
-    content: "\f573";
+    content: "\e93d";
 }
 
 .btn-stamp:after {
-    content: "\f5bf";
+    content: "\e982";
 }
 
 .btn-book:after {
-    content: "\f02d";
+    content: "\e93c";
 }
 
 .btn-home:after {
-    content: "\f015";
+    content: "\e88a";
 }
 
 .btn-eraser:after {
@@ -1141,7 +1289,27 @@ pre code {
 }
 
 .btn-clear:after {
-     content: "\f12d";
+     content: "\e0b8";
+}
+
+ /******************************
+  Material Icons - Outlined (https://fonts.google.com/icons?icon.set=Material+Symbols&icon.size=24&icon.color=%2380A4AE)
+  ******************************/
+.ma {
+    font-family: 'MaterialIcons';
+    font-style: normal;
+}
+
+.ma-account-tree:after {
+    content: "\e97a";
+}
+
+.ma-tune:after {
+    content: "\e429";
+}
+
+.appendIconAttribute:after {
+    content: attr(icon);
 }
 
 .lightbtn {
@@ -1296,19 +1464,20 @@ pre code {
 }
 
 .my-asyncdatagrid-side-panel {
-    vertical-align: top;
-    float: right;
-    margin-left: 20px;
-    background-color: COLOR_TABLE_SIDEBAR_BACKGROUND;
-    padding: 1rem 1.5rem 0 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  vertical-align: top;
+  float: right;
+  margin-left: 20px;
+  background-color: COLOR_TABLE_SIDEBAR_BACKGROUND;
+  padding: 1rem 1.5rem 0 1.5rem;
 }
 
-.col_12 .my-asyncdatagrid-side-panel {
-    margin-left: 30px;
-}
-
-.card .my-asyncdatagrid-side-panel {
-    margin-left: 15px;
+.searchWrapperSidePanel .my-asyncdatagrid-side-panel {
+  padding: 0 16px;
+  background-color: transparent;
+  margin: 0;
 }
 
 .my-asyncdatagrid-side-panel .sidebar-facet-panel {
@@ -1327,22 +1496,74 @@ pre code {
     color: #4b4a4a;
 }
 
-.my-asyncdatagrid-pager-results {
+.searchWrapperSidePanel .my-asyncdatagrid-side-panel .h5 {
+    margin-top: 0;
+    font-size: 10px;
+    font-weight: 300;
+    margin-bottom: 0;
+    color: COLOR_GREY_DARK;
+    text-transform: uppercase;
+}
+
+.searchWrapperSidePanel .sidebar-facet-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.searchWrapperSidePanel .sidebar-facet-panel.facet-empty {
+    display: none;
+}
+
+.searchWrapper .btn-link {
+    display: flex;
+    flex-direction: row;
+    font-size: 14px;
+    padding: 0;
+    box-sizing: border-box;
+    gap: 8px;
+    margin-left: 16px;
+}
+
+.searchWrapper .btn-link:hover {
+    border-bottom: 1px solid COLOR_PRIMARY;
+    text-decoration: none;
+}
+
+.searchWrapper .btn-link:after {
     display: inline-block;
+    position: static;
+}
+
+.searchWrapper a.gwt-Anchor {
+    display: flex;
+    flex-direction: row;
+    font-size: 14px;
+    padding: 0;
+    box-sizing: border-box;
+    gap: 8px;
+    background-color: transparent;
+    color: COLOR_PRIMARY;
+    text-transform: uppercase;
+    align-items: center;
+    font-weight: 600;
+    margin-right: 16px;
+}
+
+.searchWrapper a.gwt-Anchor:hover {
+    background-color: transparent;
+    color: COLOR_PRIMARY;
+    border-bottom: 1px solid COLOR_PRIMARY;
+    text-decoration: none;
+}
+
+.my-asyncdatagrid-pager-results {
     line-height: 1;
     font-size: 1.3rem;
-    float:right;
 }
 
 .my-asyncdatagrid-pager-results img {
     vertical-align: middle;
-}
-
-.my-asyncdatagrid-pager-pagesize {
-    /*margin-left: auto; */
-    /* margin-top: 5px; */
-    display: inline-block;
-    float: right;
 }
 
 .my-asyncdatagrid-pager-pagesize a {
@@ -1364,14 +1585,13 @@ pre code {
 .my-asyncdatagrid-autoupdate-signal {
     padding-top: 2px;
     padding-right: 2px;
-    display: inline-block;
-    float: right;
 }
 
 .my-asyncdatagrid-display {
     width: 100%;
     table-layout: fixed;
     margin-top: 0.6rem;
+    margin-bottom: 32px;
 }
 
 .my-asyncdatagrid .panel {
@@ -1407,11 +1627,6 @@ pre code {
 
 .selectAipResultsPanel {
     max-height: 60vh;
-}
-
-
-.table-empty {
-    margin-top: -30px;
 }
 
 .wui-dialog-layout .table-empty {
@@ -1578,17 +1793,30 @@ pre code {
     border: 1px solid #eee;
     position: absolute;
     z-index: 9;
-    box-shadow: 0 0px 28px rgba(0,0,0,0.25), 0 10px 10px rgba(0,0,0,0.22);
+    box-shadow: 0 2px 4px 0 COLOR_SHADOW;
+    border-radius: 4px;
+}
+
+.dropdown-popup .dropdown-item {
+    padding: 11px;
+}
+
+.dropdown-popup tr:last-child .dropdown-item {
+    border-radius: 0 0 4px 4px;
 }
 
 .dropdown-label,
 .dropdown-item {
-    padding: 5px;
+    padding: 0;
     background-color: white;
     min-width: 150px;
     cursor: pointer;
-    cursor: hand;
     text-transform: capitalize;
+}
+
+.dropdown-disabled .dropdown-label,
+.dropdown-disabled .dropdown-item {
+    cursor: default;
 }
 
 .dropdown-item:hover {
@@ -1598,16 +1826,20 @@ pre code {
 
 .dropdown-label:after {
     display: inline-block;
-    
-    content: "\f107";
+
+    content: "\e5cf";
     @mixin fontawesome();
-    
+
     font-size: inherit;
-    
+
     float: right;
     line-height: 2.5rem;
     padding-left: 5px;
     padding-right: 5px;
+}
+
+.dropdown-disabled .dropdown-label:after {
+   display: none;
 }
 
 .dropdown-label .gwt-Label,
@@ -1622,7 +1854,7 @@ pre code {
 }
 
 .open .dropdown-label:after {
-    content: "\f106";
+    content: "\e5ce";
 }
 
 /**********************************************
@@ -1759,8 +1991,9 @@ td.datePickerMonth, td.datePickerYear {
 				TOAST
 ************************************************/
 .wui-toast {
-    width: auto;
-    max-width: 300px;
+    position: absolute;
+    right: 2rem;
+    width: 17.5rem;
     clear: both;
     border-radius: 2px;
     background-color: rgba(50, 50, 50, 0.9);
@@ -2025,50 +2258,6 @@ td.datePickerMonth, td.datePickerYear {
 }
 
 /**********************************************
-				BANNER
-************************************************/
-.banner {
-    background-color: COLOR_BANNER_BACKGROUND;
-    color: COLOR_BANNER_FOREGROUND;
-    position: relative;
-}
-
-.homeLink {
-    cursor: pointer;
-    cursor: hand;
-}
-
-.homeLogo {
-    height: 60px;
-    float: left;
-    margin: 30px;
-}
-
-.homeText {
-    color: COLOR_BANNER_FOREGROUND;
-    font-weight: 400;
-    font-size: 6rem;
-    line-height: 110px;
-    text-align: left;
-}
-
-.homeSubText {
-    font-size: 3.5rem;
-    font-weight: 200;
-}
-
-.languageSwitcher {
-    position: absolute;
-    top: 10px;
-    right: 40px;
-}
-
-.menu {
-    padding: 0 30px;
-    background-color: COLOR_MENU_PRIMARY;
-}
-
-/**********************************************
 				LANGUAGE SWITCH
 ************************************************/
 .wui-languageSwitcher {
@@ -2085,7 +2274,6 @@ td.datePickerMonth, td.datePickerYear {
 				MENU
 ************************************************/
 .gwt-MenuBar {
-    background-color: COLOR_MENU_PRIMARY;
 }
 
 .gwt-MenuBar table {
@@ -2093,14 +2281,10 @@ td.datePickerMonth, td.datePickerYear {
 }
 
 .gwt-MenuBar.gwt-MenuBar-vertical {
-    background-color: COLOR_MENU_SECONDARY;
-    color: COLOR_MENU_SECONDARY_TEXT;
 }
 
 .gwt-MenuBar.gwt-MenuBar-vertical .gwt-MenuItem {
     min-width: 130px;
-    background-color: COLOR_MENU_SECONDARY;
-    color: COLOR_MENU_SECONDARY_TEXT;
 }
 
 .gwt-MenuBar .gwt-MenuItem {
@@ -2109,24 +2293,20 @@ td.datePickerMonth, td.datePickerYear {
     font-weight: 500;
     font-size: 1.4rem;
     font-variant: normal;
-    color: COLOR_MENU_PRIMARY_TEXT;
-    padding: 15px 12px;
-    line-height: 1;
+    padding: 5px 10px;
     text-align: left;
 }
 
 .gwt-MenuBar .gwt-MenuItem-selected {
-    background-color: COLOR_MENU_SECONDARY;
-    color: COLOR_MENU_SECONDARY_TEXT;
+
 }
 
 .gwt-MenuBar.gwt-MenuBar-vertical .gwt-MenuItem-selected {
-    background-color: COLOR_MENU_PRIMARY;
-    color: COLOR_MENU_PRIMARY_TEXT;
 }
 
 .gwt-MenuBarPopup {
     box-shadow: rgba(0, 0, 0, 0.25) 0px 4px 10px -2px, rgba(0, 0, 0, 0.22) 0px 4px 10px -2px;
+    z-index: 10;
 }
 
 .main .menus {
@@ -2205,7 +2385,7 @@ td.datePickerMonth, td.datePickerYear {
     font-size: 1.5rem;
 }
 
-.menu-register {
+.user_menu_item_register {
     display: none;
 }
 
@@ -2224,6 +2404,157 @@ td.datePickerMonth, td.datePickerYear {
 }
 
 /**********************************************
+				BANNER
+************************************************/
+.banner {
+    display: flex;
+    flex: 1;
+}
+
+.homeLink {
+    display: flex;
+    flex: 0;
+    cursor: pointer;
+    cursor: hand;
+    height: 100%;
+}
+
+.bannerLogoContainer {
+    display: flex;
+    flex: 1;
+    padding: 20px 0px 20px 0px;
+}
+
+.homeLogo {
+    height: 100%;
+}
+
+.homeText {
+    color: white;
+    font-weight: 400;
+    font-size: 6rem;
+    line-height: 110px;
+    text-align: left;
+}
+
+.homeSubText {
+    font-size: 3.5rem;
+    font-weight: 200;
+}
+
+.languageSwitcher {
+    position: absolute;
+    top: 10px;
+    right: 40px;
+}
+
+.header {
+    padding: 0 30px;
+}
+
+.header table {
+    height: 100%;
+}
+
+.header table td {
+    vertical-align: middle;
+}
+
+.userMenu {
+    display: flex;
+    flex-direction: row-reverse;
+}
+
+.userMenu .gwt-MenuItem {
+    font-size: 10px !important;
+    font-weight: 500;
+}
+
+.userMenu .gwt-MenuItem i {
+    margin-right: 4px;
+}
+.userMenuColors {
+    background-color: COLOR_HEADER_USER_BACKGROUND;
+    color: COLOR_HEADER_USER_FOREGROUND;
+}
+
+.userMenuColors .gwt-MenuItem {
+    font-weight: 500;
+}
+
+.userMenuColors .gwt-MenuItem-selected {
+    background-color: COLOR_HEADER_USER_FOREGROUND;
+    color: COLOR_HEADER_USER_BACKGROUND;
+    font-weight: 500;
+}
+
+.bannerHeader {
+    height: 64px;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 3;
+}
+
+.bannerHeader .gwt-MenuBar {
+    display: flex;
+    align-items: center;
+}
+
+.bannerHeader table {
+    height: auto
+}
+
+.bannerHeader table tr {
+    line-height: normal;
+}
+
+.bannerHeader  table tr .gwt-MenuItem.navigationMenu-item {
+    padding: 6px;
+}
+
+.bannerHeader  table tr .gwt-MenuItem.navigationMenu-item .largeIcon {
+    font-size: 30px;
+}
+
+.bannerHeader .gwt-MenuItem {
+    font-size: 12px !important;
+    font-weight: 500;
+}
+
+.bannerHeaderColors {
+    background-color: COLOR_HEADER_NAVIGATION_BACKGROUND;
+    color: COLOR_HEADER_NAVIGATION_FOREGROUND;
+    font-weight: 500;
+}
+
+.bannerHeaderColors .gwt-MenuItem {
+    font-weight: 500;
+    border-radius: 4px;
+    padding: 8px 16px;
+}
+
+.bannerHeaderColors .gwt-MenuItem-selected {
+    transition: background-color 0.1s;
+    background-color: COLOR_PRIMARY;
+    font-weight: 500;
+}
+
+.gwt-MenuBarPopup .bannerHeaderColors  tr .gwt-MenuItem {
+    border-radius: 0;
+}
+
+.gwt-MenuBarPopup .bannerHeaderColors tr:last-child .gwt-MenuItem{
+    border-radius: 0 0 4px 4px;
+}
+
+.gwt-MenuBarPopup .gwt-MenuBar {
+    border-radius: 0px 0px 4px 4px;
+}
+
+/**********************************************
 				BREADCRUMB
 ************************************************/
 .main .wui-breadcrumbPanel {
@@ -2237,7 +2568,7 @@ td.datePickerMonth, td.datePickerYear {
     color: #a7a9ac;
     cursor: pointer;
     cursor: hand;
-    font-size: 1.2rem;
+    font-size: 12px;
 
     max-width: 150px;
     white-space: nowrap;
@@ -2245,18 +2576,19 @@ td.datePickerMonth, td.datePickerYear {
     text-overflow: ellipsis;
 }
 
-.main .wui-breadcrumbPanel .breadcrumb * {
-    color: #a7a9ac;
-}
-
 .main .wui-breadcrumbPanel .breadcrumb .fa {
     margin: 0 3px;
     color: #a7a9ac;
 }
 
+.main .wui-breadcrumbPanel .breadcrumb-root {
+    color: COLOR_PRIMARY;
+    font-weight: bold;
+}
+
 .main .wui-breadcrumbPanel .breadcrumb-last {
-    color: #404142;
-    text-decoration: none;
+    font-weight: bold;
+    color: black
 }
 
 .viewRepresentationBreadcrumb .breadcrumb-last {
@@ -2264,20 +2596,19 @@ td.datePickerMonth, td.datePickerYear {
 }
 
 .main .wui-breadcrumbPanel .breadcrumb-last .fa, .main .wui-breadcrumbPanel .breadcrumb-last .description-level {
-    color: #404142;
+    color: black;
 }
 
 .main .wui-breadcrumbPanel .breadcrumb-separator {
     display: inline-block;
     vertical-align: bottom;
-    font-size: 1.2rem;
-    color: #a7a9ac;
+    font-size: 12px;
     cursor: text;
 }
 
 .main .navigationToolbarBreadcrumb .breadcrumb,
 .main .navigationToolbarBreadcrumb .breadcrumb-separator {
-    font-size: 1.4rem;
+    font-size: 12px;
 }
 
 /**********************************************
@@ -2292,6 +2623,8 @@ td.datePickerMonth, td.datePickerYear {
 
 .sidebar .sticky-flow {
 	min-width: 220px;
+	position: sticky;
+	top: 64px;
 }
 
 .sidebar .sticky-padding {
@@ -2301,6 +2634,14 @@ td.datePickerMonth, td.datePickerYear {
 
 .sidebar .btn.separator {
 	margin-bottom: 14px;
+}
+
+.sidebar .sidebar-group .actionable-button {
+    justify-content: space-between;
+}
+
+.sidebar .sidebar-group .actionable-button+.actionable-button {
+    margin-top: 10px;
 }
 
 .sidebar .h1, .sidebar .h2, .sidebar .h3, .sidebar .h4, .sidebar .h5,
@@ -2323,10 +2664,34 @@ td.datePickerMonth, td.datePickerYear {
     white-space: nowrap;
     margin-bottom: 5px;
     font-size: 1.2rem;
+    text-transform: capitalize;
 }
 
 .sidebar-facet-label label {
     vertical-align: top;
+}
+
+.sidebar-facet-row {
+    display: flex;
+    justify-content: space-between;
+}
+
+.sidebar-facet-row .sidebar-facet-label {
+    flex: 1;
+}
+
+.searchWrapper .sidebar-facet-label.fade-out:after {
+    background: linear-gradient(-90deg, COLOR_GREY_VERYLIGHT 30%, rgba(255, 255, 255, 0) 100%);
+}
+
+.sidebar-facet-count {
+    background-color: COLOR_BLUE_LIGHT;
+    color: COLOR_PRIMARY;
+    font-size: 1.2rem;
+    border-radius: 64px;
+    min-width: 20px;
+    height: 20px;
+    text-align: center;
 }
 
 .facet-input-panel {
@@ -2550,6 +2915,14 @@ td.datePickerMonth, td.datePickerYear {
 	margin-top: 0;
 }
 
+.browse_main_panel {
+    flex: 1;
+}
+
+.browse-representation .searchWrapper .searchWrapperMainPanel #list-BrowseRepresentation_files .actionable-menu {
+    display: none;
+}
+
 .browse-file .aipState {
     display: inline-block;
     margin-left: 1rem;
@@ -2629,20 +3002,28 @@ td.datePickerMonth, td.datePickerYear {
     margin-left: 3px;
 }
 
-.representationInformationMissing i {
-    color: #af1612;
+.associateRI.representationInformationMissing i {
+    color: COLOR_PRIMARY;
     background-color: white;
     border-radius: 1em;
     width: 1em;
     text-align: center;
 }
 
-.representationInformationPresent i {
+.associateRI.representationInformationMissing i:before {
+    content: "\e903";
+}
+
+.associateRI:not(.representationInformationMissing) i {
     color: COLOR_PRIMARY;
     background-color: white;
     border-radius: 1em;
     width: 1em;
     text-align: center;
+}
+
+.associateRI:not(.representationInformationMissing) i:before {
+    content: "\e910";
 }
 
 .slider .representationInformationPresent i {
@@ -2785,15 +3166,12 @@ td.datePickerMonth, td.datePickerYear {
 }
 
 .descriptiveMetadataHTML {
-    padding-top: 5px;
 }
 
 .descriptiveMetadata {
-	padding-top: 25px;
 }
 
 .descriptiveMetadataHTML .descriptiveMetadata {
-	padding-top: 0px;
 }
 
 .descriptiveMetadata .title, .preservationMetadata .title {
@@ -2945,6 +3323,236 @@ td.datePickerMonth, td.datePickerYear {
     padding: 5px;
     border: 1px solid darkgrey;
     float: left;
+}
+
+/* --------------------------------------------------
+
+  ************** RODA 6 SIDE PANELS *****************
+
+  –––––––––––––––––––––––––––––––––––––––––––––––––– */
+
+.contentWithSidePanel {
+    display: flex;
+    min-height: 767px !important;
+}
+
+.browseSidePanel {
+    width: 235px;
+    display: flex;
+    flex-direction: column;
+    padding: 24px 32px;
+    background: COLOR_GREY_DARK;
+    gap: 32px;
+}
+
+.browseSidePanel .actionable-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.browseSidePanel .actionable-title {
+    display: none;
+}
+
+.browseSidePanel .actionable-button {
+    color: white;
+    background-color: COLOR_PRIMARY;
+    border:none;
+    border-radius: 4px;
+    height: 30px;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    text-transform: uppercase;
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.browseSidePanel .actionable-button:hover {
+    background-color: COLOR_PRIMARY_HOVER;
+}
+
+.thumbnailCardList {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.thumbnailCardListTitle {
+    color: #CCCCCC;
+    text-transform: capitalize;
+}
+
+.thumbnailCardListCards {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.thumbnailCardContainer {
+    display: flex;
+    flex: 0;
+    flex-direction: column;
+}
+
+.thumbnailCard {
+    display: flex;
+    flex-direction: column;
+    flex: 0;
+    border-radius: 4px;
+    background-color: COLOR_GREY_BGDARKER;
+    font-size: 10px;
+}
+
+.thumbnailCardTitle {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 8px 16px 8px 16px;
+    cursor: pointer;
+}
+
+.thumbnailCardExpandable .thumbnailCardTitle:after {
+    font-family: 'Font Awesome 5 Free';
+    text-rendering: auto;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-weight: 900;
+    font-style: normal;
+    content: "\f078";
+}
+
+.thumbnailCardCollapsible .thumbnailCardTitle:after {
+    font-family: 'Font Awesome 5 Free';
+    text-rendering: auto;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-weight: 900;
+    font-style: normal;
+    content: "\f077";
+}
+
+.thumbnailCardDetails {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    border-radius: 4px;
+    background-color: COLOR_GREY_BGLIGHT;
+    padding: 16px 16px 8px 16px;
+}
+
+.thumbnailCardExpandable .thumbnailCardDetails {
+    display: none;
+}
+
+.thumbnailCardIconThumbnail {
+    display: flex;
+    justify-content: center;
+    height: 204px;
+    background-color: white;
+    align-items: center;
+    font-size: 100px;
+    color: COLOR_GREY_LIGHT;
+    border-radius: 4px;
+}
+
+.thumbnailCardIconThumbnail:hover {
+    cursor: pointer;
+}
+
+.thumbnailCardTags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.thumbnailCardTags .tag .gwt-Label {
+    justify-content: center;
+}
+
+.tag {
+    padding: 2px 8px;
+    border-radius: 4px;
+    /*flex: 1;*/
+    text-transform: uppercase;
+    text-align: center;
+}
+
+.tagGrey {
+    background-color: COLOR_GREY_MEDIUM;
+    color: white;
+}
+
+.tagGreen {
+    background-color: COLOR_GREEN;
+}
+
+.tagLightRed, .tagRed {
+    background-color: COLOR_RED_LIGHT;
+    color: white;
+}
+
+.tagLightYellow {
+    background-color: COLOR_YELLOW_LIGHT;
+}
+
+.tagMono {
+    font-family: FONT_MONOSPACED;
+}
+
+.tagBorderBlack {
+    border: 1px solid black;
+    color: black;
+}
+
+.tagBorderRed  {
+    border: 1px solid COLOR_RED_LIGHT;
+    color: COLOR_RED_LIGHT;
+}
+
+.tag .gwt-Label {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.tagIconCalendar .gwt-Label:before {
+    @mixin fontawesome();
+    content: "\e908";
+}
+
+.tagIconLock .gwt-Label:before {
+    @mixin fontawesome();
+    content: "\f023";
+}
+
+.tagIconClock .gwt-Label:before {
+    @mixin fontawesome();
+    content: "\e900";
+}
+
+.clickable {
+    cursor: pointer;
+}
+
+.labelWithIconReversed {
+    flex-direction: row-reverse;
+}
+
+.thumbnailCardAttributes {
+    display: flex;
+    flex-direction: column;
+}
+
+.thumbnailCardAttributes > div {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+}
+
+.thumbnailCardAttributes > div > div:first-child {
+    text-transform: uppercase;
 }
 
 /* --------------------------------------------------
@@ -3581,7 +4189,7 @@ td.datePickerMonth, td.datePickerYear {
     display: none;
 }
 
-/* @end */ /* @end */ 
+/* @end */ /* @end */
 
 /** Arrangement table **/
 .wui-browse-arrangementTable { /*	background-color: white;*/
@@ -3667,6 +4275,12 @@ td.datePickerMonth, td.datePickerYear {
     color: red;
 }
 
+/** General Browse Representation Panel **/
+
+.wui-browse-representation .representation-information-badge {
+    display: none;
+}
+
 .browseDip-topList {
 	width: 96%;
 	padding: 2%;
@@ -3718,8 +4332,80 @@ td.datePickerMonth, td.datePickerYear {
 /**********************************************
 				DEFAULT SEARCH + ADV SEARCH
 ************************************************/
+.searchWrapper {
+    display: flex;
+    align-items: start;
+}
+
+.searchWrapperSearchPanel {
+    flex: 1;
+}
+
+.searchWrapperSidePanel .my-asyncdatagrid-side-panel {
+    padding: 0;
+}
+
+.searchWrapper .objectToolbar {
+    gap: 0;
+    min-height: 32px;
+    background-color: transparent;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 8px 0 8px 0;
+    margin-left: 16px;
+    width: 250px;
+}
+
+.searchWrapper .objectToolbar .objectToolbarLabel {
+    font-size: 10px;
+    font-weight: 300;
+    color: #343A3F;
+    background-color: transparent;
+    justify-content: start;
+    padding: 0 0 10px 0;
+}
+
+.searchWrapper .objectToolbar .objectToolbarActions .actionable-title {
+    margin-top: 7px;
+    margin-bottom: 7px;
+    font-size: 10px;
+    font-weight: 300;
+    color: #343A3F;
+    text-transform: uppercase;
+}
+
+
+.searchWrapper .objectToolbar .objectToolbarActions,
+.searchWrapper .objectToolbar .objectToolbarActions .actionable-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    align-items: stretch;
+    justify-content: stretch;
+}
+
+.searchWrapper .objectToolbar button,
+.searchWrapper .objectToolbar .groupedActionableMenu button {
+    padding: 12px 4px;
+    justify-content: start;
+}
+
+.searchWrapper .objectToolbar .objectToolbarActions .verticalDivider {
+    display: none;
+}
+
+.searchWrapper .objectToolbar .groupedActionableEmptyHelp {
+    display: none;
+}
+
+.searchWrapper .my-asyncdatagrid-facets-panel {
+    margin-left: 16px;
+    padding: 0;
+    width: 250px;
+}
+
 .searchPanelContainer {
-    margin-bottom: 30px;
+    margin-bottom: 16px;
 }
 
 .searchPanelContainer.with-prefilters{
@@ -3731,10 +4417,6 @@ td.datePickerMonth, td.datePickerYear {
 }
 
 .card .searchPanelContainer {
-    margin-bottom: 15px;
-    margin-top: -15px;
-    margin-left: -15px;
-    margin-right: -15px;
 }
 
 .browse_top .card .searchPanelContainer {
@@ -3746,15 +4428,38 @@ td.datePickerMonth, td.datePickerYear {
 }
 
 .searchPanel {
-    margin-right: 80px;
-    height: 4rem;
-    background-color: #eee;
+    height: 100%;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    padding: 16px 16px 0 16px;
 }
 
 .searchPanelLeft {
     float: left;
     width: 100%;
     display: table;
+}
+
+.searchPanel .dropdown {
+    height: 100%;
+}
+
+.searchPanel .dropdown .dropdown-panel {
+    height: 100%;
+}
+
+.searchPanel .dropdown .dropdown-panel .dropdown-label {
+    height: 100%;
+}
+
+.searchPanel .selected-count-panel {
+    display: flex;
+    align-items: center;
+}
+
+.searchPanel .selected-count-panel i {
+    display: none;
 }
 
 .searchInputListBox,
@@ -3764,23 +4469,25 @@ td.datePickerMonth, td.datePickerYear {
 }
 
 .searchInputListBoxPopup {
+ border-radius: 4px;
     border-top: 2px solid white;
 }
 
 .searchPanelLeft .selected-count-panel,
 .searchInputListBox .dropdown-label,
-.searchInputListBoxPopup .dropdown-item {
-    line-height: 4rem;
-    background-color: COLOR_PRIMARY;
-    color: white;
+.searchInputListBoxPopup .dropdown-item,
+.searchWrapper .selected-count-panel {
+    color: black;
     border: none;
-    padding: 0 0 0 0;
-    padding-left: 20px;
-    padding-right: 35px;
-    min-width: 165px;
+    min-width: 220px;
     position: relative;
     white-space: nowrap;
     overflow: hidden;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
 }
 
 .searchPanelLeft .selected-count-panel {
@@ -3793,11 +4500,8 @@ td.datePickerMonth, td.datePickerYear {
 }
 
 .searchInputListBox .dropdown-label:after {
-    line-height: 40px;
-    font-size: 20px;
-    position: absolute;
-    right: 0px;
-    width: 40px;
+    font-size: 16px;
+    width: 16px;
     text-align: center;
     padding: 0;
 }
@@ -3807,9 +4511,8 @@ td.datePickerMonth, td.datePickerYear {
     color: white;
 }
 
-.searchPanelLeft .searchPanelLeftInput {
-    display: table-cell;
-    width: 100%;
+.searchPanel .searchPanelLeftInput {
+    flex: 1;
     vertical-align: top;
 }
 
@@ -3880,7 +4583,8 @@ td.datePickerMonth, td.datePickerYear {
     font-size: 2rem;
     border: none;
     padding: 0 1rem;
-    background-color: #eee;
+    background-color: COLOR_GREY_VERYLIGHT;
+    border-radius: 4px;
 }
 
 .searchBox::-webkit-input-placeholder,
@@ -3894,8 +4598,6 @@ td.datePickerMonth, td.datePickerYear {
     cursor: hand;
     position: relative;
     float: left;
-    width: 40px;
-    background-color: #999;
 }
 
 .advancedSearchButton {
@@ -3907,17 +4609,51 @@ td.datePickerMonth, td.datePickerYear {
     float: right;
 }
 
-.searchAdvancedDisclosureButton {
-    background-color: #eee;
-    color: rgba(0, 0, 0, 0.5);
+.searchWrapper .searchAdvancedDisclosureButton {
+    color: COLOR_PRIMARY;
+    font-size: 18px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 4px;
+    height: 32px;
+    width: 32px;
+}
+
+.searchWrapper .searchAdvancedDisclosureButton:hover {
+   background-color: COLOR_BLUE_LIGHT;
+   border-radius: 64px;
+}
+
+.searchWrapper .searchAdvancedDisclosureButton i {
+    font-size: 18px;
+}
+
+.searchButton {
+    background-color: COLOR_PRIMARY;
+    color: white;
+    font-size: 14px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 6px 16px;
+    font-weight: bold;
+    text-transform: uppercase;
+    border-radius: 4px
 }
 
 .searchButton:hover {
-    background-color: COLOR_PRIMARY;
+    background-color: COLOR_PRIMARY_HOVER;
 }
 
 .searchButton-html {
-    font-size: 15px;
+    display:flex;
+    gap: 8px;
+}
+
+.searchButton-html i {
+    font-size: 17px;
+
 }
 
 .searchButton-html-label {
@@ -3941,7 +4677,7 @@ td.datePickerMonth, td.datePickerYear {
     display: block;
 }
 
-.searchAdvancedDisclosureButton.open .fa-angle-down {
+.searchAdvancedDisclosureButton.open .ma-tune {
     display: none;
 }
 
@@ -3991,16 +4727,46 @@ td.datePickerMonth, td.datePickerYear {
 }
 
 .searchAdvancedPanel {
-    padding: 20px !important;
+    padding: 20px 16px !important;
     min-height: auto;
-    background-color: #eee;
-    border-top: 2px solid COLOR_PRIMARY;
+}
+
+.searchAdvancedPanel .form-textbox {
+    background-color: COLOR_GREY_VERYLIGHTEST;
+    border-bottom: 1px solid COLOR_GREY_LIGHT;
+    border-left: none;
+    flex: 1;
+}
+
+.searchAdvancedPanel .form-listbox {
+    border:none;
+    padding: 0;
+    margin: 0;
+    margin-left: -4px;
+    font-size: 14px;
+    color: black;
+    min-width: 224px;
 }
 
 .searchAdvancedFieldsPanel {
-    display: block;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
     margin-bottom: 15px;
 }
+
+.searchAdvancedPanel .search-field,
+.searchAdvancedPanel .search-field-warning {
+    max-width: 750px;
+    display: flex;
+}
+
+.searchAdvancedPanel .search-field-left-panel {
+    flex: 1;
+    display: flex;
+    gap: 16px;
+}
+
 
 .search-field {
     margin-right: 20px;
@@ -4012,11 +4778,17 @@ td.datePickerMonth, td.datePickerYear {
     height: 50px;
 }
 
+.search-field-warning-panel {
+    position: absolute;
+}
+
 .search-field-warning-label {
     font-size: 1.1rem;
-    color: #999;
+    color: COLOR_GREY_MEDIUM;
     position: absolute;
-	width: 100%;
+    top: 35px;
+    left: 236px;
+	width: 750px;
 }
 
 .search-field.full_width {
@@ -4040,8 +4812,13 @@ td.datePickerMonth, td.datePickerYear {
 }
 
 .search-field-left-panel .search-field-input-panel {
-    display: table-cell;
-    vertical-align: top;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.search-field-left-panel .search-field-input-panel .gwt-Label {
+    text-transform: capitalize;
 }
 
 .search-field-left-panel .search-field-input-panel.full_width {
@@ -4064,7 +4841,7 @@ td.datePickerMonth, td.datePickerYear {
     background: transparent;
     cursor: pointer;
     cursor: hand;
-    color: rgba(0, 0, 0, 0.5);
+    color: black;
 }
 
 .search-field-dialog {
@@ -4140,6 +4917,7 @@ td.datePickerMonth, td.datePickerYear {
 }
 
 .searchPreFilters {
+    padding: 0 16px 16px 16px;
     font-size: 60%;
 }
 
@@ -4160,25 +4938,24 @@ td.datePickerMonth, td.datePickerYear {
 
 .wui-dialog-layout {
     padding: 10px;
-    width: 60vw;
+    max-width: 60vw;
 }
 
 .gwt-DialogBox.wui-dialog-confirm .wui-dialog-layout,
 .gwt-DialogBox.wui-dialog-information .wui-dialog-layout,
 .gwt-DialogBox.wui-dialog-prompt .wui-dialog-layout {
-    width: initial;
     max-width: 95vw;
 }
 
 @media (max-width: 768px) {
     .wui-dialog-layout {
-        width: 90vw;
+        max-width: 90vw;
     }
 }
 
 @media (max-width: 1280px) {
     .wui-dialog-layout {
-        width: 75vw;
+        max-width: 75vw;
     }
 }
 
@@ -4396,7 +5173,7 @@ td.datePickerMonth, td.datePickerYear {
     margin: 40px auto 0;
     max-width: 400px;
     min-width: 300px;
-    background-color: #f9f9f9;
+    background-color: #eee;
     padding: 30px 40px;
     position: relative;
     border-radius: 2px;
@@ -4658,11 +5435,6 @@ td.datePickerMonth, td.datePickerYear {
     padding-top: 0px;
 }
 
-.bitstreamPreview-directory {
-    padding: 2%;
-    width: 96%;
-}
-
 .viewRepresentationImageFilePreview {
 	width: 100%;
 	height: 670px;
@@ -4685,7 +5457,8 @@ td.datePickerMonth, td.datePickerYear {
 
 .viewRepresentationHtmlFilePreview, .viewDIPPreview {
     width: 100%;
-    height: 670px;
+    height: 80vh;
+    min-height: 480px;
 }
 
 .viewRepresentationTextFilePreview {
@@ -4990,20 +5763,20 @@ td.datePickerMonth, td.datePickerYear {
 
 #upload-list li span.icon:after {
     display: inline-block;
-    
+
     font-size: 2rem;
     line-height: 2rem;
     width: 2rem;
     height: 2rem;
-    
-    content: "\f00c";
+
+    content: "\e876";
     @mixin fontawesome();
-    
+
     position: absolute;
     top: 20px;
     right: 20px;
     cursor: pointer;
-    
+
     color: #24c279;
     -webkit-animation: none;
     -moz-animation: none;
@@ -5011,7 +5784,7 @@ td.datePickerMonth, td.datePickerYear {
 }
 
 #upload-list li.working span.icon:after {
-    content: "\f1ce";
+    content: "\e1af";
     color: #f4d03f;
     -webkit-animation:spin 3s linear infinite;
     -moz-animation:spin 3s linear infinite;
@@ -5026,7 +5799,7 @@ td.datePickerMonth, td.datePickerYear {
 }
 
 #upload-list li.error span.icon:after {
-    content: "\f071";
+    content: "\e002";
     color: #D20707;
     -webkit-animation: none;
     -moz-animation: none;
@@ -5636,6 +6409,10 @@ td.datePickerMonth, td.datePickerYear {
     margin-bottom: 5px;
 }
 
+.wui-data-panel .gwt-TextBox-readonly {
+    pointer-events: none;
+}
+
 /** User Log **/
 .wui-userlog {
     width: 100%;
@@ -5983,7 +6760,6 @@ td.datePickerMonth, td.datePickerYear {
 ************************************************/
 .gwt-PopupPanelGlass {
     background-color: rgba(0, 0, 0, 0.25);
-    z-index: 5;
 }
 
 .office-window-dock {
@@ -6606,9 +7382,13 @@ td.datePickerMonth, td.datePickerYear {
  DOWNLOAD CSV
 ****************************************/
 
-.csvDownloadButton, .actionsButton {
+.actionsButton {
 	padding: 7px;
 	float: left;
+}
+
+.csvDownloadButton {
+    padding: 7px;
 }
 
 .object-dialog .searchPreFilters  {
@@ -6826,8 +7606,9 @@ td.datePickerMonth, td.datePickerYear {
 }
 
 .ri-edit-html-area {
-    height: 300px;
-    max-width: 100%;
+    height: 200px;
+    width: 40vw;
+    max-width: 95vw;
     padding: 0;
     margin: 0;
     resize: none;
@@ -7082,6 +7863,27 @@ span.code {
     display: block;
 }
 
+.ActionableStyleMenu .popupContent .actionable-menu {
+    display: flex;
+    flex-direction: column;
+}
+
+.ActionableStyleMenu .popupContent .actionable-menu .actionable-button {
+    display: flex;
+    flex-direction: row-reverse;
+    justify-content: start;
+    align-items: center;
+    border: none;
+    margin: 0;
+    padding: 8px;
+    gap: 8px;
+    background-color: transparent;
+}
+
+.ActionableStyleMenu .popupContent .actionable-menu .actionable-button:hover {
+    background-color: COLOR_GREY_LIGHT;
+}
+
 .ActionableStyleButtons .actionable-title,
 .ActionableStyleMenu .actionable-title {
     display:none;
@@ -7101,7 +7903,7 @@ span.code {
 }
 
 .ActionableStyleMenu .actionable-button-destroyed:hover {
-    background-color: rgba(217, 83, 79, 0.4);
+    background-color: rgba(217, 83, 79, 0.4)!important;
 }
 
 .ActionableStyleMenu .actionable-button-update:hover {
@@ -7136,8 +7938,8 @@ span.code {
 .slider .actionable-button,
 .ActionableStyleButtons .actionable-button {
     /* mimic <button> and .btn */
-    border-radius: 2px;
-    padding: 8px 8px 8px 10px;
+    border-radius: 4px;
+    padding: 8px 27px 8px 10px;
     border: none;
     background-color: COLOR_PRIMARY;
     color: white;
@@ -7151,17 +7953,17 @@ span.code {
     position: relative;
     white-space: nowrap;
     width: 100%;
-    align-items: flex-start;
+    align-items: center;
     box-sizing: border-box;
     text-rendering: auto;
     letter-spacing: normal;
     word-spacing: normal;
     text-indent: 0;
     text-shadow: none;
-    display: inline-block;
     margin: 0em;
     font-family: FONT_PRIMARY;
     line-height: normal;
+    justify-content: space-between;
 }
 
 .browseNewDescriptiveMetadataButton {
@@ -7203,7 +8005,7 @@ span.code {
 }
 
 .ActionableStyleButtons .actionable-button-label {
-    margin-right: 2em;
+    margin-right: 0.5em;
 }
 
 .browseNewDescriptiveMetadataButton,
@@ -7218,7 +8020,16 @@ span.code {
 }
 
 .my-asyncdatagrid-main-panel .ActionableStyleButtons .actionable-menu {
+    display: flex;
+    flex-direction: row;
     margin: 1rem;
+}
+
+.my-asyncdatagrid-footer {
+    display: flex;
+    justify-content: end;
+    align-items: center;
+    gap: 4px;
 }
 
 .ActionableStyleButtons {
@@ -7243,6 +8054,13 @@ span.code {
 
 .sidebar .actionable-button-destroyed:hover {
     background-color: COLOR_ACTIONS_DANGER_HOVER;
+}
+
+.actionable-button {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-evenly;
+    gap: 4px;
 }
 
 .card + .ActionableStyleButtons, .ActionableStyleButtons + .ActionableStyleButtons {
@@ -7309,10 +8127,13 @@ span.code {
   Navigation Toolbar
  */
 .navigationToolbar {
-    min-height: 35px;
-    line-height: 35px;
-    background-color: #ddd;
+    display: flex;
     position: relative;
+    background-color: white;
+    flex-direction: row;
+    align-items: center;
+    padding: 16px 32px;
+    font-size: 12px;
 }
 
 .navigationToolbar-alt {
@@ -7323,12 +8144,10 @@ span.code {
 .navigationToolbar .navigationToolbarHeaderArrow {
     display: inline-block;
     vertical-align: bottom;
-    font-size: 1.6rem;
     color: #222;
 }
 
 .navigationToolbar .navigationToolbarHeader {
-    margin-left: 40px;
     text-transform: capitalize;
 }
 
@@ -7340,13 +8159,16 @@ span.code {
 .navigationToolbar .navigationToolbarBreadcrumb {
     margin: 0;
     padding: 0;
-    display: inline-block;
+    display: flex;
+    flex-direction: row;
+    gap: 4px;
+    flex: 1;
 }
 
 .navigationToolbar .navigationToolbarIcons {
-    position: absolute;
-    top: 0;
-    right: 0;
+    display: flex;
+    flex-directoin: row;
+    align-items: center;
 }
 
 .navigationToolbar .navigationToolbarIcons .navigationToolbarLink {
@@ -7355,14 +8177,8 @@ span.code {
 
 .navigationToolbarLink {
     display: inline-block;
-    font-size: 20px;
-    line-height: 35px;
-    width: 35px;
-    height: 35px;
     cursor: pointer;
     cursor: hand;
-    color: white;
-    background-color: #999;
     text-align: center;
     /*border-left: 1px SOLID WHITE;*/
 }
@@ -7374,42 +8190,58 @@ span.code {
     height: 25px;
 }
 
+.navigationToolbarLink {
+    display:flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 14px;
+    width: 32px;
+}
+
+.navigationToolbarLink.disabled {
+    color: COLOR_GREY_LIGHT;
+}
+
 .navigationToolbarLink:hover,
 .navigationToolbarLink-selected,
 .navigationToolbarLink.active,
 .navigationToolbar-alt .navigationToolbarLink:hover,
 .navigationToolbar-alt .navigationToolbarLink-selected,
 .navigationToolbar-alt .navigationToolbarLink.active {
-    color: white;
-    background-color: COLOR_PRIMARY;
+    color: COLOR_PRIMARY;
+    background-color: COLOR_BLUE_LIGHT;
+    border-radius: 128px;
+}
+
+.navigationToolbarLink.disabled:hover,
+.navigationToolbarLink-selected.disabled,
+.navigationToolbarLink.disabled.active,
+.navigationToolbar-alt.disabled .navigationToolbarLink.disabled:hover,
+.navigationToolbar-alt.disabled .navigationToolbarLink-selected.disabled,
+.navigationToolbar-alt.disabled .navigationToolbarLink.disabled.active {
+    color: COLOR_GREY_LIGHT;
+    background-color: transparent;
 }
 
 .navigationToolbarLink.disabled,
 .navigationToolbarLink.disabled:hover {
-    background-color: #ddd;
     cursor: auto;
 }
 
 .navigationToolbar-alt .navigationToolbarLink {
-    background-color: #eee;
     color: #999;
 }
 
 .navigationToolbar-alt .navigationToolbarLink.disabled,
 .navigationToolbar-alt .navigationToolbarLink.disabled:hover {
-    color: #ddd;
+    color: COLOR_GREY_LIGHT;
     background-color: #eee;
 }
 
 .navigationToolbarPagination {
     display: inline-block;
-    line-height: 35px;
-    height: 35px;
-    color: white;
-    background-color: #999;
     text-align: center;
     width: auto;
-    font-size: 14px;
     vertical-align: top;
     padding: 0 5px 0 5px;
 }
@@ -7427,6 +8259,10 @@ span.code {
     border-left: 5px solid COLOR_PRIMARY;
     margin-top: 1rem;
     margin-bottom: 1rem;
+}
+
+.disposalMandate {
+    min-height: 20rem;
 }
 
 .disposalScopeNotes{
@@ -7657,6 +8493,450 @@ span.code {
       content: '\f071';
         @mixin fontawesome();
 }
+
+/******************************
+  Object toolbar
+ ******************************/
+
+.objectToolbar {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+    background-color: COLOR_GREY_VERYLIGHTEST;
+}
+
+.objectToolbarLabel {
+    background-color: COLOR_PRIMARY;
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 16px 32px;
+    font-size: 11px;
+    text-transform: uppercase;
+    gap: 8px;
+}
+
+.objectToolbarTags {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+}
+
+.objectToolbarTags .tag {
+    font-size: 10px;
+}
+
+.objectToolbarActions {
+    display: flex;
+    flex-direction: row;
+    white-space: nowrap;
+    gap: 16px;
+}
+
+.objectToolbarActions .verticalDivider {
+    align-self: stretch;
+}
+
+.groupedActionableMenu {
+    display: flex;
+    flex-direction: row;
+    gap: 16px;
+}
+
+.groupedActionableMenu > div {
+    display: flex;
+    flex-direction: column;
+}
+
+.objectToolbar button,
+.groupedActionableMenu button, .groupedActionableMenu .actionable-button,
+.groupedActionableDropdown button, .groupedActionableDropdown .actionable-button
+ {
+    display: flex;
+    flex-direction: row-reverse;
+    flex: 1;
+    gap:4px;
+    align-items: self-end;
+    font-family: 'Inter';
+    font-size: 12px;
+    background-color: transparent;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    padding: 8px;
+    margin: 0;
+}
+
+.objectToolbar button:hover, .groupedActionableMenu button:hover,
+.groupedActionableMenu .actionable-button:hover{
+    transition: background-color 0.1s;
+    background-color: COLOR_GREY_LIGHT;
+}
+
+.objectToolbar button.actionable-button-disabled:hover, .groupedActionableMenu button.actionable-button-disabled:hover,
+.groupedActionableMenu .actionable-button.actionable-button-disabled:hover{
+    background-color: inherit;
+}
+
+.popupAnchor {
+    position: relative;
+}
+
+.groupedActionableDropdown {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    width: fit-content;
+    background-color: white;
+    box-shadow: 0px 2px 4px 0px COLOR_SHADOW;
+    border-radius: 4px;
+}
+
+.groupedActionableDropdown button:first-child {
+    border-radius: 4px 0px 0px 0px;
+}
+
+.groupedActionableDropdown button:last-child {
+    border-radius: 0px 0px 4px 0px;
+}
+
+.groupedActionableDropdown .actionable-button {
+    flex-direction: row;
+    justify-content: flex-start;
+    padding: 11px;
+    white-space: nowrap;
+}
+
+.groupedActionableDropdown .actionable-button:hover {
+    background-color: COLOR_GREY_VERYLIGHT;
+}
+
+.groupedActionableDropdown .actionable-button:after {
+    display:none
+
+}
+
+
+/******************************
+  RODA 6 Tabs
+ ******************************/
+
+.tabsContainer {
+
+}
+
+.tabsHeader {
+    display: flex;
+    flex-direction: row;
+    border-bottom: 1px solid COLOR_BLUE_LIGHT;
+    margin-bottom: 16px;
+}
+
+.tabButtonContainer {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 8px 16px 5px 16px;
+    border-bottom: 2px solid transparent;
+}
+
+.tabSelected {
+    color: COLOR_PRIMARY;
+    border-bottom: 2px solid COLOR_PRIMARY;
+}
+
+.tabSelected .tabButton {
+    color: COLOR_PRIMARY;
+    background-color: transparent;
+}
+
+.tabButton {
+    padding: 8px;
+    border: none;
+    white-space: nowrap;
+    text-transform: uppercase;
+    font-size: 14px;
+    background-color: transparent;
+}
+
+.tabButton:hover {
+    color: COLOR_PRIMARY;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+
+/******************************
+  Descriptive metadata tabs
+ ******************************/
+
+.descriptiveMetadataTabs {
+    display: flex;
+    flex-direction: row-reverse;
+    gap: 16px;
+}
+
+.descriptiveMetadataTabs .tabsHeader {
+    width: 250px;
+    flex-direction: column;
+}
+
+.descriptiveMetadataTabs .tabContent {
+    flex: 1;
+}
+
+.descriptiveMetadataTabs .tabsHeader {
+    border: none;
+}
+
+.descriptiveMetadataTabs .tabButtonContainer {
+    text-transform: none;
+    border-bottom: 1px solid COLOR_GREY_LIGHT;
+    padding: 8px 2px 5px;
+    justify-content: start;
+}
+
+.descriptiveMetadataTabs .tabButtonContainer .tabButton {
+    font-size: 12px;
+    padding: 8px 2px;
+    text-transform: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.descriptiveMetadataTabs .tabButtonContainer.tabSelected  button{
+    font-weight: bold;
+}
+
+.descriptiveMetadataTabs .descriptiveMetadata {
+    padding: 24px 0px;
+}
+
+.descriptiveMetadataTabs .tabButtonContainer:last-child {
+    border: none;
+}
+
+.descriptiveMetadataTabs .tabButtonContainer .linkButton {
+    padding: 8px 2px;
+}
+
+.descriptiveMetadata .label {
+    font-size: 14px;
+    font-weight: 300;
+    color: COLOR_GREY_MEDIUM;
+    width: 250px;
+}
+
+.descriptiveMetadata .field {
+    margin-bottom: 1rem;
+    display: flex;
+    flex-direction: row;
+}
+
+.descriptiveMetadata .value {
+    font-size: 14px;
+    color: black;
+    flex: 1;
+}
+
+.descriptiveMetadata .form-separator {
+    font-size: 14px;
+    font-weight: bold;
+    margin: 3em -15px 0 -15px !important;
+}
+
+/******************************
+  Disposal Tabs
+ ******************************/
+
+.disposalAssociationTab {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0px 2px 4px 0px COLOR_SHADOW;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.disposalAssociationTab .row {
+    margin: 0px;
+}
+
+.disposalAssociationTab .row .content {
+    margin: 0px;
+    min-height: initial;
+}
+
+.disposalAssociationTab .row .content .panel{
+    border: none;
+    background-color: transparent;
+}
+
+.disposalAssociationTab .row .content .wui-disposal-holds-panel button {
+    display: none;
+}
+
+.disposalAssociationTab .panel-body {
+    padding: 0;
+}
+
+.disposalAssociationTab .disposal-policy-summary {
+    margin: 0;
+}
+
+.disposalAssociationTab .label {
+    font-size: 14px;
+    font-weight: 300;
+    color: COLOR_GREY_MEDIUM;
+    width: 250px;
+}
+
+.disposalAssociationTab .field {
+    margin-bottom: 1rem;
+    display: flex;
+    flex-direction: row;
+}
+
+.disposalAssociationTab .value {
+    font-size: 14px;
+    color: black;
+    flex: 1;
+}
+
+.disposalAssociationTab .panel-heading {
+    padding: 0;
+    margin-top: 16px;
+    margin-bottom: 8px;
+}
+
+.disposalAssociationTab .panel-title {
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.disposalAssociationTab .content > .wui-disposal-holds-panel {
+    margin-top: 32px;
+}
+
+
+
+/******************************
+  Permissions Tab
+ ******************************/
+
+.permissionsTab .row {
+    margin: 0;
+    padding: 0;
+}
+
+.permissionsTab .row .content {
+    min-height: 0;
+    padding: 0!important;
+    width: 100%;
+}
+
+.permissionsTab .panel.permission {
+    padding: 8px;
+    border: none;
+    background-color: transparent;
+}
+
+.permissionsTab .panel.permission .panel-body {
+    padding: 0;
+}
+
+.permissionsTab .panel.permission .panel-body i {
+    font-size: 12px;
+}
+
+.permissionsTab .permission-tags {
+    display: flex;
+    gap: 8px;
+}
+
+.permissionsTab .permission-tags .permission-tag {
+    font-size: 12px;
+    text-transform: none;
+}
+
+.permissionsTab .panel.permission:nth-child(odd) {
+    background-color: COLOR_GREY_VERYLIGHT;
+}
+
+.permissionsTab .permission .panel-body {
+    background-color: transparent;
+}
+
+
+
+.wui-disposal-schedule-data .form-textbox {
+    background-color: white;
+}
+
+wui-disposal-hold-data .form-textbox {
+    background-color: white;
+}
+
+
+/******************************
+  RODA 6 cards
+ ******************************/
+
+.roda6Card {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0px 2px 4px 0px COLOR_SHADOW;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+}
+
+.roda6CardWithHeader {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0px 2px 4px 0px COLOR_SHADOW;
+    display: flex;
+    flex-direction: column;
+}
+
+.roda6CardWithHeader .cardHeader {
+    background-color: COLOR_GREY_VERYLIGHTEST;
+    padding: 8px 16px;
+    border-radius: 8px 8px 0px 0px;
+}
+
+.roda6CardWithHeader .cardBody {
+  padding: 8px 16px;
+}
+
+.gwt-DialogBox .roda6Card,
+.gwt-DialogBox .roda6CardWithHeader {
+  box-shadow: none;
+}
+
+/******************************
+  RODA 6 buttons
+ ******************************/
+
+ .linkButton {
+    font-size: 14px;
+    font-weight: bold;
+    border: none;
+    background-color: transparent;
+    color: COLOR_PRIMARY;
+    text-transform: uppercase;
+    display: flex;
+    gap: 8px;
+ }
+
+ .linkButton:hover {
+    cursor: pointer;
+    border-bottom: 1px solid COLOR_PRIMARY;
+ }
+
+
 
 /******************************
   Plugin info
@@ -7949,3 +9229,77 @@ span.code {
      margin-top: 10px;
      margin-bottom: 5px;
  }
+
+ /******************************
+   Custom Material Icons
+  ******************************/
+
+.cmi {
+    font-family: 'CustomMaterialIcons';
+    text-rendering: auto;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-weight: 900;
+    font-style: normal;
+}
+
+.cmi-accountTree:after {
+    content: "\e901";
+}
+
+.cmi-home:after {
+    content: "\e920";
+}
+
+.cmi-cubes:after {
+    content: "\e906"
+}
+
+.cmi-file:after {
+    content: "\e911"
+}
+
+.cmi-envelope:after {
+    content: "\e928"
+}
+
+.cmi-circle-plus:after {
+    content: "\e902";
+}
+
+.largeIcon {
+    font-size: 20px;
+}
+
+.cmi-user:after {
+    content: "\e922";
+}
+
+.cmi-password:after {
+    content: "\e941";
+}
+
+.cmi-enter:after {
+    content: "\e92c";
+}
+
+.cmi-upload:after {
+    content: "\e929";
+}
+
+.details-date {
+    font-size: 1.1rem;
+    color: #999;
+    font-style: italic;
+}
+
+.details-uuid {
+    font-size: 1.6rem;
+    color: rgb(88, 89, 91);
+    font-family: FONT_MONOSPACED;
+}
+
+.details-anchor {
+    display: block;
+    margin-bottom: 0.5em;
+}

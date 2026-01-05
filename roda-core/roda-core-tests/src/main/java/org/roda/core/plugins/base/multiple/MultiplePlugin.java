@@ -28,7 +28,6 @@ import org.roda.core.plugins.PluginException;
 import org.roda.core.plugins.base.antivirus.AntivirusPlugin;
 import org.roda.core.plugins.base.characterization.PremisSkeletonPlugin;
 import org.roda.core.plugins.base.characterization.SiegfriedPlugin;
-import org.roda.core.storage.StorageService;
 
 /**
  * @author Miguel Guimarães <mguimaraes@keep.pt>
@@ -38,14 +37,23 @@ public class MultiplePlugin extends DefaultMultipleStepPlugin<AIP> {
   private static HashMap<String, PluginParameter> pluginParameters = new HashMap<>();
   static {
     pluginParameters.put(RodaConstants.PLUGIN_PARAMS_DO_VIRUS_CHECK,
-      new PluginParameter(RodaConstants.PLUGIN_PARAMS_DO_VIRUS_CHECK, SiegfriedPlugin.getStaticName(),
-        PluginParameterType.BOOLEAN, "true", true, true, SiegfriedPlugin.getStaticDescription()));
+      PluginParameter
+        .getBuilder(RodaConstants.PLUGIN_PARAMS_DO_VIRUS_CHECK, AntivirusPlugin.getStaticName(),
+          PluginParameterType.BOOLEAN)
+        .withDefaultValue("true").isReadOnly(true).withDescription(AntivirusPlugin.getStaticDescription()).build());
+
     pluginParameters.put(RodaConstants.PLUGIN_PARAMS_CREATE_PREMIS_SKELETON,
-      new PluginParameter(RodaConstants.PLUGIN_PARAMS_CREATE_PREMIS_SKELETON, PremisSkeletonPlugin.getStaticName(),
-        PluginParameterType.BOOLEAN, "true", true, true, PremisSkeletonPlugin.getStaticDescription()));
+      PluginParameter
+        .getBuilder(RodaConstants.PLUGIN_PARAMS_CREATE_PREMIS_SKELETON, PremisSkeletonPlugin.getStaticName(),
+          PluginParameterType.BOOLEAN)
+        .withDefaultValue("true").isReadOnly(true).withDescription(PremisSkeletonPlugin.getStaticDescription())
+        .build());
+
     pluginParameters.put(RodaConstants.PLUGIN_PARAMS_DO_FILE_FORMAT_IDENTIFICATION,
-      new PluginParameter(RodaConstants.PLUGIN_PARAMS_DO_FILE_FORMAT_IDENTIFICATION, SiegfriedPlugin.getStaticName(),
-        PluginParameterType.BOOLEAN, "true", true, true, SiegfriedPlugin.getStaticDescription()));
+      PluginParameter
+        .getBuilder(RodaConstants.PLUGIN_PARAMS_DO_FILE_FORMAT_IDENTIFICATION, SiegfriedPlugin.getStaticName(),
+          PluginParameterType.BOOLEAN)
+        .withDefaultValue("true").isReadOnly(true).withDescription(SiegfriedPlugin.getStaticDescription()).build());
 
     steps.add(new Step(AntivirusPlugin.class.getName(), RodaConstants.PLUGIN_PARAMS_DO_VIRUS_CHECK, true, true));
     steps.add(
@@ -56,11 +64,11 @@ public class MultiplePlugin extends DefaultMultipleStepPlugin<AIP> {
 
   @Override
   public List<PluginParameter> getParameters() {
-    final ArrayList<PluginParameter> pluginParameters = new ArrayList<>();
-    pluginParameters.add(getPluginParameter(RodaConstants.PLUGIN_PARAMS_DO_VIRUS_CHECK));
-    pluginParameters.add(getPluginParameter(RodaConstants.PLUGIN_PARAMS_CREATE_PREMIS_SKELETON));
-    pluginParameters.add(getPluginParameter(RodaConstants.PLUGIN_PARAMS_DO_FILE_FORMAT_IDENTIFICATION));
-    return pluginParameters;
+    final ArrayList<PluginParameter> parameters = new ArrayList<>();
+    parameters.add(getPluginParameter(RodaConstants.PLUGIN_PARAMS_DO_VIRUS_CHECK));
+    parameters.add(getPluginParameter(RodaConstants.PLUGIN_PARAMS_CREATE_PREMIS_SKELETON));
+    parameters.add(getPluginParameter(RodaConstants.PLUGIN_PARAMS_DO_FILE_FORMAT_IDENTIFICATION));
+    return parameters;
   }
 
   @Override
@@ -177,16 +185,15 @@ public class MultiplePlugin extends DefaultMultipleStepPlugin<AIP> {
   }
 
   /**
-   * Method executed by {@link PluginOrchestrator} after all workers have finished
-   * their work
+   * Method executed by {@link org.roda.core.plugins.PluginOrchestrator} after all
+   * workers have finished their work
    *
    * @param index
    * @param model
-   * @param storage
    * @throws PluginException
    */
   @Override
-  public Report afterAllExecute(IndexService index, ModelService model, StorageService storage) throws PluginException {
+  public Report afterAllExecute(IndexService index, ModelService model) throws PluginException {
     return null;
   }
 
@@ -202,10 +209,6 @@ public class MultiplePlugin extends DefaultMultipleStepPlugin<AIP> {
 
   @Override
   public PluginParameter getPluginParameter(String pluginParameterId) {
-    pluginParameters.put(RodaConstants.PLUGIN_PARAMS_DO_VIRUS_CHECK,
-      new PluginParameter(RodaConstants.PLUGIN_PARAMS_DO_VIRUS_CHECK, AntivirusPlugin.getStaticName(),
-        PluginParameterType.BOOLEAN, "true", true, true, AntivirusPlugin.getStaticDescription()));
-
     if (pluginParameters.get(pluginParameterId) != null) {
       return pluginParameters.get(pluginParameterId);
     } else {
@@ -215,9 +218,6 @@ public class MultiplePlugin extends DefaultMultipleStepPlugin<AIP> {
 
   @Override
   public void setParameterValues(Map<String, String> parameters) throws InvalidParameterException {
-    pluginParameters.put(RodaConstants.PLUGIN_PARAMS_DO_VIRUS_CHECK,
-      new PluginParameter(RodaConstants.PLUGIN_PARAMS_DO_VIRUS_CHECK, AntivirusPlugin.getStaticName(),
-        PluginParameterType.BOOLEAN, "true", true, true, AntivirusPlugin.getStaticDescription()));
     setTotalSteps();
     super.setParameterValues(parameters);
   }

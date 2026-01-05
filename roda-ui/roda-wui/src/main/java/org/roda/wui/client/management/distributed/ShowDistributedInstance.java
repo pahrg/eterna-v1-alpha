@@ -10,15 +10,13 @@ package org.roda.wui.client.management.distributed;
 import java.util.List;
 
 import org.roda.core.data.v2.synchronization.central.DistributedInstance;
-import org.roda.core.data.v2.user.User;
-import org.roda.wui.client.browse.BrowserService;
 import org.roda.wui.client.common.NoAsyncCallback;
 import org.roda.wui.client.common.TitlePanel;
 import org.roda.wui.client.common.UserLogin;
 import org.roda.wui.client.common.dialogs.Dialogs;
 import org.roda.wui.client.common.utils.HtmlSnippetUtils;
-import org.roda.wui.client.management.UserManagementService;
 import org.roda.wui.client.management.access.AccessKeyTablePanel;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.client.welcome.Welcome;
 import org.roda.wui.common.client.HistoryResolver;
 import org.roda.wui.common.client.tools.HistoryUtils;
@@ -133,18 +131,14 @@ public class ShowDistributedInstance extends Composite {
 
     statusValue.setHTML(HtmlSnippetUtils.getDistributedInstanceStateHtml(distributedInstance, false));
     if (StringUtils.isNotBlank(distributedInstance.getUsername())) {
-      UserManagementService.Util.getInstance().retrieveUser(distributedInstance.getUsername(),
-        new AsyncCallback<User>() {
-          @Override
-          public void onFailure(Throwable throwable) {
-            userNameValue.add(new Label("NONE"));
-          }
-
-          @Override
-          public void onSuccess(User user) {
-            userNameValue.add(new Label(user.getId()));
-          }
-        });
+      Services services = new Services("Get User", "get");
+      services.membersResource(s -> s.getUser(distributedInstance.getUsername())).whenComplete((user, error) -> {
+        if (user != null) {
+          userNameValue.add(new Label(user.getId()));
+        } else if (error != null) {
+          userNameValue.add(new Label("NONE"));
+        }
+      });
 
       accessKeyTablePanel.add(new AccessKeyTablePanel(distributedInstance.getUsername()));
     }
@@ -157,17 +151,14 @@ public class ShowDistributedInstance extends Composite {
 
   private void resolve(List<String> historyTokens, AsyncCallback<Widget> callback) {
     if (historyTokens.size() == 1) {
-      BrowserService.Util.getInstance().retrieveDistributedInstance(historyTokens.get(0),
-        new AsyncCallback<DistributedInstance>() {
-          @Override
-          public void onSuccess(DistributedInstance result) {
-            ShowDistributedInstance showDistributedInstance = new ShowDistributedInstance(result);
+      Services services = new Services("Get distributed instance", "get");
+      services.distributedInstanceResource(s -> s.getDistributedInstance(historyTokens.get(0)))
+        .whenComplete((distributedInstance, error) -> {
+          if (distributedInstance != null) {
+            ShowDistributedInstance showDistributedInstance = new ShowDistributedInstance(distributedInstance);
             callback.onSuccess(showDistributedInstance);
-          }
-
-          @Override
-          public void onFailure(Throwable caught) {
-            callback.onFailure(caught);
+          } else if (error != null) {
+            callback.onFailure(error);
             HistoryUtils.newHistory(Welcome.RESOLVER);
           }
         });
@@ -186,10 +177,10 @@ public class ShowDistributedInstance extends Composite {
         @Override
         public void onSuccess(Boolean confirm) {
           if (confirm) {
-            BrowserService.Util.getInstance().deleteDistributedInstance(distributedInstance.getId(),
-              new NoAsyncCallback<Void>() {
-                @Override
-                public void onSuccess(Void result) {
+            Services services = new Services("Delete distributed instance", "delete");
+            services.distributedInstanceResource(s -> s.deleteDistributedInstance(distributedInstance.getId()))
+              .whenComplete((result, error) -> {
+                if (error == null) {
                   HistoryUtils.newHistory(DistributedInstancesManagement.RESOLVER);
                 }
               });

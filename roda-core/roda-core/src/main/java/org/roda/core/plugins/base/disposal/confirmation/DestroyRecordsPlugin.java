@@ -28,14 +28,13 @@ import org.roda.core.data.exceptions.NotFoundException;
 import org.roda.core.data.exceptions.RequestNotValidException;
 import org.roda.core.data.utils.JsonUtils;
 import org.roda.core.data.v2.LiteOptionalWithCause;
+import org.roda.core.data.v2.disposal.confirmation.DisposalConfirmation;
+import org.roda.core.data.v2.disposal.confirmation.DisposalConfirmationAIPEntry;
+import org.roda.core.data.v2.disposal.confirmation.DisposalConfirmationState;
+import org.roda.core.data.v2.disposal.metadata.DisposalDestructionAIPMetadata;
 import org.roda.core.data.v2.ip.AIP;
 import org.roda.core.data.v2.ip.AIPState;
 import org.roda.core.data.v2.ip.Representation;
-import org.roda.core.data.v2.ip.StoragePath;
-import org.roda.core.data.v2.ip.disposal.DisposalConfirmation;
-import org.roda.core.data.v2.ip.disposal.DisposalConfirmationAIPEntry;
-import org.roda.core.data.v2.ip.disposal.DisposalConfirmationState;
-import org.roda.core.data.v2.ip.disposal.aipMetadata.DisposalDestructionAIPMetadata;
 import org.roda.core.data.v2.ip.metadata.DescriptiveMetadata;
 import org.roda.core.data.v2.jobs.Job;
 import org.roda.core.data.v2.jobs.PluginState;
@@ -43,15 +42,13 @@ import org.roda.core.data.v2.jobs.PluginType;
 import org.roda.core.data.v2.jobs.Report;
 import org.roda.core.index.IndexService;
 import org.roda.core.model.ModelService;
-import org.roda.core.model.utils.ModelUtils;
 import org.roda.core.plugins.AbstractPlugin;
 import org.roda.core.plugins.Plugin;
 import org.roda.core.plugins.PluginException;
+import org.roda.core.plugins.PluginHelper;
 import org.roda.core.plugins.RODAObjectProcessingLogic;
 import org.roda.core.plugins.orchestrate.JobPluginInfo;
-import org.roda.core.plugins.PluginHelper;
 import org.roda.core.storage.Binary;
-import org.roda.core.storage.StorageService;
 import org.roda.core.storage.StringContentPayload;
 import org.roda.core.util.CommandException;
 import org.slf4j.Logger;
@@ -63,22 +60,11 @@ import org.slf4j.LoggerFactory;
 public class DestroyRecordsPlugin extends AbstractPlugin<DisposalConfirmation> {
   private static final Logger LOGGER = LoggerFactory.getLogger(DestroyRecordsPlugin.class);
   private static final String EVENT_DESCRIPTION = "AIP destroyed by disposal confirmation";
-
-  private boolean processedWithErrors = false;
   private final Date executionDate = new Date();
-
-  @Override
-  public String getVersionImpl() {
-    return "1.0";
-  }
+  private boolean processedWithErrors = false;
 
   public static String getStaticName() {
     return "Destroy records under disposal confirmation report";
-  }
-
-  @Override
-  public String getName() {
-    return getStaticName();
   }
 
   public static String getStaticDescription() {
@@ -86,6 +72,16 @@ public class DestroyRecordsPlugin extends AbstractPlugin<DisposalConfirmation> {
       + "them to a disposal bin structure so they can be later on restored or "
       + "permanently deleted from the storage. This process marks the AIP as "
       + "destroyed and a PREMIS event is recorded after finishing the task.";
+  }
+
+  @Override
+  public String getVersionImpl() {
+    return "1.0";
+  }
+
+  @Override
+  public String getName() {
+    return getStaticName();
   }
 
   @Override
@@ -119,23 +115,21 @@ public class DestroyRecordsPlugin extends AbstractPlugin<DisposalConfirmation> {
   }
 
   @Override
-  public Report beforeAllExecute(IndexService index, ModelService model, StorageService storage)
-    throws PluginException {
+  public Report beforeAllExecute(IndexService index, ModelService model) throws PluginException {
     // do nothing
     return null;
   }
 
   @Override
-  public Report execute(IndexService index, ModelService model, StorageService storage,
-    List<LiteOptionalWithCause> liteList) throws PluginException {
+  public Report execute(IndexService index, ModelService model, List<LiteOptionalWithCause> liteList)
+    throws PluginException {
     return PluginHelper.processObjects(this,
-      (RODAObjectProcessingLogic<DisposalConfirmation>) (indexService, modelService, storageService, report, cachedJob,
-        jobPluginInfo, plugin,
-        object) -> processDisposalConfirmation(modelService, storageService, report, cachedJob, jobPluginInfo, object),
-      index, model, storage, liteList);
+      (RODAObjectProcessingLogic<DisposalConfirmation>) (indexService, modelService, report, cachedJob, jobPluginInfo,
+        plugin, object) -> processDisposalConfirmation(modelService, report, cachedJob, jobPluginInfo, object),
+      index, model, liteList);
   }
 
-  private void processDisposalConfirmation(ModelService model, StorageService storage, Report report, Job cachedJob,
+  private void processDisposalConfirmation(ModelService model, Report report, Job cachedJob,
     JobPluginInfo jobPluginInfo, DisposalConfirmation disposalConfirmation) {
 
     // iterate over the AIP list
@@ -153,8 +147,8 @@ public class DestroyRecordsPlugin extends AbstractPlugin<DisposalConfirmation> {
     String disposalConfirmationId = disposalConfirmation.getId();
 
     try {
-      StoragePath disposalConfirmationAIPsPath = ModelUtils.getDisposalConfirmationAIPsPath(disposalConfirmationId);
-      Binary binary = storage.getBinary(disposalConfirmationAIPsPath);
+      Binary binary = model.getBinary(disposalConfirmation,
+        RodaConstants.STORAGE_DIRECTORY_DISPOSAL_CONFIRMATION_AIPS_FILENAME);
 
       try (BufferedReader reader = new BufferedReader(new InputStreamReader(binary.getContent().createInputStream()))) {
         jobPluginInfo.setSourceObjectsCount(disposalConfirmation.getNumberOfAIPs().intValue());
@@ -262,7 +256,7 @@ public class DestroyRecordsPlugin extends AbstractPlugin<DisposalConfirmation> {
     }
 
     model.createEvent(aip.getId(), null, null, null, RodaConstants.PreservationEventType.DESTRUCTION, EVENT_DESCRIPTION,
-      null, null, state, outcomeText, "", cachedJob.getUsername(), true);
+      null, null, state, outcomeText, "", cachedJob.getUsername(), true, null);
 
     // copy the preservation event to the AIP in the disposal bin
     // using the --ignore-existing flag in the rsync process, copying only the new
@@ -330,7 +324,7 @@ public class DestroyRecordsPlugin extends AbstractPlugin<DisposalConfirmation> {
   }
 
   @Override
-  public Report afterAllExecute(IndexService index, ModelService model, StorageService storage) throws PluginException {
+  public Report afterAllExecute(IndexService index, ModelService model) throws PluginException {
     // do nothing
     return null;
   }

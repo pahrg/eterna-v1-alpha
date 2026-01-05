@@ -10,12 +10,12 @@ package org.roda.wui.client.management.distributed;
 import java.util.List;
 
 import org.roda.core.data.v2.accessKey.AccessKey;
+import org.roda.core.data.v2.synchronization.central.CreateDistributedInstanceRequest;
 import org.roda.core.data.v2.synchronization.central.DistributedInstance;
-import org.roda.wui.client.browse.BrowserService;
 import org.roda.wui.client.common.NoAsyncCallback;
 import org.roda.wui.client.common.UserLogin;
 import org.roda.wui.client.common.dialogs.AccessKeyDialogs;
-import org.roda.wui.client.common.utils.JavascriptUtils;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.HistoryResolver;
 import org.roda.wui.common.client.tools.HistoryUtils;
 import org.roda.wui.common.client.tools.ListUtils;
@@ -79,34 +79,25 @@ public class CreateDistributedInstance extends Composite {
     initWidget(uiBinder.createAndBindUi(this));
   }
 
-  @Override
-  protected void onLoad() {
-    super.onLoad();
-    JavascriptUtils.stickSidebar();
-  }
-
   @UiHandler("buttonSave")
   void buttonApplyHandler(ClickEvent e) {
     if (distributedInstanceDataPanel.isValid()) {
       distributedInstance = distributedInstanceDataPanel.getDistributedInstance();
-      BrowserService.Util.getInstance().createDistributedInstance(distributedInstance,
-        new NoAsyncCallback<DistributedInstance>() {
-          @Override
-          public void onSuccess(DistributedInstance distributedInstance) {
-            BrowserService.Util.getInstance().retrieveAccessKey(distributedInstance.getAccessKeyId(),
-              new NoAsyncCallback<AccessKey>() {
-                @Override
-                public void onSuccess(AccessKey accessKey) {
-                  HistoryUtils.newHistory(ShowDistributedInstance.RESOLVER, distributedInstance.getId());
-                  AccessKeyDialogs.showAccessKeyDialog(messages.accessKeyLabel(), accessKey,
-                    new NoAsyncCallback<Boolean>() {
-                      @Override
-                      public void onSuccess(Boolean result) {
-                        Toast.showInfo(messages.accessKeyLabel(), messages.accessKeySuccessfullyRegenerated());
-                      }
-                    });
-                }
-              });
+      CreateDistributedInstanceRequest createDistributedInstanceRequest = new CreateDistributedInstanceRequest(
+        distributedInstance.getName(), distributedInstance.getDescription());
+      Services services = new Services("Create distributed instance", "create");
+      services.distributedInstanceResource(s -> s.createDistributedInstance(createDistributedInstanceRequest))
+        .whenComplete((createdDistributedInstance, error) -> {
+          if (createdDistributedInstance != null) {
+            AccessKey accessKey = new AccessKey();
+            accessKey.setKey(createdDistributedInstance.getToken());
+            HistoryUtils.newHistory(ShowDistributedInstance.RESOLVER, createdDistributedInstance.getId());
+            AccessKeyDialogs.showAccessKeyDialog(messages.accessKeyLabel(), accessKey, new NoAsyncCallback<Boolean>() {
+              @Override
+              public void onSuccess(Boolean result) {
+                Toast.showInfo(messages.accessKeyLabel(), messages.accessKeySuccessfullyRegenerated());
+              }
+            });
           }
         });
     }

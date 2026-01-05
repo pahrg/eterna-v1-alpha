@@ -15,7 +15,6 @@ import java.util.Map;
 
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrInputDocument;
-import org.roda.core.RodaCoreFactory;
 import org.roda.core.data.common.RodaConstants;
 import org.roda.core.data.exceptions.AuthorizationDeniedException;
 import org.roda.core.data.exceptions.GenericException;
@@ -31,11 +30,8 @@ import org.roda.core.index.schema.AbstractSolrCollection;
 import org.roda.core.index.schema.CopyField;
 import org.roda.core.index.schema.Field;
 import org.roda.core.index.schema.SolrCollection;
-import org.roda.core.index.utils.IndexUtils;
 import org.roda.core.index.utils.SolrUtils;
 import org.roda.core.model.ModelService;
-import org.roda.core.storage.Directory;
-import org.roda.core.storage.StorageService;
 import org.roda.core.util.IdUtils;
 
 public class RepresentationCollection extends AbstractSolrCollection<IndexedRepresentation, Representation> {
@@ -116,12 +112,12 @@ public class RepresentationCollection extends AbstractSolrCollection<IndexedRepr
   }
 
   @Override
-  public SolrInputDocument toSolrDocument(Representation rep, IndexingAdditionalInfo info)
+  public SolrInputDocument toSolrDocument(ModelService model, Representation rep, IndexingAdditionalInfo info)
     throws RequestNotValidException, GenericException, NotFoundException, AuthorizationDeniedException {
 
     boolean safemode = info.getFlags().contains(Flags.SAFE_MODE_ON);
 
-    SolrInputDocument doc = super.toSolrDocument(rep, info);
+    SolrInputDocument doc = super.toSolrDocument(model, rep, info);
 
     doc.addField(RodaConstants.REPRESENTATION_AIP_ID, rep.getAipId());
     doc.addField(RodaConstants.REPRESENTATION_ORIGINAL, rep.isOriginal());
@@ -140,25 +136,20 @@ public class RepresentationCollection extends AbstractSolrCollection<IndexedRepr
     }
 
     if (!safemode) {
-      SolrUtils.indexDescriptiveMetadataFields(RodaCoreFactory.getModelService(), rep.getAipId(), rep.getId(),
-        rep.getDescriptiveMetadata(), doc);
+      SolrUtils.indexDescriptiveMetadataFields(model, rep.getAipId(), rep.getId(), rep.getDescriptiveMetadata(), doc);
     }
 
     // Calculate number of documentation and schema files
-    ModelService model = RodaCoreFactory.getModelService();
-    StorageService storage = model.getStorage();
     Long numberOfDocumentationFiles;
     try {
-      Directory documentationDirectory = model.getDocumentationDirectory(rep.getAipId(), rep.getId());
-      numberOfDocumentationFiles = storage.countResourcesUnderDirectory(documentationDirectory.getStoragePath(), true);
+      numberOfDocumentationFiles = model.countDocumentationFiles(rep.getAipId(), rep.getId());
     } catch (NotFoundException e) {
       numberOfDocumentationFiles = 0L;
     }
 
     Long numberOfSchemaFiles;
     try {
-      Directory schemasDirectory = model.getSchemasDirectory(rep.getAipId(), rep.getId());
-      numberOfSchemaFiles = storage.countResourcesUnderDirectory(schemasDirectory.getStoragePath(), true);
+      numberOfSchemaFiles = model.countSchemaFiles(rep.getAipId(), rep.getId());
     } catch (NotFoundException e) {
       numberOfSchemaFiles = 0L;
     }

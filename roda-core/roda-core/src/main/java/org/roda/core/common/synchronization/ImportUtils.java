@@ -7,11 +7,21 @@
  */
 package org.roda.core.common.synchronization;
 
-import com.fasterxml.jackson.core.JsonEncoding;
-import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonToken;
+import java.io.BufferedOutputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
 import org.roda.core.RodaCoreFactory;
 import org.roda.core.common.SyncUtils;
 import org.roda.core.common.iterables.CloseableIterable;
@@ -36,6 +46,7 @@ import org.roda.core.data.v2.ip.IndexedRepresentation;
 import org.roda.core.data.v2.ip.StoragePath;
 import org.roda.core.data.v2.ip.metadata.IndexedPreservationEvent;
 import org.roda.core.data.v2.ip.metadata.PreservationMetadata;
+import org.roda.core.data.v2.jobs.IndexedJob;
 import org.roda.core.data.v2.jobs.Job;
 import org.roda.core.data.v2.jobs.PluginState;
 import org.roda.core.data.v2.jobs.Report;
@@ -58,26 +69,16 @@ import org.roda.core.plugins.orchestrate.JobPluginInfo;
 import org.roda.core.plugins.orchestrate.JobsHelper;
 import org.roda.core.storage.Container;
 import org.roda.core.storage.Resource;
-import org.roda.core.storage.StorageService;
 import org.roda.core.storage.fs.FSUtils;
 import org.roda.core.storage.fs.FileStorageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedOutputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import com.fasterxml.jackson.core.JsonEncoding;
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
 
 /**
  * {@author João Gomes <jgomes@keep.pt>}.
@@ -90,88 +91,12 @@ public class ImportUtils {
     // do nothing
   }
 
-  public static int importStorage(final ModelService model, final IndexService index, final StorageService storage,
+  public static int importStorage(final ModelService model, final IndexService index,
     final Path workingDir, final boolean importJobs) throws GenericException, NotFoundException,
     AuthorizationDeniedException, AlreadyExistsException, RequestNotValidException {
     FileStorageService tmpStorage = new FileStorageService(workingDir.resolve(RodaConstants.CORE_STORAGE_FOLDER), false,
       null, false);
-
-    int total = 0;
-
-    for (Container container : tmpStorage.listContainers()) {
-      // Let local instance handle job creation
-      if (!RodaConstants.STORAGE_CONTAINER_JOB.equals(container.getStoragePath().getName()) || importJobs) {
-        for (Resource resource : tmpStorage.listResourcesUnderContainer(container.getStoragePath(), false)) {
-          StoragePath storagePath = resource.getStoragePath();
-          if (RodaConstants.STORAGE_CONTAINER_PRESERVATION.equals(container.getStoragePath().getName())
-            || RodaConstants.STORAGE_CONTAINER_JOB_REPORT.equals(container.getStoragePath().getName())) {
-            CloseableIterable<Resource> resources = tmpStorage.listResourcesUnderDirectory(resource.getStoragePath(),
-              true);
-            for (Resource pmResource : resources) {
-              StoragePath pmStoragePath = pmResource.getStoragePath();
-              importResource(model, index, storage, tmpStorage, pmResource, pmStoragePath);
-            }
-          } else {
-            importResource(model, index, storage, tmpStorage, resource, storagePath);
-          }
-          total++;
-        }
-      }
-    }
-    return total;
-  }
-
-  private static void importResource(ModelService model, IndexService index, StorageService storage,
-    FileStorageService tmpStorage, Resource resource, StoragePath storagePath) throws NotFoundException,
-    GenericException, AuthorizationDeniedException, AlreadyExistsException, RequestNotValidException {
-
-    // if the resource already exists, remove it before moving the updated resource
-    if (storage.exists(storagePath)) {
-      storage.deleteResource(storagePath);
-    }
-    storage.copy(tmpStorage, storagePath, storagePath);
-    reindexResource(model, index, resource);
-  }
-
-  private static void reindexResource(ModelService model, IndexService index, Resource resource)
-    throws AuthorizationDeniedException, GenericException, NotFoundException {
-    String containerName = resource.getStoragePath().getContainerName();
-    Class<IsRODAObject> objectClass = ModelUtils.giveRespectiveModelClassFromContainerName(containerName);
-
-    if (Report.class.equals(objectClass) || PreservationMetadata.class.equals(objectClass)) {
-      if (resource.isDirectory()) {
-        return;
-      }
-    }
-
-    OptionalWithCause<LiteRODAObject> liteRODAObject = ResourceParseUtils.convertResourceToLite(resource, objectClass);
-    if (liteRODAObject.isPresent()) {
-      OptionalWithCause<IsModelObject> rodaObject = model.retrieveObjectFromLite(liteRODAObject.get());
-      if (rodaObject.isPresent()) {
-        if (PreservationMetadata.class.equals(objectClass)) {
-          model.notifyPreservationMetadataCreated((PreservationMetadata) rodaObject.get()).failOnError();
-        } else if (Report.class.equals(objectClass)) {
-          String jobId = ModelUtils.getJobAndReportIds(resource.getStoragePath()).get(0);
-          Job job = index.retrieve(Job.class, jobId, Arrays.asList());
-          model.notifyJobReportCreatedOrUpdated((Report) rodaObject.get(), job);
-        } else {
-          clearSpecificIndexes(index, objectClass, rodaObject.get());
-          index.reindex(rodaObject.get());
-        }
-      }
-    }
-  }
-
-  private static void clearSpecificIndexes(IndexService index, Class<IsRODAObject> objectClass,
-    IsModelObject rodaObject) throws AuthorizationDeniedException {
-    if (AIP.class.equals(objectClass)) {
-      List<String> ids = Arrays.asList(rodaObject.getId());
-      index.delete(IndexedRepresentation.class,
-        new Filter(new OneOfManyFilterParameter(RodaConstants.REPRESENTATION_AIP_ID, ids)));
-      index.delete(IndexedFile.class, new Filter(new OneOfManyFilterParameter(RodaConstants.FILE_AIP_ID, ids)));
-      index.delete(IndexedPreservationEvent.class,
-        new Filter(new OneOfManyFilterParameter(RodaConstants.PRESERVATION_EVENT_AIP_ID, ids)));
-    }
+    return model.importAll(index, tmpStorage, importJobs);
   }
 
   public static void importAttachments(Path workingDir, BundleManifest manifest) throws GenericException {

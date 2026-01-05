@@ -7,13 +7,26 @@
  */
 package org.roda.core.data.v2.user;
 
+import java.io.Serializable;
 import java.util.Set;
 
 import org.roda.core.data.v2.IsModelObject;
 import org.roda.core.data.v2.index.IsIndexed;
 import org.roda.core.data.v2.ip.HasId;
 
-public interface RODAMember extends IsIndexed, IsModelObject, HasId {
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonSubTypes;
+import com.fasterxml.jackson.annotation.JsonSubTypes.Type;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "type")
+@JsonSubTypes({@Type(value = User.class, name = "User"),
+  @Type(value = Group.class, name = "Group")})
+@Schema(oneOf = {User.class, Group.class})
+public interface RODAMember extends IsIndexed, IsModelObject, HasId, Serializable {
 
   boolean isActive();
 

@@ -11,20 +11,20 @@
 package org.roda.wui.client.browse;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 
 import org.roda.core.data.common.RodaConstants;
-import org.roda.wui.client.browse.bundle.BinaryVersionBundle;
-import org.roda.wui.client.browse.bundle.DescriptiveMetadataVersionsBundle;
+import org.roda.core.data.v2.ip.metadata.DescriptiveMetadataVersions;
+import org.roda.core.data.v2.ip.metadata.ResourceVersion;
 import org.roda.wui.client.common.NoAsyncCallback;
 import org.roda.wui.client.common.TitlePanel;
 import org.roda.wui.client.common.UserLogin;
+import org.roda.wui.client.common.dialogs.Dialogs;
 import org.roda.wui.client.common.utils.AsyncCallbackUtils;
 import org.roda.wui.client.common.utils.JavascriptUtils;
 import org.roda.wui.client.common.utils.PermissionClientUtils;
+import org.roda.wui.client.services.Services;
 import org.roda.wui.common.client.HistoryResolver;
 import org.roda.wui.common.client.tools.HistoryUtils;
 import org.roda.wui.common.client.tools.ListUtils;
@@ -34,10 +34,12 @@ import org.roda.wui.common.client.widgets.Toast;
 
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.core.client.JsonUtils;
+import com.google.gwt.dom.client.Document;
 import com.google.gwt.dom.client.Element;
 import com.google.gwt.event.dom.client.ChangeEvent;
 import com.google.gwt.event.dom.client.ChangeHandler;
 import com.google.gwt.event.dom.client.ClickEvent;
+import com.google.gwt.event.dom.client.DomEvent;
 import com.google.gwt.http.client.Request;
 import com.google.gwt.http.client.RequestBuilder;
 import com.google.gwt.http.client.RequestCallback;
@@ -77,29 +79,34 @@ public class DescriptiveMetadataHistory extends Composite {
         final String representationId = historyTokens.size() == 3 ? historyTokens.get(1) : null;
         final String descriptiveMetadataId = new HTML(historyTokens.get(historyTokens.size() - 1)).getText();
 
-        BrowserService.Util.getInstance().requestAIPLock(aipId, new NoAsyncCallback<Boolean>() {
-          @Override
-          public void onSuccess(Boolean result) {
-            if (Boolean.TRUE.equals(result)) {
-              BrowserService.Util.getInstance().retrieveDescriptiveMetadataVersionsBundle(aipId, representationId,
-                descriptiveMetadataId, LocaleInfo.getCurrentLocale().getLocaleName(),
-                new AsyncCallback<DescriptiveMetadataVersionsBundle>() {
+        Services service = new Services("History resolver", "get");
 
-                  @Override
-                  public void onFailure(Throwable caught) {
-                    AsyncCallbackUtils.defaultFailureTreatment(caught);
-                  }
-
-                  @Override
-                  public void onSuccess(DescriptiveMetadataVersionsBundle bundle) {
-                    DescriptiveMetadataHistory widget = new DescriptiveMetadataHistory(aipId, representationId,
-                      descriptiveMetadataId, bundle);
+        service.aipResource(s -> s.requestAIPLock(aipId)).whenComplete((value, error) -> {
+          if (value) {
+            if (representationId == null) {
+              service.aipResource(s -> s.retrieveAIPDescriptiveMetadataVersions(aipId, descriptiveMetadataId,
+                LocaleInfo.getCurrentLocale().getLocaleName())).whenComplete((result, throwable) -> {
+                  if (throwable != null) {
+                    AsyncCallbackUtils.defaultFailureTreatment(throwable);
+                  } else {
+                    DescriptiveMetadataHistory widget = new DescriptiveMetadataHistory(aipId, null,
+                      descriptiveMetadataId, result);
                     callback.onSuccess(widget);
                   }
                 });
             } else {
-              HistoryUtils.newHistory(BrowseTop.RESOLVER, aipId);
-              Toast.showInfo(messages.editDescMetadataLockedTitle(), messages.editDescMetadataLockedText());
+              service
+                .aipResource(s -> s.retrieveRepresentationDescriptiveMetadataVersions(aipId, representationId,
+                  descriptiveMetadataId, LocaleInfo.getCurrentLocale().getLocaleName()))
+                .whenComplete((result, throwable) -> {
+                  if (throwable != null) {
+                    AsyncCallbackUtils.defaultFailureTreatment(throwable);
+                  } else {
+                    DescriptiveMetadataHistory widget = new DescriptiveMetadataHistory(aipId, representationId,
+                      descriptiveMetadataId, result);
+                    callback.onSuccess(widget);
+                  }
+                });
             }
           }
         });
@@ -136,7 +143,7 @@ public class DescriptiveMetadataHistory extends Composite {
   private final String aipId;
   private final String representationId;
   private final String descriptiveMetadataId;
-  private DescriptiveMetadataVersionsBundle bundle;
+  private DescriptiveMetadataVersions descriptiveMetadataVersions;
 
   private boolean inHTML = true;
   private String selectedVersion = null;
@@ -175,17 +182,17 @@ public class DescriptiveMetadataHistory extends Composite {
    *          the representation identifier.
    * @param descriptiveMetadataId
    *          the descriptive metadata identifier.
-   * @param bundle
+   * @param versions
    *          the descriptive metadata versions
    *          bundle @{DescriptiveMetadataVersionsBundle}
    *
    */
   public DescriptiveMetadataHistory(final String aipId, final String representationId,
-    final String descriptiveMetadataId, final DescriptiveMetadataVersionsBundle bundle) {
+    final String descriptiveMetadataId, final DescriptiveMetadataVersions versions) {
     this.aipId = aipId;
     this.representationId = representationId;
     this.descriptiveMetadataId = descriptiveMetadataId;
-    this.bundle = bundle;
+    this.descriptiveMetadataVersions = versions;
     aipLocked = true;
 
     initWidget(uiBinder.createAndBindUi(this));
@@ -202,39 +209,31 @@ public class DescriptiveMetadataHistory extends Composite {
       }
     });
 
-    PermissionClientUtils.bindPermission(buttonRevert, bundle.getPermissions(),
+    PermissionClientUtils.bindPermission(buttonRevert, descriptiveMetadataVersions.getPermissions(),
       RodaConstants.PERMISSION_METHOD_REVERT_DESCRIPTIVE_METADATA_VERSION);
-    PermissionClientUtils.bindPermission(buttonRemove, bundle.getPermissions(),
+    PermissionClientUtils.bindPermission(buttonRemove, descriptiveMetadataVersions.getPermissions(),
       RodaConstants.PERMISSION_METHOD_DELETE_DESCRIPTIVE_METADATA_VERSION);
 
     Element firstElement = showXml.getElement().getFirstChildElement();
     if ("input".equalsIgnoreCase(firstElement.getTagName())) {
       firstElement.setAttribute("title", "browse input");
     }
-  }
 
-  @Override
-  protected void onLoad() {
-    super.onLoad();
-    JavascriptUtils.stickSidebar();
+    // Set the selected index
+    list.setSelectedIndex(0);
+    // Manually trigger a ValueChangeEvent
+    DomEvent.fireNativeEvent(Document.get().createChangeEvent(), list);
+
   }
 
   private void init() {
     // sort
-    List<BinaryVersionBundle> versionList = new ArrayList<>(bundle.getVersions());
-    Collections.sort(versionList, new Comparator<BinaryVersionBundle>() {
-
-      @Override
-      public int compare(BinaryVersionBundle v1, BinaryVersionBundle v2) {
-        return (int) (v2.getCreatedDate().getTime() - v1.getCreatedDate().getTime());
-      }
-    });
+    List<ResourceVersion> versionList = new ArrayList<>(descriptiveMetadataVersions.getVersions());
+    versionList.sort((v1, v2) -> (int) (v2.getCreatedDate().getTime() - v1.getCreatedDate().getTime()));
 
     // create list layout
-    for (BinaryVersionBundle version : versionList) {
+    for (ResourceVersion version : versionList) {
       String versionKey = version.getId();
-      Date createdDate = version.getCreatedDate();
-
       String message = "";
       if (version.getProperties() != null) {
         message = messages.versionAction(version.getProperties().get(RodaConstants.VERSION_ACTION));
@@ -243,17 +242,19 @@ public class DescriptiveMetadataHistory extends Composite {
           message = messages.versionActionBy(message, version.getProperties().get(RodaConstants.VERSION_USER));
         }
       }
+      Date createdDate = version.getCreatedDate();
 
       list.addItem(messages.descriptiveMetadataHistoryLabel(message, createdDate), versionKey);
     }
 
-    descriptiveMetadataType.setText(bundle.getDescriptiveMetadata().getLabel());
-
     if (!versionList.isEmpty()) {
       list.setSelectedIndex(0);
       selectedVersion = versionList.get(0).getId();
-      updatePreview();
     }
+
+    // Manually trigger a ValueChangeEvent
+    DomEvent.fireNativeEvent(Document.get().createChangeEvent(), list);
+
   }
 
   protected void updatePreview() {
@@ -373,60 +374,127 @@ public class DescriptiveMetadataHistory extends Composite {
 
   @UiHandler("buttonRevert")
   void buttonRevertHandler(ClickEvent e) {
-    BrowserService.Util.getInstance().revertDescriptiveMetadataVersion(aipId, representationId, descriptiveMetadataId,
-      selectedVersion, new AsyncCallback<Void>() {
-
+    Dialogs.showConfirmDialog(messages.descriptiveHistoryRevertConfirmDialogTitle(),
+      messages.descriptiveHistoryRevertConfirmDialogMessage(), messages.dialogNo(), messages.dialogYes(),
+      new NoAsyncCallback<Boolean>() {
         @Override
-        public void onFailure(Throwable caught) {
-          AsyncCallbackUtils.defaultFailureTreatment(caught);
-        }
+        public void onSuccess(Boolean result) {
+          if (result) {
+            Services service = new Services("Revert descriptive metadata version", "put");
 
-        @Override
-        public void onSuccess(Void result) {
-          Toast.showInfo(messages.dialogDone(), messages.versionReverted());
-          HistoryUtils.newHistory(BrowseTop.RESOLVER, aipId);
+            if (representationId == null) {
+
+              service
+                .aipResource(s -> s.revertAIPDescriptiveMetadataVersion(aipId, descriptiveMetadataId, selectedVersion))
+                .whenComplete((value, error) -> {
+                  if (error != null) {
+                    AsyncCallbackUtils.defaultFailureTreatment(error);
+                  } else {
+                    Toast.showInfo(messages.dialogDone(), messages.versionReverted());
+                    HistoryUtils.newHistory(BrowseTop.RESOLVER, aipId);
+                  }
+                });
+
+            } else {
+              service.aipResource(s -> s.revertRepresentationDescriptiveMetadataVersion(aipId, representationId,
+                descriptiveMetadataId, selectedVersion)).whenComplete((value, error) -> {
+                  if (error != null) {
+                    AsyncCallbackUtils.defaultFailureTreatment(error);
+                  } else {
+                    Toast.showInfo(messages.dialogDone(), messages.versionReverted());
+                    HistoryUtils.newHistory(BrowseTop.RESOLVER, RodaConstants.RODA_OBJECT_REPRESENTATION, aipId,
+                      representationId);
+                  }
+                });
+            }
+          }
         }
       });
   }
 
   @UiHandler("buttonRemove")
   void buttonRemoveHandler(ClickEvent e) {
-    BrowserService.Util.getInstance().deleteDescriptiveMetadataVersion(aipId, representationId, descriptiveMetadataId,
-      selectedVersion, new AsyncCallback<Void>() {
 
+    Dialogs.showConfirmDialog(messages.descriptiveHistoryRemoveConfirmDialogTitle(),
+      messages.descriptiveHistoryRemoveConfirmDialogMessage(), messages.dialogNo(), messages.removeButton(),
+      new NoAsyncCallback<Boolean>() {
         @Override
-        public void onFailure(Throwable caught) {
-          AsyncCallbackUtils.defaultFailureTreatment(caught);
-        }
+        public void onSuccess(Boolean result) {
+          if (result) {
 
-        @Override
-        public void onSuccess(Void result) {
-          Toast.showInfo(messages.dialogDone(), messages.versionDeleted());
-          refresh();
-          if (bundle.getVersions().isEmpty()) {
-            HistoryUtils.newHistory(BrowseTop.RESOLVER, aipId);
+            Services service = new Services("Delete descriptive metadata version", "delete");
+
+            if (representationId == null) {
+              service
+                .aipResource(s -> s.deleteDescriptiveMetadataVersion(aipId, descriptiveMetadataId, selectedVersion))
+                .thenCompose(unused -> service.aipResource(s -> s.retrieveAIPDescriptiveMetadataVersions(aipId,
+                  descriptiveMetadataId, LocaleInfo.getCurrentLocale().getLocaleName())))
+                .whenComplete((value, error) -> {
+                  if (error != null) {
+                    AsyncCallbackUtils.defaultFailureTreatment(error);
+                  } else {
+                    if (value.getVersions().isEmpty()) {
+                      HistoryUtils.newHistory(BrowseTop.RESOLVER, aipId);
+                    } else {
+                      descriptiveMetadataVersions = value;
+                      clean();
+                      init();
+                    }
+                  }
+                });
+            } else {
+              service
+                .aipResource(s -> s.deleteRepresentationDescriptiveMetadataVersion(aipId, representationId,
+                  descriptiveMetadataId, selectedVersion))
+                .thenCompose(unused -> service
+                  .aipResource(s -> s.retrieveRepresentationDescriptiveMetadataVersions(aipId, representationId,
+                    descriptiveMetadataId, LocaleInfo.getCurrentLocale().getLocaleName()))
+                  .whenComplete((value, error) -> {
+                    if (error != null) {
+                      AsyncCallbackUtils.defaultFailureTreatment(error);
+                    } else {
+                      if (value.getVersions().isEmpty()) {
+                        HistoryUtils.newHistory(BrowseRepresentation.RESOLVER, aipId, representationId);
+                      } else {
+                        descriptiveMetadataVersions = value;
+                        clean();
+                        init();
+                      }
+                    }
+                  }));
+            }
           }
         }
       });
   }
 
   protected void refresh() {
-    BrowserService.Util.getInstance().retrieveDescriptiveMetadataVersionsBundle(aipId, representationId,
-      descriptiveMetadataId, LocaleInfo.getCurrentLocale().getLocaleName(),
-      new AsyncCallback<DescriptiveMetadataVersionsBundle>() {
 
-        @Override
-        public void onFailure(Throwable caught) {
-          AsyncCallbackUtils.defaultFailureTreatment(caught);
-        }
+    Services service = new Services("Get descriptive metadata versions", "get");
 
-        @Override
-        public void onSuccess(DescriptiveMetadataVersionsBundle bundle) {
-          DescriptiveMetadataHistory.this.bundle = bundle;
-          clean();
-          init();
-        }
-      });
+    if (representationId == null) {
+      service.aipResource(s -> s.retrieveAIPDescriptiveMetadataVersions(aipId, descriptiveMetadataId,
+        LocaleInfo.getCurrentLocale().getLocaleName())).whenComplete((value, error) -> {
+          if (error != null) {
+            AsyncCallbackUtils.defaultFailureTreatment(error);
+          } else {
+            DescriptiveMetadataHistory.this.descriptiveMetadataVersions = value;
+            clean();
+            init();
+          }
+        });
+    } else {
+      service.aipResource(s -> s.retrieveRepresentationDescriptiveMetadataVersions(aipId, representationId,
+        descriptiveMetadataId, LocaleInfo.getCurrentLocale().getLocaleName())).whenComplete((result, throwable) -> {
+          if (throwable != null) {
+            AsyncCallbackUtils.defaultFailureTreatment(throwable);
+          } else {
+            DescriptiveMetadataHistory.this.descriptiveMetadataVersions = result;
+            clean();
+            init();
+          }
+        });
+    }
   }
 
   protected void clean() {
@@ -448,12 +516,8 @@ public class DescriptiveMetadataHistory extends Composite {
   @Override
   protected void onDetach() {
     if (aipLocked) {
-      BrowserService.Util.getInstance().releaseAIPLock(this.aipId, new NoAsyncCallback<Void>() {
-        @Override
-        public void onSuccess(Void result) {
-          aipLocked = false;
-        }
-      });
+      Services services = new Services("Release AIP lock", "lock");
+      services.aipResource(s -> s.releaseAIPLock(this.aipId)).whenComplete((s, throwable) -> aipLocked = false);
     }
     super.onDetach();
   }

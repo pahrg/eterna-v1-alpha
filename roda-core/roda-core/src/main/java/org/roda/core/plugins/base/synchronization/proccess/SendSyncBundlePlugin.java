@@ -7,7 +7,6 @@
  */
 package org.roda.core.plugins.base.synchronization.proccess;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -42,7 +41,6 @@ import org.roda.core.plugins.PluginException;
 import org.roda.core.plugins.PluginHelper;
 import org.roda.core.plugins.RODAProcessingLogic;
 import org.roda.core.plugins.orchestrate.JobPluginInfo;
-import org.roda.core.storage.StorageService;
 import org.roda.core.util.RESTClientUtility;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -137,17 +135,17 @@ public class SendSyncBundlePlugin extends AbstractPlugin<Void> {
   }
 
   @Override
-  public Report beforeAllExecute(IndexService index, ModelService model, StorageService storage)
+  public Report beforeAllExecute(IndexService index, ModelService model)
     throws PluginException {
     return null;
   }
 
   @Override
-  public Report execute(IndexService index, ModelService model, StorageService storage,
+  public Report execute(IndexService index, ModelService model,
     List<LiteOptionalWithCause> list) throws PluginException {
     return PluginHelper.processVoids(this, new RODAProcessingLogic<Void>() {
       @Override
-      public void process(IndexService index, ModelService model, StorageService storage, Report report, Job cachedJob,
+      public void process(IndexService index, ModelService model, Report report, Job cachedJob,
         JobPluginInfo jobPluginInfo, Plugin<Void> plugin) throws PluginException {
         try {
           localInstance = RodaCoreFactory.getLocalInstance();
@@ -156,7 +154,7 @@ public class SendSyncBundlePlugin extends AbstractPlugin<Void> {
         }
         sendSyncBundle(model, report, jobPluginInfo, cachedJob);
       }
-    }, index, model, storage);
+    }, index, model);
   }
 
   private void sendSyncBundle(ModelService model, Report report, JobPluginInfo jobPluginInfo, Job cachedJob) {
@@ -194,18 +192,18 @@ public class SendSyncBundlePlugin extends AbstractPlugin<Void> {
     try {
       AccessToken accessToken = TokenManager.getInstance().getAccessToken(localInstance);
 
-      String resource = RodaConstants.API_SEP + RodaConstants.API_REST_V1_DISTRIBUTED_INSTANCE
+      String resource = RodaConstants.API_SEP + RodaConstants.API_REST_V2_DISTRIBUTED_INSTANCE
         + RodaConstants.API_PATH_PARAM_DISTRIBUTED_INSTANCE_SYNC + RodaConstants.API_SEP + localInstance.getId();
-      return RESTClientUtility.sendPostRequestWithCompressedFile(localInstance.getCentralInstanceURL(), resource,
+      return RESTClientUtility.sendPostRequestWithCompressedFileHttp5(localInstance.getCentralInstanceURL(), resource,
         zipPath, accessToken);
-    } catch (RODAException | IOException e) {
+    } catch (RODAException e) {
       LOGGER.error("Unable to send bundle to central instance", e);
       throw new GenericException("Unable to send bundle to central instance", e);
     }
   }
 
   @Override
-  public Report afterAllExecute(IndexService index, ModelService model, StorageService storage) throws PluginException {
+  public Report afterAllExecute(IndexService index, ModelService model) throws PluginException {
     return new Report();
   }
 

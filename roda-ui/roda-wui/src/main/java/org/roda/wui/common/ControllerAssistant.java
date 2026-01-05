@@ -10,7 +10,6 @@ package org.roda.wui.common;
 import java.lang.reflect.Method;
 import java.util.Date;
 
-import org.roda.core.model.utils.UserUtility;
 import org.roda.core.data.exceptions.AuthorizationDeniedException;
 import org.roda.core.data.exceptions.GenericException;
 import org.roda.core.data.exceptions.RequestNotValidException;
@@ -20,11 +19,13 @@ import org.roda.core.data.v2.ip.AIPState;
 import org.roda.core.data.v2.ip.IndexedAIP;
 import org.roda.core.data.v2.log.LogEntryState;
 import org.roda.core.data.v2.user.User;
+import org.roda.core.model.utils.UserUtility;
 import org.roda.wui.common.client.tools.StringUtils;
+import org.roda.wui.common.model.RequestContext;
 
 public class ControllerAssistant {
-  private final Date startDate;
-  private final Method enclosingMethod;
+  protected Date startDate;
+  protected Method enclosingMethod;
 
   public ControllerAssistant() {
     this.startDate = new Date();
@@ -87,6 +88,18 @@ public class ControllerAssistant {
     }
   }
 
+  public void registerAction(final RequestContext requestContext, final String relatedObjectId,
+    final LogEntryState state, final Object... parameters) {
+    final long duration = new Date().getTime() - startDate.getTime();
+    ControllerAssistantUtils.registerAction(requestContext, this.enclosingMethod.getDeclaringClass().getName(),
+      this.enclosingMethod.getName(), relatedObjectId, duration, state, parameters);
+  }
+
+  public void registerAction(final RequestContext requestContext, final LogEntryState state,
+    final Object... parameters) {
+    registerAction(requestContext, null, state, parameters);
+  }
+
   public void registerAction(final User user, final String relatedObjectId, final LogEntryState state,
     final Object... parameters) {
     final long duration = new Date().getTime() - startDate.getTime();
@@ -102,18 +115,22 @@ public class ControllerAssistant {
     registerAction(user, (String) null, state);
   }
 
-  public void checkAIPstate(IndexedAIP aip) throws RequestNotValidException {
+  public void checkAIPState(IndexedAIP aip) throws RequestNotValidException {
     if (aip.getState().equals(AIPState.DESTROYED)) {
       throw new RequestNotValidException(
         "The AIP [id: " + aip.getId() + "] is destroyed, therefore the request is not valid.");
     }
   }
 
-  public void checkIfAIPInConfirmation(IndexedAIP indexedAip) throws RequestNotValidException {
-    if (StringUtils.isNotBlank(indexedAip.getDisposalConfirmationId())) {
+  public void checkIfAIPIsUnderADisposalPolicy(IndexedAIP indexedAIP) throws RequestNotValidException {
+    if (StringUtils.isNotBlank(indexedAIP.getDisposalConfirmationId())) {
+      throw new RequestNotValidException("The AIP [id: " + indexedAIP.getId()
+        + "] is under a disposal confirmation, therefore the request is not valid.");
+    }
+
+    if (indexedAIP.isOnHold()) {
       throw new RequestNotValidException(
-        "The AIP [id: " + indexedAip.getId() + "] is under a disposal confirmation [id: "
-          + indexedAip.getDisposalConfirmationId() + "]  , therefore the request is not valid.");
+        "The AIP [id: " + indexedAIP.getId() + "] is on hold, therefore the request is not valid.");
     }
   }
 }
