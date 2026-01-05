@@ -12,6 +12,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.Objects;
 
 import org.roda.core.data.common.RodaConstants;
 import org.roda.core.data.exceptions.AlreadyExistsException;
@@ -27,6 +28,7 @@ import org.roda.core.data.v2.index.select.SelectedItems;
 import org.roda.core.data.v2.index.select.SelectedItemsList;
 import org.roda.core.data.v2.ip.IndexedFile;
 import org.roda.core.data.v2.ip.Permissions;
+import org.roda.core.data.v2.ip.metadata.FileFormat;
 import org.roda.wui.client.common.LastSelectedItemsSingleton;
 import org.roda.wui.client.common.actions.callbacks.ActionAsyncCallback;
 import org.roda.wui.client.common.actions.callbacks.ActionNoAsyncCallback;
@@ -90,39 +92,6 @@ public class FileActions extends AbstractActionable<IndexedFile> {
     this.parentFolder = parentFolder != null && parentFolder.isDirectory() ? parentFolder : null;
   }
 
-  // MANAGEMENT
-  public enum FileAction implements Action<IndexedFile> {
-    DOWNLOAD(), RENAME(RodaConstants.PERMISSION_METHOD_RENAME_FOLDER), MOVE(RodaConstants.PERMISSION_METHOD_MOVE_FILES),
-    REMOVE(RodaConstants.PERMISSION_METHOD_DELETE_FILE), UPLOAD_FILES(RodaConstants.PERMISSION_METHOD_CREATE_FILE),
-    CREATE_FOLDER(RodaConstants.PERMISSION_METHOD_CREATE_FOLDER),
-    NEW_PROCESS(RodaConstants.PERMISSION_METHOD_CREATE_JOB),
-    IDENTIFY_FORMATS(RodaConstants.PERMISSION_METHOD_CREATE_JOB),
-    SHOW_EVENTS(RodaConstants.PERMISSION_METHOD_FIND_PRESERVATION_EVENT),
-    SHOW_RISKS(RodaConstants.PERMISSION_METHOD_FIND_RISK),
-    REDACT_PDF(RodaConstants.PERMISSION_METHOD_CREATE_FILE);
-
-    private List<String> methods;
-
-    FileAction(String... methods) {
-      this.methods = Arrays.asList(methods);
-    }
-
-    @Override
-    public List<String> getMethods() {
-      return this.methods;
-    }
-  }
-
-  @Override
-  public FileAction[] getActions() {
-    return FileAction.values();
-  }
-
-  @Override
-  public FileAction actionForName(String name) {
-    return FileAction.valueOf(name);
-  }
-
   public static FileActions get() {
     return GENERAL_INSTANCE;
   }
@@ -181,13 +150,9 @@ public class FileActions extends AbstractActionable<IndexedFile> {
       return new CanActResult(POSSIBLE_ACTIONS_ON_SINGLE_FILE_DIRECTORY.contains(action), CanActResult.Reason.CONTEXT,
         messages.reasonCantActOnFileDirectory());
       } else {
-        if (action == FileAction.REDACT_PDF) {
-          canAct = hasFileFormat(file, "application/pdf", "pdf");
-      } else {
         return new CanActResult(POSSIBLE_ACTIONS_ON_SINGLE_FILE_BITSTREAM.contains(action), CanActResult.Reason.CONTEXT,
         messages.reasonCantActOnFileBitstream());
-        }
-    }
+      }
   }
 
   @Override
@@ -689,9 +654,12 @@ public class FileActions extends AbstractActionable<IndexedFile> {
     REMOVE(RodaConstants.PERMISSION_METHOD_DELETE_FILE), UPLOAD_FILES(RodaConstants.PERMISSION_METHOD_CREATE_FILE),
     CREATE_FOLDER(RodaConstants.PERMISSION_METHOD_CREATE_FOLDER),
     NEW_PROCESS(RodaConstants.PERMISSION_METHOD_CREATE_JOB),
-    IDENTIFY_FORMATS(RodaConstants.PERMISSION_METHOD_CREATE_JOB);
+    IDENTIFY_FORMATS(RodaConstants.PERMISSION_METHOD_CREATE_JOB),
+    SHOW_EVENTS(RodaConstants.PERMISSION_METHOD_FIND_PRESERVATION_EVENT),
+    SHOW_RISKS(RodaConstants.PERMISSION_METHOD_FIND_RISK),
+    REDACT_PDF(RodaConstants.PERMISSION_METHOD_CREATE_FILE);
 
-    private final List<String> methods;
+    private List<String> methods;
 
     FileAction(String... methods) {
       this.methods = Arrays.asList(methods);
@@ -702,4 +670,5 @@ public class FileActions extends AbstractActionable<IndexedFile> {
       return this.methods;
     }
   }
+
 }
