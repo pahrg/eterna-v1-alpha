@@ -11,7 +11,6 @@ import java.util.Collections;
 import java.util.List;
 
 import org.roda.wui.client.common.UserLogin;
-import org.roda.wui.client.disposal.association.DisposalPolicyAssociationPanel;
 import org.roda.wui.client.disposal.confirmations.CreateDisposalConfirmation;
 import org.roda.wui.client.disposal.policy.DisposalPolicy;
 import org.roda.wui.common.client.HistoryResolver;
