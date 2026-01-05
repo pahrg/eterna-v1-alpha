@@ -201,7 +201,7 @@ public class IngestTransfer extends Composite {
 
     initWidget(uiBinder.createAndBindUi(this));
 
-    navigationToolbar.setHeader(messages.oneOfAObject(TransferredResource.class.getName()));
+    // navigationToolbar.setHeader(messages.oneOfAObject(TransferredResource.class.getName())); //TODO: Add header
 
     ingestTransferDescription.add(new HTMLWidgetWrapper("IngestTransferDescription.html"));
 
@@ -217,9 +217,9 @@ public class IngestTransfer extends Composite {
       download.setVisible(false);
       navigationToolbar.setVisible(false);
       objectToolbar.setVisible(false);
-      if (!dropFolderActive) {
-        ingestTransferPanel.setVisible(JavascriptUtils.accessLocalStorage(CARD_IDENTIFIER));
-      }
+      // if (!dropFolderActive) {
+      //   ingestTransferPanel.setVisible(JavascriptUtils.accessLocalStorage(CARD_IDENTIFIER));
+      // }
       lastScanned.setText("");
     } else {
       objectToolbar.setObjectAndBuild(resource, null, null);
