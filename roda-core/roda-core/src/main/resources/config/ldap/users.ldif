@@ -13,9 +13,7 @@ email: demo-admin@whitered.se
 givenName: ETERNA Administrator
 shadowInactive: 0
 uid: admin
-userPassword:: e1BCS0RGMi1TSEE1MTJ9MTAwMDAkTmFOelplam56QWdoaVJrOTZRWGJjZyRZZ1Z
- HV2Vtd0ZJMHhsdGp3eUwuT0NULnc5dVNkRTB1U09WeDFlLnQuYlk2SkpBZmVHVnF6bWd3UnNXaDJR
- MWFycC91c29VeXE0QjNsNnouWTd5NnMwUQ==
+userPassword:: e1BCS0RGMi1TSEE1MTJ9MTAwMDAkY05USGlvYnlYUnh0QWF3WTNCNkFNQSRVaVpoelBMWkVHS1RKbi5pb0N2V1doQ3dNUFpqM0kxSE5lQVlWbmNRSjMydk16amFNZGZhNTEzTTgwamZTLmRYTUVUNVI2Q2I2ZnhhUXJwWk12RS5Edw==
 
 
 dn: uid=guest,ou=users,dc=roda,dc=org
@@ -31,6 +29,4 @@ email: demo-guest@whitered.se
 givenName: ETERNA Guest
 shadowInactive: 0
 uid: guest
-userPassword:: e1BCS0RGMi1TSEE1MTJ9MTAwMDAkTmFOelplam56QWdoaVJrOTZRWGJjZyRZZ1Z
- HV2Vtd0ZJMHhsdGp3eUwuT0NULnc5dVNkRTB1U09WeDFlLnQuYlk2SkpBZmVHVnF6bWd3UnNXaDJR
- MWFycC91c29VeXE0QjNsNnouWTd5NnMwUQ==
+userPassword:: e1BCS0RGMi1TSEE1MTJ9MTAwMDAkY05USGlvYnlYUnh0QWF3WTNCNkFNQSRVaVpoelBMWkVHS1RKbi5pb0N2V1doQ3dNUFpqM0kxSE5lQVlWbmNRSjMydk16amFNZGZhNTEzTTgwamZTLmRYTUVUNVI2Q2I2ZnhhUXJwWk12RS5Edw==
