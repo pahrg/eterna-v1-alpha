@@ -25,7 +25,7 @@ public class LdapConfig {
     contextSource.setUrl("ldap://localhost:1389");
     contextSource.setBase("dc=roda,dc=org");
     contextSource.setUserDn("cn=admin,dc=roda,dc=org");
-    contextSource.setPassword("roda");
+    contextSource.setPassword("eterna");
     return contextSource;
   }
 
