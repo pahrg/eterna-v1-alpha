@@ -127,8 +127,6 @@ public class Login extends Composite {
   @UiField
   FlowPanel loggedInPanel;
 
-  @UiField(provided = true)
-  UpSalePanel casMessagePanel;
 
   @UiField
   FlowPanel mmaPanel;
@@ -146,9 +144,6 @@ public class Login extends Composite {
   private Login() {
     initWidget(uiBinder.createAndBindUi(this));
 
-    if (casActive) {
-      casMessagePanel.setVisible(false);
-    }
 
     if (multiMethodAuthenticationActive) {
       mmaPanel.setVisible(true);
