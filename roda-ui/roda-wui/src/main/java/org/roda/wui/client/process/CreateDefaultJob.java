@@ -141,7 +141,7 @@ public class CreateDefaultJob extends Composite {
   @UiField
   TabPanel workflowTabPanel;
   @UiField
-  FlowPanel workflowList, workflowStoreList;
+  FlowPanel workflowList;
   @UiField
   FlowPanel workflowListPluginStatus;
   @UiField

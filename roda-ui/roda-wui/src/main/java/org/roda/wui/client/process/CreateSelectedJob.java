@@ -123,7 +123,7 @@ public abstract class CreateSelectedJob<T extends IsIndexed> extends Composite {
   @UiField
   TabPanel workflowTabPanel;
   @UiField
-  FlowPanel workflowList, workflowStoreList;
+  FlowPanel workflowList;
   @UiField
   FlowPanel workflowListPluginStatus;
   @UiField
