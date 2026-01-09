@@ -396,7 +396,8 @@ public class ScatteredFileStorageService extends FileStorageService  {
 
   @Override
   public Binary updateBinaryContent(StoragePath storagePath, ContentPayload payload, boolean asReference,
-                                    boolean createIfNotExists) throws GenericException, NotFoundException, RequestNotValidException {
+                                    boolean createIfNotExists, boolean snapshotCurrentVersion, Map<String, String> snapshotProperties)
+          throws GenericException, NotFoundException, RequestNotValidException {
     if (asReference) {
       Path binaryPath = ScatteredFSUtils.getEntityPath(basePath, storagePath);
       boolean fileExists = ScatteredFSUtils.exists(binaryPath);
@@ -427,15 +428,28 @@ public class ScatteredFileStorageService extends FileStorageService  {
       }
     } else {
       Path binaryPath = ScatteredFSUtils.getEntityPath(basePath, storagePath);
-      boolean fileExists = FSUtils.exists(binaryPath);
+      boolean fileExists = ScatteredFSUtils.exists(binaryPath);
+      BinaryVersion previousBinaryVersion = null;
 
       if (!fileExists && !createIfNotExists) {
         throw new NotFoundException("Binary does not exist: " + binaryPath);
-      } else if (fileExists && !FSUtils.isFile(binaryPath)) {
+      } else if (fileExists && !ScatteredFSUtils.isFile(binaryPath)) {
         throw new GenericException("Looking for a binary but found something else");
       } else {
+        if (snapshotCurrentVersion) {
+          try {
+            previousBinaryVersion = createBinaryVersion(storagePath, snapshotProperties);
+          } catch (RequestNotValidException | NotFoundException | GenericException e) {
+            LOGGER.warn("Could not create binary version for {}", storagePath, e);
+          }
+        }
         try {
-          binaryPath.getParent().toFile().mkdirs();
+          // ensuring parent exists
+          Path parent = binaryPath.getParent();
+          if (!ScatteredFSUtils.exists(parent)) {
+            Files.createDirectories(parent);
+          }
+
           payload.writeToPath(binaryPath);
         } catch (IOException e) {
           throw new GenericException("Could not update binary content", e);
@@ -444,7 +458,11 @@ public class ScatteredFileStorageService extends FileStorageService  {
 
       Resource resource = ScatteredFSUtils.convertPathToResource(basePath, binaryPath);
       if (resource instanceof Binary) {
-        return (DefaultBinary) resource;
+        DefaultBinary ret = (DefaultBinary) resource;
+        if (previousBinaryVersion != null) {
+          ret.setPreviousVersionId(previousBinaryVersion.getId());
+        }
+        return ret;
       } else {
         throw new GenericException("Looking for a binary but found something else");
       }
@@ -513,8 +531,8 @@ public class ScatteredFileStorageService extends FileStorageService  {
   }
 
   @Override
-  public void copy(StorageService fromService, StoragePath fromStoragePath, Path toPath, String resource)
-          throws AlreadyExistsException, GenericException {
+  public void copy(StorageService fromService, StoragePath fromStoragePath, Path toPath, String resource,
+                   boolean replaceExisting) throws AlreadyExistsException, GenericException {
     Path sourcePath = null;
     if (StringUtils.isNotBlank(resource)) {
       sourcePath = ScatteredFSUtils.getEntityPath(basePath, fromStoragePath).resolve(resource);
@@ -522,7 +540,7 @@ public class ScatteredFileStorageService extends FileStorageService  {
       sourcePath = ScatteredFSUtils.getEntityPath(basePath, fromStoragePath);
     }
     if (FSUtils.exists(sourcePath)) {
-      FSUtils.copy(sourcePath, toPath, false);
+      FSUtils.copy(sourcePath, toPath, replaceExisting);
     }
   }
 
@@ -578,6 +596,16 @@ public class ScatteredFileStorageService extends FileStorageService  {
         // for UNIX programs using user with read-only permissions
         // for Java programs using SecurityManager and Policy
         return ScatteredFSUtils.getEntityPath(basePath, storagePath);
+      }
+
+      @Override
+      public boolean isDirectory() {
+        return ScatteredFSUtils.isDirectory(getPath());
+      }
+
+      @Override
+      public boolean exists() {
+        return ScatteredFSUtils.exists(getPath());
       }
 
       @Override
@@ -675,7 +703,6 @@ public class ScatteredFileStorageService extends FileStorageService  {
     return ScatteredFSUtils.convertPathToBinaryVersion(historyDataPath, historyMetadataPath, binVersionPath);
   }
 
-  @Override
   public BinaryVersion createBinaryVersion(StoragePath storagePath, Map<String, String> properties)
           throws RequestNotValidException, NotFoundException, GenericException {
     if (historyDataPath == null) {
@@ -725,31 +752,46 @@ public class ScatteredFileStorageService extends FileStorageService  {
   }
 
   @Override
-  public void revertBinaryVersion(StoragePath storagePath, String version)
+  public Binary revertBinaryVersion(StoragePath storagePath, String version, Map<String, String> properties)
           throws NotFoundException, RequestNotValidException, GenericException {
+    Path binPath = ScatteredFSUtils.getEntityPath(basePath, storagePath);
+
     if (historyDataPath == null) {
       LOGGER.warn("Skipping revert binary version because no history folder is defined!");
-      return;
+      return (DefaultBinary) ScatteredFSUtils.convertPathToResource(basePath, binPath);
     }
 
-    Path binPath = ScatteredFSUtils.getEntityPath(basePath, storagePath);
     Path binVersionPath = ScatteredFSUtils.getEntityPath(historyDataPath, storagePath, version);
 
-    if (!FSUtils.exists(binPath)) {
+    if (!ScatteredFSUtils.exists(binPath)) {
       throw new NotFoundException("Binary does not exist: " + binPath);
     }
 
-    if (!FSUtils.isFile(binPath)) {
+    if (!ScatteredFSUtils.isFile(binPath)) {
       throw new RequestNotValidException("Not a regular file: " + binPath);
     }
 
-    if (!FSUtils.exists(binVersionPath)) {
+    if (!ScatteredFSUtils.exists(binVersionPath)) {
       throw new NotFoundException("Binary version does not exist: " + binVersionPath);
     }
 
     try {
+      // get binary
+      BinaryVersion previousBinaryVersion = null;
+      try {
+        previousBinaryVersion = createBinaryVersion(storagePath, properties);
+      } catch (RequestNotValidException | NotFoundException | GenericException e) {
+        LOGGER.warn("Could not create binary version for {}", storagePath, e);
+      }
       // writing file
       Files.copy(binVersionPath, binPath, StandardCopyOption.REPLACE_EXISTING);
+      // get binary to return
+      Resource resource = ScatteredFSUtils.convertPathToResource(basePath, binPath);
+      DefaultBinary ret = (DefaultBinary) resource;
+      if (previousBinaryVersion != null) {
+        ret.setPreviousVersionId(previousBinaryVersion.getId());
+      }
+      return ret;
     } catch (IOException e) {
       throw new GenericException("Could not create binary", e);
     }
@@ -863,26 +905,27 @@ public class ScatteredFileStorageService extends FileStorageService  {
     }
     return storagePaths;
   }
-    public Map<StoragePath, Path> listContainersWithPaths() throws GenericException {
-        Map<StoragePath, Path> containersWithPaths = new HashMap<>();
 
-        try (CloseableIterable<Container> containers = listContainers()) {
-            for (Container container : containers) {
-                if (container == null) {
-                    LOGGER.warn("Encountered null container while listing containers under {}", basePath);
-                    continue; // skip it
-                }
+  public Map<StoragePath, Path> listContainersWithPaths() throws GenericException {
+    Map<StoragePath, Path> containersWithPaths = new HashMap<>();
 
-                StoragePath storagePath = container.getStoragePath();
-                Path entityPath = ScatteredFSUtils.getEntityPath(basePath, storagePath);
-                containersWithPaths.put(storagePath, entityPath);
-            }
-        } catch (IOException e) {
-            throw new GenericException("Error closing containers iterable", e);
+    try (CloseableIterable<Container> containers = listContainers()) {
+      for (Container container : containers) {
+        if (container == null) {
+          LOGGER.warn("Encountered null container while listing containers under {}", basePath);
+          continue; // skip it
         }
 
-        return containersWithPaths;
+        StoragePath storagePath = container.getStoragePath();
+        Path entityPath = ScatteredFSUtils.getEntityPath(basePath, storagePath);
+        containersWithPaths.put(storagePath, entityPath);
+      }
+    } catch (IOException e) {
+      throw new GenericException("Error closing containers iterable", e);
     }
+
+    return containersWithPaths;
+  }
 
     @Override
     public Map<String, Object> getStorageStats() throws GenericException {
