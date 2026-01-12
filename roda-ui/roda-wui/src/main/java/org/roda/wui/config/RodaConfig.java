@@ -15,6 +15,7 @@ import org.roda.wui.filter.SecurityHeadersFilter;
 import org.roda.wui.servlets.ContextListener;
 import org.roda.wui.servlets.RodaWuiServlet;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.boot.web.servlet.ServletContextInitializer;
@@ -24,7 +25,6 @@ import org.springframework.boot.web.servlet.server.CookieSameSiteSupplier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
-import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -189,12 +189,13 @@ public class RodaConfig {
   }
 
   @Bean
-  public ServletContextInitializer servletContextInitializer() {
+  public ServletContextInitializer servletContextInitializer(
+      @Value("${server.servlet.session.cookie.secure:false}") boolean secureCookies) {
     return new ServletContextInitializer() {
 
       @Override
       public void onStartup(ServletContext servletContext) throws ServletException {
-        servletContext.getSessionCookieConfig().setSecure(true);
+        servletContext.getSessionCookieConfig().setSecure(secureCookies);
         servletContext.getSessionCookieConfig().setHttpOnly(true);
       }
     };
