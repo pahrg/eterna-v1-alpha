@@ -25,7 +25,7 @@
             </wcag:AccessibleFocusPanel>
             <wcag:AccessibleFocusPanel styleName="searchButton" ui:field="searchInputButton">
                 <g:HTML addStyleNames="searchButton-html">
-                    Search
+                    <ui:text from='{messages.searchButton}'/>
                     <span>
                         <i class="fa fa-search">
                         </i>
