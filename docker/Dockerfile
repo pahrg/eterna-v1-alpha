@@ -8,11 +8,6 @@ RUN set -ex; \
     apt-get -qq -y --no-install-recommends install clamdscan zip rsync jq && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Remove python dependency
-RUN \
-	DEBIAN_FRONTEND=noninteractive \
-	apt-get autoremove -y --purge *python*
-
 COPY ./docker-files/clamd.conf /etc/clamav/clamd.conf
 
 # setup remove old ROOT folder from tomcat
@@ -56,6 +51,16 @@ RUN set -ex; \
   mkdir -p -m0770 "$RODA_HOME/data"; \
   mkdir -p -m0770 "$RODA_HOME/config"; \
   chown -R "$RODA_USER:0" "$RODA_HOME"
+
+# Install python + unoserver client (PEP 668 safe)
+RUN apt-get update && \
+    apt-get install -y python3 python3-venv python3-pip && \
+    python3 -m venv /opt/unoserver-venv && \
+    /opt/unoserver-venv/bin/pip install --no-cache-dir unoserver && \
+    ln -s /opt/unoserver-venv/bin/unoconvert /usr/local/bin/unoconvert && \
+    apt-get purge -y python3-pip && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
 
 VOLUME "$RODA_HOME/data"
 
