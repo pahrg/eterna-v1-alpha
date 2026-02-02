@@ -1,4 +1,8 @@
 # ETERNA Changelog
+
+## v1.0.0-SNAPSHOT
+#### WIP
+
 ## v0.5.0 (2025-12-16)
 #### Updates
 - Added Swedish and English SVG credentials images
