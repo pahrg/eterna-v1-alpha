@@ -97,7 +97,7 @@ jobs:
       - name: Install clamdscan mock
         run: |
           sudo cp .github/workflows/bin/clamscan /usr/bin/clamscan
-          sudo cp .github/workflows/bin/clamdscan /usr/bin/clamscan
+          sudo cp .github/workflows/bin/clamscan /usr/bin/clamdscan
           sudo chmod a+rx /usr/bin/clamscan /usr/bin/clamdscan
 
       - name: Get test version info
