@@ -10,6 +10,10 @@ package org.roda.core.common;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.InetAddress;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -364,6 +368,83 @@ public class SyncUtils {
     return jfactory.createParser(path.toFile());
   }
 
+  /**
+   * Builds and validates the URI used to contact the central instance, to
+   * mitigate SSRF by restricting where the server can connect.
+   */
+  private static URI buildCentralInstanceUri(LocalInstance localInstance, String resource) throws GenericException {
+    String baseUrl = localInstance != null ? localInstance.getCentralInstanceURL() : null;
+    if (baseUrl == null || baseUrl.trim().isEmpty()) {
+      throw new GenericException("Central instance URL is not configured");
+    }
+
+    try {
+      URI baseUri = new URI(baseUrl.trim());
+      if (!baseUri.isAbsolute() || baseUri.getScheme() == null) {
+        throw new GenericException("Central instance URL must be an absolute URI");
+      }
+      String scheme = baseUri.getScheme().toLowerCase();
+      if (!"http".equals(scheme) && !"https".equals(scheme)) {
+        throw new GenericException("Central instance URL must use HTTP or HTTPS");
+      }
+
+      String host = baseUri.getHost();
+      if (host == null || host.trim().isEmpty()) {
+        throw new GenericException("Central instance URL must include a host");
+      }
+
+      try {
+        InetAddress address = InetAddress.getByName(host);
+        if (address.isAnyLocalAddress() || address.isLoopbackAddress()) {
+          throw new GenericException("Central instance URL cannot point to a local address");
+        }
+        if (isPrivateAddress(address)) {
+          throw new GenericException("Central instance URL cannot point to a private network address");
+        }
+      } catch (UnknownHostException e) {
+        throw new GenericException("Central instance host is invalid: " + e.getMessage());
+      }
+
+      String normalizedResource = resource == null ? "" : resource.trim();
+      if (!normalizedResource.isEmpty()) {
+        String base = baseUri.toString();
+        if (base.endsWith("/") && normalizedResource.startsWith("/")) {
+          normalizedResource = normalizedResource.substring(1);
+        } else if (!base.endsWith("/") && !normalizedResource.startsWith("/")) {
+          normalizedResource = "/" + normalizedResource;
+        }
+        return new URI(base + normalizedResource);
+      } else {
+        return baseUri;
+      }
+    } catch (URISyntaxException e) {
+      throw new GenericException("Central instance URL is malformed: " + e.getMessage());
+    }
+  }
+
+  /**
+   * Returns true if the given address is in a private RFC1918 range.
+   */
+  private static boolean isPrivateAddress(InetAddress address) {
+    byte[] addr = address.getAddress();
+    int firstOctet = addr[0] & 0xFF;
+    int secondOctet = addr[1] & 0xFF;
+
+    // 10.0.0.0/8
+    if (firstOctet == 10) {
+      return true;
+    }
+    // 172.16.0.0/12 -> 172.16.0.0 to 172.31.255.255
+    if (firstOctet == 172 && secondOctet >= 16 && secondOctet <= 31) {
+      return true;
+    }
+    // 192.168.0.0/16
+    if (firstOctet == 192 && secondOctet == 168) {
+      return true;
+    }
+    return false;
+  }
+
   public static void updateDistributedInstance(LocalInstance localInstance, DistributedInstance distributedInstance)
     throws GenericException {
     try {
@@ -371,7 +452,8 @@ public class SyncUtils {
       String resource = RodaConstants.API_SEP + RodaConstants.API_REST_V1_DISTRIBUTED_INSTANCE + "update";
 
       CloseableHttpClient httpClient = HttpClientBuilder.create().build();
-      HttpPut httpPut = new HttpPut(localInstance.getCentralInstanceURL() + resource);
+      URI targetUri = buildCentralInstanceUri(localInstance, resource);
+      HttpPut httpPut = new HttpPut(targetUri.toString());
       httpPut.setEntity(new StringEntity(JsonUtils.getJsonFromObject(distributedInstance)));
       httpPut.addHeader("Authorization", "Bearer " + accessToken.getToken());
       httpPut.addHeader("content-type", "application/json");
@@ -395,7 +477,8 @@ public class SyncUtils {
         + RodaConstants.API_PATH_PARAM_DISTRIBUTED_INSTANCE_GET_UPDATES + RodaConstants.API_SEP + localInstance.getId();
 
       CloseableHttpClient httpClient = HttpClientBuilder.create().build();
-      HttpGet httpGet = new HttpGet(localInstance.getCentralInstanceURL() + resource);
+      URI targetUri = buildCentralInstanceUri(localInstance, resource);
+      HttpGet httpGet = new HttpGet(targetUri.toString());
       httpGet.addHeader("Authorization", "Bearer " + accessToken.getToken());
       httpGet.addHeader("content-type", "application/json");
       httpGet.addHeader("Accept", "application/json");
