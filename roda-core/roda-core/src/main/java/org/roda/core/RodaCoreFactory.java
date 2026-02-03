@@ -15,6 +15,7 @@ import java.io.InputStreamReader;
 import java.io.Serializable;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.net.InetAddress;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
@@ -2379,7 +2380,58 @@ public class RodaCoreFactory {
     return localInstance;
   }
 
+  /**
+   * Validate the LocalInstance configuration to prevent unsafe values that could
+   * be used for server-side request forgery (SSRF).
+   *
+   * @param newLocalInstance
+   *          the LocalInstance configuration to validate.
+   * @throws GenericException
+   *           if the configuration is invalid.
+   */
+  private static void validateLocalInstance(LocalInstance newLocalInstance) throws GenericException {
+    if (newLocalInstance == null) {
+      return;
+    }
+
+    String centralUrl = newLocalInstance.getCentralInstanceURL();
+    if (centralUrl == null || centralUrl.trim().isEmpty()) {
+      throw new GenericException("Central instance URL must not be empty");
+    }
+
+    try {
+      URI uri = new URI(centralUrl.trim());
+
+      if (!uri.isAbsolute()) {
+        throw new GenericException("Central instance URL must be absolute");
+      }
+
+      String scheme = uri.getScheme();
+      if (scheme == null || (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme))) {
+        throw new GenericException("Central instance URL must use HTTP or HTTPS");
+      }
+
+      String host = uri.getHost();
+      if (host == null || host.trim().isEmpty()) {
+        throw new GenericException("Central instance URL must include a host");
+      }
+
+      InetAddress address = InetAddress.getByName(host);
+      if (address.isAnyLocalAddress() || address.isLoopbackAddress() || address.isLinkLocalAddress()
+        || address.isSiteLocalAddress() || address.isMulticastAddress()) {
+        throw new GenericException("Central instance URL must not point to a local or private address");
+      }
+    } catch (GenericException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new GenericException("Invalid central instance URL", e);
+    }
+  }
+
   public static void createOrUpdateLocalInstance(LocalInstance newLocalInstance) throws GenericException {
+    // Validate before writing configuration and updating the in-memory instance.
+    validateLocalInstance(newLocalInstance);
+
     Path configuration = localInstanceConfigPath.resolve(RodaConstants.SYNCHRONIZATION_CONFIG_LOCAL_INSTANCE_FILE);
     if (Files.exists(configuration)) {
       try {
