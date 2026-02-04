@@ -117,11 +117,6 @@ jobs:
           LDAP_SERVER_PORT: 1389
           SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/roda_core_db
 
-      - name: Copy target to docker context
-        run: |
-          mkdir -p docker/target
-          cp -r roda-ui/roda-wui/target/roda-wui-*.jar docker/target
-
       - name: Docker meta for test images
         id: meta
         uses: docker/metadata-action@v5
@@ -147,7 +142,8 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           push: true
-          context: docker
+          context: .
+          file: ./docker/Dockerfile
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           sbom: true

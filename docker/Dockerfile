@@ -10,10 +10,10 @@ RUN set -ex; \
 	DEBIAN_FRONTEND=noninteractive \
 	apt-get autoremove -y --purge "*python*"
 
-COPY ./docker-files/clamd.conf /etc/clamav/clamd.conf
+COPY ./docker/docker-files/clamd.conf /etc/clamav/clamd.conf
 
 # Copy the Roda WUI WAR file
-COPY ./target/roda-wui-*.jar  /KEEPS/bin/
+COPY roda-ui/roda-wui/target/roda-wui-*.jar  /KEEPS/bin/
 
 ENV RODA_HOME=/roda \
     LDAP_SERVER_URL=ldap://openldap \
@@ -26,8 +26,8 @@ ENV RODA_HOME=/roda \
     RODA_GROUP="roda" \
     RODA_GID="1000"
 
-COPY ./docker-files/docker-entrypoint.sh /
-COPY ./docker-files/docker-entrypoint.d/* /docker-entrypoint.d/
+COPY ./docker/docker-files/docker-entrypoint.sh /
+COPY ./docker/docker-files/docker-entrypoint.d/* /docker-entrypoint.d/
 
 RUN set -ex; \
   groupadd -r --gid "$RODA_GID" "$RODA_GROUP"; \
