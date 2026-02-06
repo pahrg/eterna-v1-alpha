@@ -18,7 +18,6 @@ services:
     command: -c
     volumes:
       - solr_data:/var/solr
-
   clamd:
     image: docker.io/clamav/clamav:latest
     restart: unless-stopped
@@ -43,11 +42,16 @@ services:
       - URL=http://eterna:8080/api/openapi.json
       - DOC_EXPANSION=none
       - VALIDATOR_URL=none
-  libreoffice:
-    image: libreoffice-unoserver:latest
+  unoserver:
+    image: philiplehmann/unoserver:latest
     restart: unless-stopped
+    # This forces the internal process to listen on the network
+    entrypoint: [ "unoserver", "--interface", "0.0.0.0", "--port", "2003" ]
+    volumes:
+      - roda_data:/roda/data/
+    mem_limit: 1g
   eterna:
-    image: ghcr.io/eterna-earkiv/eterna:v0.6.0-SNAPSHOT
+    image: eterna:local
     restart: unless-stopped
     ports:
       - "8080:8080"
@@ -55,13 +59,10 @@ services:
       - solr
       - clamd
       - siegfried
-      - libreoffice
+      - unoserver
     volumes:
       - roda_data:/roda/data/
-      - ./roda/config/plugins:/roda/config/plugins
     environment:
-      - LIBREOFFICE_HOST=libreoffice
-      - LIBREOFFICE_PORT=2002
       - RODA_CORE_SOLR_TYPE=CLOUD
       - RODA_CORE_SOLR_CLOUD_URLS=zoo:2181
       - SOLR_NUM_SHARDS=4
