@@ -1,7 +1,7 @@
 name: Auto-label vid flytt i Project
 
 on:
-  projects_v2_item:
+  project_v2_item:
     types: [edited]
 
 jobs:
