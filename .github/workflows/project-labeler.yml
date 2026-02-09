@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Lägg till label om status är Prioritized
-        uses: leonsteinhaeuser/project-beta-automations@v3.0.0
+        uses: leonsteinhaeuser/project-beta-automations@v2.2.1
         with:
           # Din token som vi skapade (Krävs för att läsa projektet)
           gh_token: ${{ secrets.MY_PROJECT_TOKEN }}
