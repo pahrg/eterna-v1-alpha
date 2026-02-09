@@ -23,6 +23,8 @@ jobs:
           
           # Vilket fält lyssnar vi på? (Kolumnerna styrs av "Status"-fältet)
           resource_field: Status
+
+          resource_node_id: ${{ github.event.issue.node_id }}
           
           # Vilken kolumn ska trigga detta?
           event_filter: Prioritized
