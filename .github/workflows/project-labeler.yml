@@ -1,8 +1,9 @@
 name: Auto-label vid flytt i Project
 
 on:
-  project_v2_item:
-    types: [edited]
+  schedule:
+    - cron: '*/10 * * * *'  # Kör var 10:e minut
+  workflow_dispatch:        # Knapp för att köra manuellt vid behov
 
 jobs:
   add-label-when-moved:
