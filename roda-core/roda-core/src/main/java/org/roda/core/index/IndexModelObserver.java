@@ -80,6 +80,9 @@ import org.roda.core.index.schema.collections.RepresentationCollection;
 import org.roda.core.index.schema.collections.RiskCollection;
 import org.roda.core.index.utils.IterableIndexResult;
 import org.roda.core.index.utils.SolrUtils;
+import org.roda.core.plugins.base.originalmets.UpdateOriginalMETS;
+
+
 import org.roda.core.model.ModelObserver;
 import org.roda.core.model.ModelService;
 import org.roda.core.storage.Binary;
@@ -913,6 +916,16 @@ public class IndexModelObserver implements ModelObserver {
       indexRepresentation(aip, representation, ancestors).addTo(ret);
       if (ret.isEmpty()) {
         indexPreservationsEvents(aip.getId(), representation.getId()).addTo(ret);
+        
+        CloseableIterable<OptionalWithCause<PreservationMetadata>> preservationMetadata = model.listPreservationMetadata(aip.getId(), representation.getId());
+        for (OptionalWithCause<PreservationMetadata> opm : preservationMetadata) {
+          if (opm.isPresent()) {
+            PreservationMetadata pm = opm.get();
+            if (PreservationMetadataType.REPRESENTATION.equals(pm.getType())) {
+              UpdateOriginalMETS.handleRepresentation(representation.getAipId(), representation.getId(), IdUtils.getRepresentationId(representation.getAipId(), representation.getId()), model);
+            }
+          }
+        }        
 
         if (aip.getRepresentations().size() == 1) {
           SolrUtils.update(index, IndexedAIP.class, aip.getId(),
@@ -1047,6 +1060,11 @@ public class IndexModelObserver implements ModelObserver {
     ReturnWithExceptions<Void, ModelObserver> ret = new ReturnWithExceptions<>(this);
 
     PreservationMetadataType type = pm.getType();
+    
+    if (pm != null && pm.getAipId() != null && pm.getId() != null) {
+      UpdateOriginalMETS.update(pm, model);
+    }
+    
     if (PreservationMetadataType.EVENT.equals(type)) {
       indexPreservationEvent(pm).addTo(ret);
     } else if (PreservationMetadataType.AGENT.equals(type)) {

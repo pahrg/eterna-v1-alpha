@@ -128,6 +128,7 @@ import org.roda.core.model.ModelObserver;
 import org.roda.core.model.ModelService;
 import org.roda.core.model.utils.LdapUtility;
 import org.roda.core.model.utils.UserUtility;
+import org.roda.core.plugins.base.originalmets.OriginalMETSUtils;
 import org.roda.core.plugins.PluginManager;
 import org.roda.core.plugins.PluginManagerException;
 import org.roda.core.plugins.PluginOrchestrator;
@@ -505,6 +506,8 @@ public class RodaCoreFactory {
           LOGGER.debug("Finished clean unfinished transactions operation");
         }
 
+        OriginalMETSUtils.setMainStorageService(storage);
+        
         instantiated = true;
 
       } catch (GenericException e) {

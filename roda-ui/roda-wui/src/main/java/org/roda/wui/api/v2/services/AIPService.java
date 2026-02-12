@@ -84,6 +84,7 @@ import org.roda.core.plugins.base.maintenance.ChangeTypePlugin;
 import org.roda.core.plugins.base.maintenance.DeleteRODAObjectPlugin;
 import org.roda.core.plugins.base.maintenance.MovePlugin;
 import org.roda.core.plugins.base.maintenance.UpdatePermissionsPlugin;
+import org.roda.core.plugins.base.originalmets.CreateLogicalMETS;
 import org.roda.core.plugins.base.preservation.AppraisalPlugin;
 import org.roda.core.storage.Binary;
 import org.roda.core.storage.BinaryConsumesOutputStream;
@@ -332,7 +333,10 @@ public class AIPService {
     AlreadyExistsException {
     User user = requestContext.getUser();
     ModelService model = requestContext.getModelService();
-    return model.createAIP(parentAipId, type, permissions, user.getName(), null);
+    //return model.createAIP(parentAipId, type, permissions, user.getName(), null);
+    AIP aip = model.createAIP(parentAipId, type, permissions, user.getName(), null);
+    CreateLogicalMETS.create(aip, model);
+    return aip;
   }
 
   public boolean hasDocumentation(ModelService model, String aipId)
