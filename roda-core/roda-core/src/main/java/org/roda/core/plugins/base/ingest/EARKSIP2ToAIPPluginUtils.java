@@ -40,6 +40,7 @@ import org.roda.core.data.v2.ip.metadata.PreservationMetadata.PreservationMetada
 import org.roda.core.data.v2.jobs.Report;
 import org.roda.core.data.v2.validation.ValidationException;
 import org.roda.core.model.ModelService;
+import org.roda.core.plugins.base.originalmets.CopyOriginalMETS;
 import org.roda.core.plugins.Plugin;
 import org.roda.core.plugins.PluginHelper;
 import org.roda.core.storage.ContentPayload;
@@ -93,6 +94,8 @@ public class EARKSIP2ToAIPPluginUtils {
     for (IPRepresentation representation : sip.getRepresentations()) {
       processIPRepresentationInformation(model, representation, aip.getId(), notify, false, username, null);
     }
+    
+    CopyOriginalMETS.copy(aip.getId(), sip, model);
 
     // INFO 20190509 hsilva: this is required as the previous instructions
     // update the AIP metadata

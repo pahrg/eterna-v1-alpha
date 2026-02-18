@@ -356,6 +356,8 @@ public final class RodaConstants {
   public static final String API_REST_V1_DISTRIBUTED_INSTANCE = "api/v1/distributed_instances/";
 
   public static final String API_REST_V1_REPRESENTATION_OTHER_METADATA = "otherMetadata";
+  
+  public static final String CORE_PLUGINS_BASE_KEEP_ORIGINAL_METS = "core.plugins.base.keep_original_mets";
 
   /**
    * API related (Version 2)
