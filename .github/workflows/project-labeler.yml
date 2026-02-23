@@ -4,11 +4,15 @@ on:
     types: [created]
 
 jobs:
-  test:
+  label:
     runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    if: contains(github.event.comment.body, 'from Backlog to Prioritized')
     steps:
-      - uses: Amwam/issue-comment-action@v1.5.0
-        with:
-          keywords: '["from Backlog to Prioritized"]'
-          labels: '["prioritized"]'
-          github-token: "${{ secrets.GITHUB_TOKEN }}"
+      - run: gh issue edit "$NUMBER" --add-label "$LABELS"
+        env:
+          LABELS: prioritized
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number }}
